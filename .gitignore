@@ -1,0 +1,10 @@
+bin
+config.yaml
+config2.yaml
+__debug_bin*
+dist/
+checkpointz
+store.db
+index.db
+server.yaml
+agent.yaml

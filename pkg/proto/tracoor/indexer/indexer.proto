@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package indexer;
+
+option go_package = "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+message BeaconState {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3 [json_name = "fetched_at"];
+  google.protobuf.UInt64Value slot = 4;
+  google.protobuf.UInt64Value epoch = 5;
+  google.protobuf.StringValue state_root = 6 [json_name = "state_root"];
+  google.protobuf.StringValue node_version = 7 [json_name = "node_version"];
+  google.protobuf.StringValue location = 8;
+  google.protobuf.StringValue network = 9;
+}
+
+service Indexer {
+  // BeaconState
+  rpc CreateBeaconState(CreateBeaconStateRequest) returns (CreateBeaconStateResponse) {}
+  rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
+}
+
+message CreateBeaconStateRequest {
+  google.protobuf.StringValue node = 1;
+  google.protobuf.Timestamp fetched_at = 2 [json_name = "fetched_at"];
+  google.protobuf.UInt64Value slot = 3;
+  google.protobuf.UInt64Value epoch = 4;
+  google.protobuf.StringValue state_root = 5 [json_name = "state_root"];
+  google.protobuf.StringValue node_version = 6 [json_name = "node_version"];
+  google.protobuf.StringValue location = 7;
+  google.protobuf.StringValue network = 8;
+}
+
+message CreateBeaconStateResponse {
+  google.protobuf.StringValue id = 1;
+}
+
+message ListBeaconStateRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string state_root = 4 [json_name = "state_root"];
+  string node_version = 5 [json_name = "node_version"];
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+
+  PaginationCursor pagination = 10;
+}
+
+message ListBeaconStateResponse {
+  repeated BeaconState beacon_states = 1;
+}
+
+message PaginationCursor {
+  int32 limit = 1;
+  int32 offset = 2;
+  string order_by = 3;
+}

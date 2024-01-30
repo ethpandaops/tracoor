@@ -1,0 +1,11 @@
+version: v1
+plugins:
+- name: grpc-gateway
+  out: pkg/api
+  opt:
+  - paths=source_relative
+  - generate_unbound_methods=true
+  - standalone=true
+  - grpc_api_configuration=./pkg/proto/tracoor/api/config.yaml
+- plugin: openapiv2
+  out: pkg/api/openapiv2
