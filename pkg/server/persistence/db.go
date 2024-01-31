@@ -259,35 +259,6 @@ func contains(slice []string, val string) bool {
 	}
 	return false
 }
-func (i *Indexer) ListNodesWithBeaconStates(ctx context.Context, filter *BeaconStateFilter, page *PaginationCursor) ([]string, error) {
-	operation := OperationListBeaconState
-
-	i.metrics.ObserveOperation(operation)
-
-	var nodes []string
-
-	query := i.db.WithContext(ctx).Model(&BeaconState{})
-
-	query, err := filter.ApplyToQuery(query)
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
-	}
-
-	if page != nil {
-		query = page.ApplyOffsetLimit(query)
-	}
-
-	result := query.Distinct("node").Order("node ASC").Find(&nodes)
-	if result.Error != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, result.Error
-	}
-
-	return nodes, nil
-}
 
 func (i *Indexer) DeleteBeaconState(ctx context.Context, id string) error {
 	operation := OperationDeleteBeaconState

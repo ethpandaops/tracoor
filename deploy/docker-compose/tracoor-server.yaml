@@ -9,6 +9,11 @@ persistence:
   dsn: "postgres://user:password@postgres:5432/tracoor?sslmode=disable"
   driver_name: postgres
 
+services:
+  indexer:
+    retention:
+      beaconStates: 1m
+
 store:
   type: s3
   config:

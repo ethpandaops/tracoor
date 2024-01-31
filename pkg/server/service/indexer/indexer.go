@@ -7,6 +7,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -26,13 +27,16 @@ type Indexer struct {
 	store store.Store
 
 	db *persistence.Indexer
+
+	config *Config
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store) (*Indexer, error) {
 	e := &Indexer{
-		log:   log.WithField("server/module", ServiceType),
-		db:    db,
-		store: st,
+		log:    log.WithField("server/module", ServiceType),
+		db:     db,
+		store:  st,
+		config: conf,
 	}
 
 	return e, nil
@@ -41,7 +45,13 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 func (e *Indexer) Start(ctx context.Context, grpcServer *grpc.Server) error {
 	e.log.Info("Starting module")
 
+	if err := e.store.Healthy(ctx); err != nil {
+		return errors.Wrap(err, "failed to connect to store")
+	}
+
 	indexer.RegisterIndexerServer(grpcServer, e)
+
+	go e.startRetentionWatchers(ctx)
 
 	return nil
 }
@@ -82,9 +92,6 @@ func (e *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.Get
 }
 
 func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaconStateRequest) (*indexer.CreateBeaconStateResponse, error) {
-	e.log.Debug("Received CreateBeaconState request")
-
-	// Ensure request is valid
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -92,6 +99,12 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	// Check the store for the state
 	exists, err := e.store.Exists(ctx, req.GetLocation().GetValue())
 	if err != nil {
+		e.log.
+			WithError(err).
+			WithField("location", req.GetLocation().GetValue()).
+			WithField("node", req.GetNode().GetValue()).
+			Error("Failed to index a beacon state because the state could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

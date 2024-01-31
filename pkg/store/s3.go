@@ -73,6 +73,15 @@ func (s *S3Store) PathPrefix() string {
 	return s.config.KeyPrefix
 }
 
+func (s *S3Store) Healthy(ctx context.Context) error {
+	_, err := s.s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
 	compressed, err := GzipCompress(*data)
 	if err != nil {
@@ -227,7 +236,7 @@ func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte,
 	return &uncompressed, nil
 }
 
-func (s *S3Store) DeleteState(ctx context.Context, location string) error {
+func (s *S3Store) DeleteBeaconState(ctx context.Context, location string) error {
 	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(location),
