@@ -29,13 +29,14 @@ services:
     networks:
       - tracoor-net
   server:
-    image: 'server:latest'
+    image: 'tracoor:latest'
     build:
       context: .
       dockerfile: Dockerfile
     command: server --config /etc/config.yaml
     ports:
       - '8081:8081'
+      - '7007:7007'
     volumes:
       - ./deploy/docker-compose/tracoor-server.yaml:/etc/config.yaml
     depends_on:

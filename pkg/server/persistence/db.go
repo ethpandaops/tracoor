@@ -226,9 +226,9 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 				case "node":
 					results.Node = append(results.Node, values[i].(string))
 				case "slot":
-					results.Slot = append(results.Slot, values[i].(uint64))
+					results.Slot = append(results.Slot, uint64(values[i].(int64)))
 				case "epoch":
-					results.Epoch = append(results.Epoch, values[i].(uint64))
+					results.Epoch = append(results.Epoch, uint64(values[i].(int64)))
 				case "state_root":
 					results.StateRoot = append(results.StateRoot, values[i].(string))
 				case "node_version":
