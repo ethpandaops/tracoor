@@ -1,0 +1,76 @@
+version: '3.7'
+
+networks:
+  tracoor-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  minio-data:
+    driver: local
+
+
+services:
+  postgres:
+    image: postgres:15
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: tracoor
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d tracoor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tracoor-net
+  server:
+    image: 'server:latest'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: server --config /etc/config.yaml
+    ports:
+      - '8081:8081'
+    volumes:
+      - ./deploy/docker-compose/tracoor-server.yaml:/etc/config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tracoor-net
+  minio:
+    image: minio/minio
+    volumes:
+      - minio-data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - tracoor-net
+    healthcheck:
+      test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
+      start_period: 5s
+      interval: 10s
+      timeout: 5s
+      retries: 2
+  create-bucket:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/tracoor;
+      "
+    networks:
+      - tracoor-net

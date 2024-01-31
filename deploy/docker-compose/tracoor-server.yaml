@@ -1,0 +1,19 @@
+logging: "debug"
+addr: ":8081"
+metricsAddr: ":9091"
+pprofAddr: ":6060"
+preStopSleepSeconds: 1
+ntpServer: time.google.com
+
+persistence:
+  dsn: "postgres://user:password@postgres:5432/tracoor?sslmode=disable"
+  driver_name: postgres
+
+store:
+  type: s3
+  config:
+    region: "us-east-1"
+    endpoint: http://minio:9000
+    bucket_name: tracoor
+    access_key: minioadmin
+    access_secret: minioadmin
