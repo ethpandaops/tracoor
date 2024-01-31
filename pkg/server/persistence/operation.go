@@ -8,4 +8,6 @@ const (
 	OperationCountBeaconState  Operation = "count_beacon_state_metadata"
 	OperationListBeaconState   Operation = "list_beacon_state_metadata"
 	OperationUpdateBeaconState Operation = "update_beacon_state_metadata"
+
+	OperationDistinctValues Operation = "distinct_values"
 )

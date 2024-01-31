@@ -23,6 +23,8 @@ service Indexer {
   // BeaconState
   rpc CreateBeaconState(CreateBeaconStateRequest) returns (CreateBeaconStateResponse) {}
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
+
+  rpc ListUniqueValues(ListUniqueValuesRequest) returns (ListUniqueValuesResponse) {}
 }
 
 message CreateBeaconStateRequest {
@@ -38,6 +40,35 @@ message CreateBeaconStateRequest {
 
 message CreateBeaconStateResponse {
   google.protobuf.StringValue id = 1;
+}
+
+enum Entity {
+  UNKNOWN = 0;
+  BEACON_STATE = 1;
+}
+
+message ListUniqueValuesRequest {
+  Entity entity = 1;
+  enum Field {
+    NODE = 0;
+    SLOT = 1;
+    EPOCH = 2;
+    STATE_ROOT = 3;
+    NODE_VERSION = 4;
+    LOCATION = 5;
+    NETWORK = 6;
+  }
+  repeated Field fields = 2;
+}
+
+message ListUniqueValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string state_root = 4 [json_name = "state_root"];
+  repeated string node_version = 5 [json_name = "node_version"];
+  repeated string location = 6;
+  repeated string network = 7;
 }
 
 message ListBeaconStateRequest {

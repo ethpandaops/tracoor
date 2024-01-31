@@ -17,6 +17,18 @@
   ],
   "paths": {},
   "definitions": {
+    "ListUniqueValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "node",
+        "slot",
+        "epoch",
+        "state_root",
+        "node_version",
+        "network"
+      ],
+      "default": "node"
+    },
     "apiBeaconState": {
       "type": "object",
       "properties": {
@@ -49,6 +61,14 @@
         }
       }
     },
+    "apiEntity": {
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "BEACON_STATE"
+      ],
+      "default": "UNKNOWN"
+    },
     "apiListBeaconStateResponse": {
       "type": "object",
       "properties": {
@@ -57,6 +77,49 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/apiBeaconState"
+          }
+        }
+      }
+    },
+    "apiListUniqueValuesResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slot": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "epoch": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "state_root": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "node_version": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }

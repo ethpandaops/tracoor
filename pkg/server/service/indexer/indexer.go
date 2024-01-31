@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
@@ -15,7 +16,7 @@ import (
 )
 
 const (
-	ServiceType = "indexer"
+	ServiceType = "tracoor.indexer"
 )
 
 type Indexer struct {
@@ -186,4 +187,55 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	return &indexer.ListBeaconStateResponse{
 		BeaconStates: protoBeaconStates,
 	}, nil
+}
+
+func (i *Indexer) ListUniqueValues(ctx context.Context, req *indexer.ListUniqueValuesRequest) (*indexer.ListUniqueValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueValuesRequest_SLOT:
+			fields[idx] = "slot"
+		case indexer.ListUniqueValuesRequest_EPOCH:
+			fields[idx] = "epoch"
+		case indexer.ListUniqueValuesRequest_STATE_ROOT:
+			fields[idx] = "state_root"
+		case indexer.ListUniqueValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		case indexer.ListUniqueValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueValuesRequest_NETWORK:
+			fields[idx] = "network"
+		}
+	}
+
+	entities := map[indexer.Entity]interface{}{
+		indexer.Entity_BEACON_STATE: &persistence.BeaconState{},
+	}
+
+	if _, ok := entities[req.Entity]; !ok {
+		return nil, fmt.Errorf("unknown entity: %s", req.Entity.String())
+	}
+
+	distinctValues, err := i.db.DistinctValues(ctx, entities[req.Entity], fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueValuesResponse{
+		Node:        distinctValues.Node,
+		Slot:        distinctValues.Slot,
+		Epoch:       distinctValues.Epoch,
+		StateRoot:   distinctValues.StateRoot,
+		NodeVersion: distinctValues.NodeVersion,
+		Location:    distinctValues.Location,
+		Network:     distinctValues.Network,
+	}
+
+	return response, nil
 }

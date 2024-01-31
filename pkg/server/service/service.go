@@ -27,7 +27,7 @@ const (
 	ServiceTypeAPI     Type = api.ServiceType
 )
 
-func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store) ([]GRPCService, error) {
+func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store, grpcConn string, grpcOpts []grpc.DialOption) ([]GRPCService, error) {
 	services := []GRPCService{}
 
 	// Indexer
@@ -47,7 +47,7 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 		return nil, err
 	}
 
-	ap, err := api.NewAPI(ctx, log, &cfg.API, p, c)
+	ap, err := api.NewAPI(ctx, log, &cfg.API, c, grpcConn, grpcOpts)
 	if err != nil {
 		return nil, err
 	}

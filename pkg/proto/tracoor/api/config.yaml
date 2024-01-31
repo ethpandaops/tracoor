@@ -1,0 +1,11 @@
+type: google.api.Service
+config_version: 3
+
+http:
+  rules:
+    - selector: api.API.ListBeaconState
+      post: /v1/api/list-beacon-state
+      body: "*"
+    - selector: api.API.ListUniqueValues
+      post: /v1/api/list-unique-values
+      body: "*"

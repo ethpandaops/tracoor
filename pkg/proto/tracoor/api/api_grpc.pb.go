@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	API_ListBeaconState_FullMethodName = "/api.API/ListBeaconState"
+	API_ListBeaconState_FullMethodName  = "/api.API/ListBeaconState"
+	API_ListUniqueValues_FullMethodName = "/api.API/ListUniqueValues"
 )
 
 // APIClient is the client API for API service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type APIClient interface {
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
+	ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error)
 }
 
 type aPIClient struct {
@@ -46,11 +48,21 @@ func (c *aPIClient) ListBeaconState(ctx context.Context, in *ListBeaconStateRequ
 	return out, nil
 }
 
+func (c *aPIClient) ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error) {
+	out := new(ListUniqueValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // APIServer is the server API for API service.
 // All implementations must embed UnimplementedAPIServer
 // for forward compatibility
 type APIServer interface {
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
+	ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error)
 	mustEmbedUnimplementedAPIServer()
 }
 
@@ -60,6 +72,9 @@ type UnimplementedAPIServer struct {
 
 func (UnimplementedAPIServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
+}
+func (UnimplementedAPIServer) ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueValues not implemented")
 }
 func (UnimplementedAPIServer) mustEmbedUnimplementedAPIServer() {}
 
@@ -92,6 +107,24 @@ func _API_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _API_ListUniqueValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListUniqueValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListUniqueValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListUniqueValues(ctx, req.(*ListUniqueValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // API_ServiceDesc is the grpc.ServiceDesc for API service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -102,6 +135,10 @@ var API_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListBeaconState",
 			Handler:    _API_ListBeaconState_Handler,
+		},
+		{
+			MethodName: "ListUniqueValues",
+			Handler:    _API_ListUniqueValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

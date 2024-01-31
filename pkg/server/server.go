@@ -61,7 +61,11 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 		return nil, err
 	}
 
-	services, err := service.CreateGRPCServices(ctx, log, &conf.Services, db, st)
+	var opts []grpc.DialOption
+
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	services, err := service.CreateGRPCServices(ctx, log, &conf.Services, db, st, conf.Addr, opts)
 	if err != nil {
 		return nil, err
 	}

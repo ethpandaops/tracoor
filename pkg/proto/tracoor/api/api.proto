@@ -20,6 +20,8 @@ message BeaconState {
 
 service API {
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
+
+  rpc ListUniqueValues(ListUniqueValuesRequest) returns (ListUniqueValuesResponse) {}
 }
 
 message ListBeaconStateRequest {
@@ -28,16 +30,42 @@ message ListBeaconStateRequest {
   uint64 epoch = 3;
   string state_root = 4 [json_name = "state_root"];
   string node_version = 5 [json_name = "node_version"];
-  string location = 6;
-  string network = 7;
-  google.protobuf.Timestamp before = 8;
-  google.protobuf.Timestamp after = 9;
+  string network = 6;
+  google.protobuf.Timestamp before = 7;
+  google.protobuf.Timestamp after = 8;
 
-  PaginationCursor pagination = 10;
+  PaginationCursor pagination = 9;
 }
 
 message ListBeaconStateResponse {
   repeated BeaconState beacon_states = 1 [json_name = "beacon_states"];
+}
+
+enum Entity {
+  UNKNOWN = 0;
+  BEACON_STATE = 1;
+}
+
+message ListUniqueValuesRequest {
+  Entity entity = 1;
+  enum Field {
+    node = 0;
+    slot = 1;
+    epoch = 2;
+    state_root = 3;
+    node_version = 4;
+    network = 5;
+  }
+  repeated Field fields = 2 [json_name = "fields"];
+}
+
+message ListUniqueValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string state_root = 4 [json_name = "state_root"];
+  repeated string node_version = 5 [json_name = "node_version"];
+  repeated string network = 6;
 }
 
 message PaginationCursor {

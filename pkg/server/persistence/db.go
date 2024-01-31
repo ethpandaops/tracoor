@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/glebarez/sqlite"
 	perrors "github.com/pkg/errors"
@@ -165,32 +166,85 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 	return BeaconStates, nil
 }
 
-func (i *Indexer) CountNodesWithBeaconStates(ctx context.Context, filter *BeaconStateFilter) (int64, error) {
-	operation := OperationCountBeaconState
+type DistinctValueResults struct {
+	Node        []string `json:"node"`
+	Slot        []uint64 `json:"slot"`
+	Epoch       []uint64 `json:"epoch"`
+	StateRoot   []string `json:"state_root"`
+	NodeVersion []string `json:"node_version"`
+	Location    []string `json:"location"`
+	Network     []string `json:"network"`
+}
+
+func (i *Indexer) DistinctValues(ctx context.Context, entity interface{}, fields []string) (*DistinctValueResults, error) {
+	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
 
-	var count int64
+	results := &DistinctValueResults{}
+	query := i.db.WithContext(ctx).Model(entity).Select(fields).Distinct()
 
-	query := i.db.WithContext(ctx).Model(&BeaconState{})
-
-	query, err := filter.ApplyToQuery(query)
+	rows, err := query.Rows()
 	if err != nil {
 		i.metrics.ObserveOperationError(operation)
+		return nil, err
+	}
+	defer rows.Close()
 
-		return 0, err
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			i.metrics.ObserveOperationError(operation)
+			return nil, err
+		}
+		switch {
+		case contains(fields, "node"):
+			results.Node = append(results.Node, value)
+		case contains(fields, "slot"):
+			slot, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				i.metrics.ObserveOperationError(operation)
+
+				return nil, err
+			}
+
+			results.Slot = append(results.Slot, slot)
+		case contains(fields, "epoch"):
+			epoch, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				i.metrics.ObserveOperationError(operation)
+
+				return nil, err
+			}
+
+			results.Epoch = append(results.Epoch, epoch)
+		case contains(fields, "state_root"):
+			results.StateRoot = append(results.StateRoot, value)
+		case contains(fields, "node_version"):
+			results.NodeVersion = append(results.NodeVersion, value)
+		case contains(fields, "location"):
+			results.Location = append(results.Location, value)
+		case contains(fields, "network"):
+			results.Network = append(results.Network, value)
+		}
 	}
 
-	result := query.Distinct("node").Count(&count)
-	if result.Error != nil {
+	if err := rows.Err(); err != nil {
 		i.metrics.ObserveOperationError(operation)
-
-		return 0, result.Error
+		return nil, err
 	}
 
-	return count, nil
+	return results, nil
 }
 
+func contains(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
 func (i *Indexer) ListNodesWithBeaconStates(ctx context.Context, filter *BeaconStateFilter, page *PaginationCursor) ([]string, error) {
 	operation := OperationListBeaconState
 
