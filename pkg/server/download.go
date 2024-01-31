@@ -100,6 +100,8 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/octet-stream")
+
 	_, err = w.Write(*data)
 	if err != nil {
 		writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
@@ -116,8 +118,6 @@ func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte
 	switch strings.ToLower(compression) {
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
-
-		w.Header().Set("Content-Type", "application/octet-stream")
 
 		var b bytes.Buffer
 
