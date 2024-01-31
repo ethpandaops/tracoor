@@ -43,65 +43,67 @@ func (d *ObjectDownloader) Start() error {
 
 	d.indexer = indexer.NewIndexerClient(conn)
 
-	d.mux.HandlePath("GET", "/download/beacon_states/{id}", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
-		ctx := r.Context()
-
-		id := pathParams["id"]
-		if id == "" {
-			writeJSONError(w, "No ID provided", http.StatusBadRequest)
-
-			return
-		}
-
-		resp, err := d.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
-			Id: id,
-			Pagination: &indexer.PaginationCursor{
-				Limit: 1,
-			},
-		})
-		if err != nil {
-			d.log.WithError(err).Errorf("Failed to list beacon states for ID %s", id)
-
-			writeJSONError(w, "Failed to list beacon states", http.StatusInternalServerError)
-
-			return
-		}
-
-		if len(resp.BeaconStates) == 0 {
-			writeJSONError(w, "No beacon states found", http.StatusNotFound)
-
-			return
-		}
-
-		if len(resp.BeaconStates) > 1 {
-			writeJSONError(w, "More than one beacon state found", http.StatusInternalServerError)
-
-			return
-		}
-
-		state := resp.BeaconStates[0]
-
-		data, err := d.store.GetBeaconState(ctx, state.Location.Value)
-		if err != nil {
-			d.log.WithError(err).Errorf("Failed to get beacon state from store for ID %s from %s", id, state.Location.Value)
-
-			writeJSONError(w, "Failed to get beacon state", http.StatusInternalServerError)
-
-			return
-		}
-
-		if err := setResponseCompression(w, r, data); err != nil {
-			writeJSONError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		_, err = w.Write(*data)
-		if err != nil {
-			writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
-		}
-	})
+	d.mux.HandlePath("GET", "/download/beacon_state/{id}", d.beaconStateHandler)
 
 	return nil
+}
+
+func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	ctx := r.Context()
+
+	id := pathParams["id"]
+	if id == "" {
+		writeJSONError(w, "No ID provided", http.StatusBadRequest)
+
+		return
+	}
+
+	resp, err := d.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
+		Id: id,
+		Pagination: &indexer.PaginationCursor{
+			Limit: 1,
+		},
+	})
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to list beacon states for ID %s", id)
+
+		writeJSONError(w, "Failed to list beacon states", http.StatusInternalServerError)
+
+		return
+	}
+
+	if len(resp.BeaconStates) == 0 {
+		writeJSONError(w, "No beacon states found", http.StatusNotFound)
+
+		return
+	}
+
+	if len(resp.BeaconStates) > 1 {
+		writeJSONError(w, "More than one beacon state found", http.StatusInternalServerError)
+
+		return
+	}
+
+	state := resp.BeaconStates[0]
+
+	data, err := d.store.GetBeaconState(ctx, state.Location.Value)
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to get beacon state from store for ID %s from %s", id, state.Location.Value)
+
+		writeJSONError(w, "Failed to get beacon state", http.StatusInternalServerError)
+
+		return
+	}
+
+	if err := setResponseCompression(w, r, data); err != nil {
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = w.Write(*data)
+	if err != nil {
+		writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+	}
 }
 
 func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte) error {

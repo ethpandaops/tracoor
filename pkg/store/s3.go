@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -139,6 +140,12 @@ func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte,
 	data, err := s.GetRaw(ctx, location)
 	if err != nil {
 		return nil, err
+	}
+
+	if !strings.Contains(".gz", location) {
+		b := data.Bytes()
+
+		return &b, nil
 	}
 
 	s.basicMetrics.ObserveItemRetreived(string(BeaconStateDataType))
