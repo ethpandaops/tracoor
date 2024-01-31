@@ -17,7 +17,7 @@
   ],
   "paths": {},
   "definitions": {
-    "ListUniqueValuesRequestField": {
+    "ListUniqueBeaconStateValuesRequestField": {
       "type": "string",
       "enum": [
         "node",
@@ -61,14 +61,6 @@
         }
       }
     },
-    "apiEntity": {
-      "type": "string",
-      "enum": [
-        "UNKNOWN",
-        "BEACON_STATE"
-      ],
-      "default": "UNKNOWN"
-    },
     "apiListBeaconStateResponse": {
       "type": "object",
       "properties": {
@@ -81,7 +73,7 @@
         }
       }
     },
-    "apiListUniqueValuesResponse": {
+    "apiListUniqueBeaconStateValuesResponse": {
       "type": "object",
       "properties": {
         "node": {

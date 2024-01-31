@@ -29,13 +29,9 @@ func (req *CreateBeaconStateRequest) Validate() error {
 	return nil
 }
 
-func (r *ListUniqueValuesRequest) Validate() error {
+func (r *ListUniqueBeaconStateValuesRequest) Validate() error {
 	if r == nil {
 		return errors.New("request is nil")
-	}
-
-	if r.Entity == Entity_UNKNOWN {
-		return errors.New("entity is required")
 	}
 
 	if len(r.Fields) == 0 {

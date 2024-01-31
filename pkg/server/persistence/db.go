@@ -3,7 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
-	"strconv"
+	"strings"
 
 	"github.com/glebarez/sqlite"
 	perrors "github.com/pkg/errors"
@@ -166,66 +166,80 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 	return BeaconStates, nil
 }
 
-type DistinctValueResults struct {
-	Node        []string `json:"node"`
-	Slot        []uint64 `json:"slot"`
-	Epoch       []uint64 `json:"epoch"`
-	StateRoot   []string `json:"state_root"`
-	NodeVersion []string `json:"node_version"`
-	Location    []string `json:"location"`
-	Network     []string `json:"network"`
+type DistinctBeaconStateValueResults struct {
+	Node        []string
+	Slot        []uint64
+	Epoch       []uint64
+	StateRoot   []string
+	NodeVersion []string
+	Location    []string
+	Network     []string
 }
 
-func (i *Indexer) DistinctValues(ctx context.Context, entity interface{}, fields []string) (*DistinctValueResults, error) {
+func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string) (*DistinctBeaconStateValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
 
-	results := &DistinctValueResults{}
-	query := i.db.WithContext(ctx).Model(entity).Select(fields).Distinct()
+	results := &DistinctBeaconStateValueResults{
+		Node:        make([]string, 0),
+		Slot:        make([]uint64, 0),
+		Epoch:       make([]uint64, 0),
+		StateRoot:   make([]string, 0),
+		NodeVersion: make([]string, 0),
+		Location:    make([]string, 0),
+		Network:     make([]string, 0),
+	}
+	query := i.db.WithContext(ctx).Model(&BeaconState{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
 	rows, err := query.Rows()
 	if err != nil {
 		i.metrics.ObserveOperationError(operation)
+
 		return nil, err
 	}
 	defer rows.Close()
 
+	valueSets := make(map[string]map[interface{}]bool)
+	for _, field := range fields {
+		valueSets[field] = make(map[interface{}]bool)
+	}
+
+	var values []interface{}
 	for rows.Next() {
-		var value string
-		if err := rows.Scan(&value); err != nil {
+		values = make([]interface{}, len(fields))
+		valuePtrs := make([]interface{}, len(fields))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		err := rows.Scan(valuePtrs...)
+		if err != nil {
 			i.metrics.ObserveOperationError(operation)
+
 			return nil, err
 		}
-		switch {
-		case contains(fields, "node"):
-			results.Node = append(results.Node, value)
-		case contains(fields, "slot"):
-			slot, err := strconv.ParseUint(value, 10, 64)
-			if err != nil {
-				i.metrics.ObserveOperationError(operation)
 
-				return nil, err
+		for i, field := range fields {
+			if !valueSets[field][values[i]] {
+				switch field {
+				case "node":
+					results.Node = append(results.Node, values[i].(string))
+				case "slot":
+					results.Slot = append(results.Slot, values[i].(uint64))
+				case "epoch":
+					results.Epoch = append(results.Epoch, values[i].(uint64))
+				case "state_root":
+					results.StateRoot = append(results.StateRoot, values[i].(string))
+				case "node_version":
+					results.NodeVersion = append(results.NodeVersion, values[i].(string))
+				case "location":
+					results.Location = append(results.Location, values[i].(string))
+				case "network":
+					results.Network = append(results.Network, values[i].(string))
+				}
+				valueSets[field][values[i]] = true
 			}
-
-			results.Slot = append(results.Slot, slot)
-		case contains(fields, "epoch"):
-			epoch, err := strconv.ParseUint(value, 10, 64)
-			if err != nil {
-				i.metrics.ObserveOperationError(operation)
-
-				return nil, err
-			}
-
-			results.Epoch = append(results.Epoch, epoch)
-		case contains(fields, "state_root"):
-			results.StateRoot = append(results.StateRoot, value)
-		case contains(fields, "node_version"):
-			results.NodeVersion = append(results.NodeVersion, value)
-		case contains(fields, "location"):
-			results.Location = append(results.Location, value)
-		case contains(fields, "network"):
-			results.Network = append(results.Network, value)
 		}
 	}
 

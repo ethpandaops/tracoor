@@ -116,41 +116,32 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	}, nil
 }
 
-func (i *API) ListUniqueValues(ctx context.Context, req *api.ListUniqueValuesRequest) (*api.ListUniqueValuesResponse, error) {
+func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniqueBeaconStateValuesRequest) (*api.ListUniqueBeaconStateValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
 	}
 
-	entity := indexer.Entity_UNKNOWN
-	switch req.Entity {
-	case api.Entity_BEACON_STATE:
-		entity = indexer.Entity_BEACON_STATE
-	default:
-		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid entity: %s", req.Entity.String()).Error())
-	}
-
 	// Create our "indexer" equivalent structs
-	rq := indexer.ListUniqueValuesRequest{
-		Fields: []indexer.ListUniqueValuesRequest_Field{},
-		Entity: entity,
+	rq := indexer.ListUniqueBeaconStateValuesRequest{
+		Fields: []indexer.ListUniqueBeaconStateValuesRequest_Field{},
 	}
 
 	for _, field := range req.Fields {
-		var f indexer.ListUniqueValuesRequest_Field
+		var f indexer.ListUniqueBeaconStateValuesRequest_Field
 
 		switch field {
-		case api.ListUniqueValuesRequest_node:
-			f = indexer.ListUniqueValuesRequest_NODE
-		case api.ListUniqueValuesRequest_node_version:
-			f = indexer.ListUniqueValuesRequest_NODE_VERSION
-		case api.ListUniqueValuesRequest_network:
-			f = indexer.ListUniqueValuesRequest_NETWORK
-		case api.ListUniqueValuesRequest_slot:
-			f = indexer.ListUniqueValuesRequest_SLOT
-		case api.ListUniqueValuesRequest_epoch:
-			f = indexer.ListUniqueValuesRequest_EPOCH
-		case api.ListUniqueValuesRequest_state_root:
-			f = indexer.ListUniqueValuesRequest_STATE_ROOT
+		case api.ListUniqueBeaconStateValuesRequest_node:
+			f = indexer.ListUniqueBeaconStateValuesRequest_NODE
+		case api.ListUniqueBeaconStateValuesRequest_node_version:
+			f = indexer.ListUniqueBeaconStateValuesRequest_NODE_VERSION
+		case api.ListUniqueBeaconStateValuesRequest_network:
+			f = indexer.ListUniqueBeaconStateValuesRequest_NETWORK
+		case api.ListUniqueBeaconStateValuesRequest_slot:
+			f = indexer.ListUniqueBeaconStateValuesRequest_SLOT
+		case api.ListUniqueBeaconStateValuesRequest_epoch:
+			f = indexer.ListUniqueBeaconStateValuesRequest_EPOCH
+		case api.ListUniqueBeaconStateValuesRequest_state_root:
+			f = indexer.ListUniqueBeaconStateValuesRequest_STATE_ROOT
 		default:
 			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
 		}
@@ -159,13 +150,13 @@ func (i *API) ListUniqueValues(ctx context.Context, req *api.ListUniqueValuesReq
 	}
 
 	// Call the indexer
-	resp, err := i.indexer.ListUniqueValues(ctx, &rq)
+	resp, err := i.indexer.ListUniqueBeaconStateValues(ctx, &rq)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique values: %w", err).Error())
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique beacon state values: %w", err).Error())
 	}
 
 	// Convert the response
-	response := &api.ListUniqueValuesResponse{
+	response := &api.ListUniqueBeaconStateValuesResponse{
 		Node:        resp.Node,
 		Slot:        resp.Slot,
 		Epoch:       resp.Epoch,

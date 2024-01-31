@@ -20,8 +20,7 @@ message BeaconState {
 
 service API {
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
-
-  rpc ListUniqueValues(ListUniqueValuesRequest) returns (ListUniqueValuesResponse) {}
+  rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest) returns (ListUniqueBeaconStateValuesResponse) {}
 }
 
 message ListBeaconStateRequest {
@@ -41,13 +40,7 @@ message ListBeaconStateResponse {
   repeated BeaconState beacon_states = 1 [json_name = "beacon_states"];
 }
 
-enum Entity {
-  UNKNOWN = 0;
-  BEACON_STATE = 1;
-}
-
-message ListUniqueValuesRequest {
-  Entity entity = 1;
+message ListUniqueBeaconStateValuesRequest {
   enum Field {
     node = 0;
     slot = 1;
@@ -56,10 +49,10 @@ message ListUniqueValuesRequest {
     node_version = 4;
     network = 5;
   }
-  repeated Field fields = 2 [json_name = "fields"];
+  repeated Field fields = 1 [json_name = "fields"];
 }
 
-message ListUniqueValuesResponse {
+message ListUniqueBeaconStateValuesResponse {
   repeated string node = 1;
   repeated uint64 slot = 2;
   repeated uint64 epoch = 3;

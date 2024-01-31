@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
@@ -189,7 +188,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	}, nil
 }
 
-func (i *Indexer) ListUniqueValues(ctx context.Context, req *indexer.ListUniqueValuesRequest) (*indexer.ListUniqueValuesResponse, error) {
+func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.ListUniqueBeaconStateValuesRequest) (*indexer.ListUniqueBeaconStateValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -197,37 +196,29 @@ func (i *Indexer) ListUniqueValues(ctx context.Context, req *indexer.ListUniqueV
 	fields := make([]string, len(req.Fields))
 	for idx, field := range req.Fields {
 		switch field {
-		case indexer.ListUniqueValuesRequest_NODE:
+		case indexer.ListUniqueBeaconStateValuesRequest_NODE:
 			fields[idx] = "node"
-		case indexer.ListUniqueValuesRequest_SLOT:
+		case indexer.ListUniqueBeaconStateValuesRequest_SLOT:
 			fields[idx] = "slot"
-		case indexer.ListUniqueValuesRequest_EPOCH:
+		case indexer.ListUniqueBeaconStateValuesRequest_EPOCH:
 			fields[idx] = "epoch"
-		case indexer.ListUniqueValuesRequest_STATE_ROOT:
+		case indexer.ListUniqueBeaconStateValuesRequest_STATE_ROOT:
 			fields[idx] = "state_root"
-		case indexer.ListUniqueValuesRequest_NODE_VERSION:
+		case indexer.ListUniqueBeaconStateValuesRequest_NODE_VERSION:
 			fields[idx] = "node_version"
-		case indexer.ListUniqueValuesRequest_LOCATION:
+		case indexer.ListUniqueBeaconStateValuesRequest_LOCATION:
 			fields[idx] = "location"
-		case indexer.ListUniqueValuesRequest_NETWORK:
+		case indexer.ListUniqueBeaconStateValuesRequest_NETWORK:
 			fields[idx] = "network"
 		}
 	}
 
-	entities := map[indexer.Entity]interface{}{
-		indexer.Entity_BEACON_STATE: &persistence.BeaconState{},
-	}
-
-	if _, ok := entities[req.Entity]; !ok {
-		return nil, fmt.Errorf("unknown entity: %s", req.Entity.String())
-	}
-
-	distinctValues, err := i.db.DistinctValues(ctx, entities[req.Entity], fields)
+	distinctValues, err := i.db.DistinctBeaconStateValues(ctx, fields)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &indexer.ListUniqueValuesResponse{
+	response := &indexer.ListUniqueBeaconStateValuesResponse{
 		Node:        distinctValues.Node,
 		Slot:        distinctValues.Slot,
 		Epoch:       distinctValues.Epoch,

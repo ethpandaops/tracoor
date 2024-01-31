@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Indexer_CreateBeaconState_FullMethodName = "/indexer.Indexer/CreateBeaconState"
-	Indexer_ListBeaconState_FullMethodName   = "/indexer.Indexer/ListBeaconState"
-	Indexer_ListUniqueValues_FullMethodName  = "/indexer.Indexer/ListUniqueValues"
+	Indexer_CreateBeaconState_FullMethodName           = "/indexer.Indexer/CreateBeaconState"
+	Indexer_ListBeaconState_FullMethodName             = "/indexer.Indexer/ListBeaconState"
+	Indexer_ListUniqueBeaconStateValues_FullMethodName = "/indexer.Indexer/ListUniqueBeaconStateValues"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -31,7 +31,7 @@ type IndexerClient interface {
 	// BeaconState
 	CreateBeaconState(ctx context.Context, in *CreateBeaconStateRequest, opts ...grpc.CallOption) (*CreateBeaconStateResponse, error)
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
-	ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error)
+	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
 }
 
 type indexerClient struct {
@@ -60,9 +60,9 @@ func (c *indexerClient) ListBeaconState(ctx context.Context, in *ListBeaconState
 	return out, nil
 }
 
-func (c *indexerClient) ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error) {
-	out := new(ListUniqueValuesResponse)
-	err := c.cc.Invoke(ctx, Indexer_ListUniqueValues_FullMethodName, in, out, opts...)
+func (c *indexerClient) ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error) {
+	out := new(ListUniqueBeaconStateValuesResponse)
+	err := c.cc.Invoke(ctx, Indexer_ListUniqueBeaconStateValues_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ type IndexerServer interface {
 	// BeaconState
 	CreateBeaconState(context.Context, *CreateBeaconStateRequest) (*CreateBeaconStateResponse, error)
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
-	ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error)
+	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
 	mustEmbedUnimplementedIndexerServer()
 }
 
@@ -90,8 +90,8 @@ func (UnimplementedIndexerServer) CreateBeaconState(context.Context, *CreateBeac
 func (UnimplementedIndexerServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
 }
-func (UnimplementedIndexerServer) ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueValues not implemented")
+func (UnimplementedIndexerServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
 }
 func (UnimplementedIndexerServer) mustEmbedUnimplementedIndexerServer() {}
 
@@ -142,20 +142,20 @@ func _Indexer_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Indexer_ListUniqueValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListUniqueValuesRequest)
+func _Indexer_ListUniqueBeaconStateValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueBeaconStateValuesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IndexerServer).ListUniqueValues(ctx, in)
+		return srv.(IndexerServer).ListUniqueBeaconStateValues(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Indexer_ListUniqueValues_FullMethodName,
+		FullMethod: Indexer_ListUniqueBeaconStateValues_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexerServer).ListUniqueValues(ctx, req.(*ListUniqueValuesRequest))
+		return srv.(IndexerServer).ListUniqueBeaconStateValues(ctx, req.(*ListUniqueBeaconStateValuesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -176,8 +176,8 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Indexer_ListBeaconState_Handler,
 		},
 		{
-			MethodName: "ListUniqueValues",
-			Handler:    _Indexer_ListUniqueValues_Handler,
+			MethodName: "ListUniqueBeaconStateValues",
+			Handler:    _Indexer_ListUniqueBeaconStateValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

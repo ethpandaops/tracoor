@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	API_ListBeaconState_FullMethodName  = "/api.API/ListBeaconState"
-	API_ListUniqueValues_FullMethodName = "/api.API/ListUniqueValues"
+	API_ListBeaconState_FullMethodName             = "/api.API/ListBeaconState"
+	API_ListUniqueBeaconStateValues_FullMethodName = "/api.API/ListUniqueBeaconStateValues"
 )
 
 // APIClient is the client API for API service.
@@ -28,7 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type APIClient interface {
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
-	ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error)
+	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
 }
 
 type aPIClient struct {
@@ -48,9 +48,9 @@ func (c *aPIClient) ListBeaconState(ctx context.Context, in *ListBeaconStateRequ
 	return out, nil
 }
 
-func (c *aPIClient) ListUniqueValues(ctx context.Context, in *ListUniqueValuesRequest, opts ...grpc.CallOption) (*ListUniqueValuesResponse, error) {
-	out := new(ListUniqueValuesResponse)
-	err := c.cc.Invoke(ctx, API_ListUniqueValues_FullMethodName, in, out, opts...)
+func (c *aPIClient) ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error) {
+	out := new(ListUniqueBeaconStateValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueBeaconStateValues_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (c *aPIClient) ListUniqueValues(ctx context.Context, in *ListUniqueValuesRe
 // for forward compatibility
 type APIServer interface {
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
-	ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error)
+	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
 	mustEmbedUnimplementedAPIServer()
 }
 
@@ -73,8 +73,8 @@ type UnimplementedAPIServer struct {
 func (UnimplementedAPIServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
 }
-func (UnimplementedAPIServer) ListUniqueValues(context.Context, *ListUniqueValuesRequest) (*ListUniqueValuesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueValues not implemented")
+func (UnimplementedAPIServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
 }
 func (UnimplementedAPIServer) mustEmbedUnimplementedAPIServer() {}
 
@@ -107,20 +107,20 @@ func _API_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _API_ListUniqueValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListUniqueValuesRequest)
+func _API_ListUniqueBeaconStateValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueBeaconStateValuesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(APIServer).ListUniqueValues(ctx, in)
+		return srv.(APIServer).ListUniqueBeaconStateValues(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: API_ListUniqueValues_FullMethodName,
+		FullMethod: API_ListUniqueBeaconStateValues_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(APIServer).ListUniqueValues(ctx, req.(*ListUniqueValuesRequest))
+		return srv.(APIServer).ListUniqueBeaconStateValues(ctx, req.(*ListUniqueBeaconStateValuesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -137,8 +137,8 @@ var API_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _API_ListBeaconState_Handler,
 		},
 		{
-			MethodName: "ListUniqueValues",
-			Handler:    _API_ListUniqueValues_Handler,
+			MethodName: "ListUniqueBeaconStateValues",
+			Handler:    _API_ListUniqueBeaconStateValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
