@@ -100,6 +100,10 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		FetchedAt:   req.GetFetchedAt(),
 	}
 
+	if err := state.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	logFields := logrus.Fields{
 		"node":         req.GetNode().GetValue(),
 		"network":      req.GetNetwork().GetValue(),
@@ -126,6 +130,10 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 
 func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconStateRequest) (*indexer.ListBeaconStateResponse, error) {
 	filter := &persistence.BeaconStateFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
 
 	if req.Node != "" {
 		filter.AddNode(req.Node)

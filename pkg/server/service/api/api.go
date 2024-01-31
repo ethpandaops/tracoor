@@ -101,6 +101,7 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	protoBeaconStates := make([]*api.BeaconState, len(resp.BeaconStates))
 	for i, state := range resp.BeaconStates {
 		protoBeaconStates[i] = &api.BeaconState{
+			Id:          state.Id,
 			Node:        state.Node,
 			Slot:        state.Slot,
 			Epoch:       state.Epoch,

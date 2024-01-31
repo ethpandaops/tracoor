@@ -71,11 +71,13 @@ func (s *S3Store) PathPrefix() string {
 	return s.config.KeyPrefix
 }
 
-func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) error {
+func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
 	compressed, err := GzipCompress(*data)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	location = location + ".gz"
 
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -87,18 +89,18 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location st
 		if errors.As(err, &apiErr) {
 			switch apiErr.(type) {
 			case *s3types.NoSuchBucket:
-				return errors.New("bucket does not exist: " + apiErr.Error())
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
 			case *s3types.NotFound:
-				return ErrNotFound
+				return "", ErrNotFound
 			default:
-				return errors.New("failed to save frame: " + apiErr.Error())
+				return "", errors.New("failed to save frame: " + apiErr.Error())
 			}
 		}
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
 
-	return err
+	return location, err
 }
 
 func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, error) {

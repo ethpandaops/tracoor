@@ -76,6 +76,7 @@ message ListBeaconStateRequest {
   google.protobuf.Timestamp after = 9;
 
   PaginationCursor pagination = 10;
+  string id = 11;
 }
 
 message ListBeaconStateResponse {

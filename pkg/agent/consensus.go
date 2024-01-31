@@ -28,6 +28,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		rootAsString,
 	)
 
+	location = fmt.Sprintf("%s.ssz", location)
+
 	// Check if we've somehow already indexed this beacon state
 	rsp, err := s.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
 		Node:      s.Config.Name,
@@ -55,7 +57,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	s.log.WithField("location", location).Debug("Saving beacon state")
 
 	// Upload the state to the store
-	if err := s.store.SaveBeaconState(ctx, &state, location); err != nil {
+	location, err = s.store.SaveBeaconState(ctx, &state, location)
+	if err != nil {
 		return err
 	}
 

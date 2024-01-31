@@ -5,6 +5,34 @@ import (
 	"fmt"
 )
 
+func (s *BeaconState) Validate() error {
+	if s == nil {
+		return errors.New("beacon state is nil")
+	}
+
+	if s.GetStateRoot().Value == "" {
+		return errors.New("root is required")
+	}
+
+	if s.GetEpoch() == nil {
+		return errors.New("epoch is required")
+	}
+
+	if s.GetSlot() == nil {
+		return errors.New("slot is required")
+	}
+
+	if s.GetStateRoot().Value == "" {
+		return errors.New("state root is required")
+	}
+
+	if s.GetId() == nil {
+		return errors.New("id is required")
+	}
+
+	return nil
+}
+
 func (req *CreateBeaconStateRequest) Validate() error {
 	if req.GetLocation().GetValue() == "" {
 		return fmt.Errorf("location is required")

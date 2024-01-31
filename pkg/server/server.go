@@ -44,6 +44,9 @@ type Server struct {
 
 	db    *persistence.Indexer
 	store store.Store
+
+	grpcClientConn string
+	grpcClientOpts []grpc.DialOption
 }
 
 func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Server, error) {
@@ -71,11 +74,13 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 	}
 
 	return &Server{
-		config:   conf,
-		log:      log.WithField("component", "server"),
-		db:       db,
-		store:    st,
-		services: services,
+		config:         conf,
+		log:            log.WithField("component", "server"),
+		db:             db,
+		store:          st,
+		services:       services,
+		grpcClientConn: conf.Addr,
+		grpcClientOpts: opts,
 	}, nil
 }
 
@@ -231,9 +236,11 @@ func (x *Server) startGrpcServer(ctx context.Context) error {
 func (x *Server) startGrpcGateway(ctx context.Context) error {
 	mux := runtime.NewServeMux()
 
-	mux.HandlePath("GET", "/download", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
-		x.log.Info("Hello")
-	})
+	downloader := NewObjectDownloader(x.log, x.store, mux, x.grpcClientConn, x.grpcClientOpts)
+
+	if err := downloader.Start(); err != nil {
+		return fmt.Errorf("failed to start object downloader: %v", err)
+	}
 
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	err := gw.RegisterAPIHandlerFromEndpoint(ctx, mux, x.config.Addr, opts)

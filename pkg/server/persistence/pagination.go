@@ -27,7 +27,7 @@ func (p *PaginationCursor) ApplyOrderBy(query *gorm.DB) *gorm.DB {
 	if p.OrderBy != "" {
 		query = query.Order(p.OrderBy)
 	} else {
-		query = query.Order("fetched_at ASC")
+		query = query.Order("fetched_at DESC")
 	}
 
 	return query

@@ -13,7 +13,7 @@ type Store interface {
 	// Exists checks if the file exists in the store
 	Exists(ctx context.Context, location string) (bool, error)
 	// SaveBeaconState saves a beacon state to the store
-	SaveBeaconState(ctx context.Context, data *[]byte, location string) error
+	SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error)
 	// GetBeaconState fetches a beacon state from the store
 	GetBeaconState(ctx context.Context, id string) (*[]byte, error)
 	// Delete deletes a beacon state from the store

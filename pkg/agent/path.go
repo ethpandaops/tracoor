@@ -21,6 +21,6 @@ func CreateBeaconStateFileName(
 		"slots",
 		fmt.Sprintf("%d", slot),
 		node,
-		fmt.Sprintf("%s.ssz.gz", stateRoot),
+		stateRoot,
 	)
 }

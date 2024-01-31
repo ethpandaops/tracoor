@@ -2,8 +2,6 @@ module github.com/ethpandaops/tracoor
 
 go 1.19
 
-replace github.com/ethpandaops/beacon => ../beacon
-
 require (
 	github.com/attestantio/go-eth2-client v0.19.9
 	github.com/aws/aws-sdk-go-v2 v1.24.1
@@ -12,7 +10,7 @@ require (
 	github.com/aws/smithy-go v1.19.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/creasty/defaults v1.7.0
-	github.com/ethpandaops/beacon v0.34.0
+	github.com/ethpandaops/beacon v0.35.0
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/glebarez/sqlite v1.10.0
 	github.com/go-co-op/gocron v1.27.1
@@ -64,6 +62,7 @@ require (
 	github.com/jackc/pgx/v5 v5.4.3 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/klauspost/compress v1.17.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
