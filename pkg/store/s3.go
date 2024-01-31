@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -132,6 +133,74 @@ func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, e
 	}
 
 	return &buff, nil
+}
+
+func (s *S3Store) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {
+	key := fmt.Sprintf("handshake/%s", node)
+	_, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NotFound:
+				return false, nil
+			default:
+				return false, errors.New("failed to check if storage handshake token exists: " + apiErr.Error())
+			}
+		}
+
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *S3Store) SaveStorageHandshakeToken(ctx context.Context, node, data string) error {
+	key := fmt.Sprintf("handshake/%s", node)
+
+	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(key),
+		Body:   strings.NewReader(data),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to save storage handshake for node %s: %w", node, err)
+	}
+
+	return nil
+}
+
+func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (string, error) {
+	key := fmt.Sprintf("handshake/%s", node)
+	result, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to get: " + apiErr.Error())
+			}
+		}
+
+		return "", fmt.Errorf("failed to get storage handshake for node %s: %w", node, err)
+	}
+	defer result.Body.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(result.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read storage handshake for node %s: %w", node, err)
+	}
+
+	return buf.String(), nil
 }
 
 func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte, error) {

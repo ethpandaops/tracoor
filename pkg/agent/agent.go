@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,8 +20,10 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
 	"github.com/ethpandaops/tracoor/pkg/networks"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor"
+	pIndexer "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/go-co-op/gocron"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -148,6 +151,10 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.WithField("network", s.Config.Ethereum.OverrideNetworkName).Info("Overriding network name")
 	}
 
+	if err := s.performTokenHandshake(ctx); err != nil {
+		return err
+	}
+
 	if err := s.beacon.Start(ctx); err != nil {
 		return err
 	}
@@ -157,6 +164,55 @@ func (s *agent) Start(ctx context.Context) error {
 
 	sig := <-cancel
 	s.log.Printf("Caught signal: %v", sig)
+
+	return nil
+}
+
+func (s *agent) performTokenHandshake(ctx context.Context) error {
+	s.log.Info("Performing token handshake")
+
+	// Perform a token handshake with the indexer to ensure we're connected to the same store.
+	// This is important for the indexer to be able to find the beacon states we upload.
+
+	// First check the store. If the token already exists, download it and use it.
+	token := uuid.New().String()
+
+	exists, err := s.store.StorageHandshakeTokenExists(ctx, s.Config.Name)
+	if err != nil {
+		return fmt.Errorf("failed to check if storage handshake token exists: %w", err)
+	}
+
+	if exists {
+		token, err = s.store.GetStorageHandshakeToken(ctx, s.Config.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get storage handshake token: %w", err)
+		}
+
+		s.log.WithField("token", token).Debug("Storage handshake token already exists")
+	} else {
+		// Save the token to the store
+		if err := s.store.SaveStorageHandshakeToken(ctx, s.Config.Name, token); err != nil {
+			return fmt.Errorf("failed to save storage handshake token: %w", err)
+		}
+
+		// Sleep for a bit to give the store time to update
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Perform the handshake with the indexer
+	rsp, err := s.indexer.GetStorageHandshakeToken(ctx, &pIndexer.GetStorageHandshakeTokenRequest{
+		Node:  s.Config.Name,
+		Token: token,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get storage handshake token from indexer: %w", err)
+	}
+
+	if rsp.Token != token {
+		return fmt.Errorf("storage handshake token mismatch: %s (ours) != %s (theirs)", token, rsp.Token)
+	}
+
+	s.log.Info("Storage handshake complete 🤝 - we are connected to the same storage backend as the indexer")
 
 	return nil
 }

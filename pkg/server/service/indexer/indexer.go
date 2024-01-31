@@ -54,6 +54,33 @@ func (e *Indexer) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (e *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	token, err := e.store.GetStorageHandshakeToken(ctx, req.Node)
+	if err != nil {
+		e.log.WithError(err).WithField("node", req.GetNode()).Debug("Failed to get storage handshake")
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if token != req.GetToken() {
+		e.log.
+			WithField("agent", req.GetNode()).
+			Warn(`Storage handshake token mismatch.
+			It's highly likely that the node is not pointed at the same storage backend as the indexer. 
+			Check the storage backend configuration for both the indexer and the agent instance.`)
+
+		return nil, status.Error(codes.Unauthenticated, "storage handshake token mismatch")
+	}
+
+	return &indexer.GetStorageHandshakeTokenResponse{
+		Token: token,
+	}, nil
+}
+
 func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaconStateRequest) (*indexer.CreateBeaconStateResponse, error) {
 	e.log.Debug("Received CreateBeaconState request")
 

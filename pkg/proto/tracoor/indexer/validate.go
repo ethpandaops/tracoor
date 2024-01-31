@@ -68,3 +68,15 @@ func (r *ListUniqueBeaconStateValuesRequest) Validate() error {
 
 	return nil
 }
+
+func (req *GetStorageHandshakeTokenRequest) Validate() error {
+	if req.GetNode() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if req.GetToken() == "" {
+		return fmt.Errorf("token is required")
+	}
+
+	return nil
+}

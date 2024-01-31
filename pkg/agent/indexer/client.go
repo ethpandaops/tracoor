@@ -86,3 +86,10 @@ func (c *Client) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSta
 
 	return c.pb.ListBeaconState(ctx, req, grpc.UseCompressor(gzip.Name))
 }
+
+func (c *Client) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.GetStorageHandshakeToken(ctx, req)
+}

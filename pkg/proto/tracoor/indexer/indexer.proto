@@ -20,10 +20,20 @@ message BeaconState {
 }
 
 service Indexer {
+  rpc GetStorageHandshakeToken(GetStorageHandshakeTokenRequest) returns (GetStorageHandshakeTokenResponse) {}
   // BeaconState
   rpc CreateBeaconState(CreateBeaconStateRequest) returns (CreateBeaconStateResponse) {}
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
   rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest) returns (ListUniqueBeaconStateValuesResponse) {}
+}
+
+message GetStorageHandshakeTokenRequest {
+  string node = 1;
+  string token = 2;
+}
+
+message GetStorageHandshakeTokenResponse {
+  string token = 1;
 }
 
 message CreateBeaconStateRequest {

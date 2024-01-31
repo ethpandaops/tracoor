@@ -21,7 +21,6 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	rootAsString := fmt.Sprintf("%#x", root)
 
 	location := CreateBeaconStateFileName(
-		s.store.PathPrefix(),
 		s.Config.Name,
 		string(s.beacon.Metadata().Network.Name),
 		slot,
