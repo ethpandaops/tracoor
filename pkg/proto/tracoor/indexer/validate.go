@@ -30,6 +30,10 @@ func (s *BeaconState) Validate() error {
 		return errors.New("id is required")
 	}
 
+	if s.GetBeaconImplementation().GetValue() == "" {
+		return errors.New("beacon implementation is required")
+	}
+
 	return nil
 }
 
@@ -52,6 +56,10 @@ func (req *CreateBeaconStateRequest) Validate() error {
 
 	if req.GetStateRoot().Value == "" {
 		return fmt.Errorf("state root is required")
+	}
+
+	if req.GetBeaconImplementation().Value == "" {
+		return fmt.Errorf("beacon implementation is required")
 	}
 
 	return nil

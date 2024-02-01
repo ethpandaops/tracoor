@@ -156,7 +156,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 		return nil, err
 	}
 
-	result := query.Order("fetched_at ASC").Find(&BeaconStates).Limit(1000)
+	result := query.Find(&BeaconStates)
 	if result.Error != nil {
 		i.metrics.ObserveOperationError(operation)
 
@@ -167,13 +167,14 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 }
 
 type DistinctBeaconStateValueResults struct {
-	Node        []string
-	Slot        []uint64
-	Epoch       []uint64
-	StateRoot   []string
-	NodeVersion []string
-	Location    []string
-	Network     []string
+	Node                 []string
+	Slot                 []uint64
+	Epoch                []uint64
+	StateRoot            []string
+	NodeVersion          []string
+	Location             []string
+	Network              []string
+	BeaconImplementation []string
 }
 
 func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string) (*DistinctBeaconStateValueResults, error) {
@@ -182,13 +183,14 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 	i.metrics.ObserveOperation(operation)
 
 	results := &DistinctBeaconStateValueResults{
-		Node:        make([]string, 0),
-		Slot:        make([]uint64, 0),
-		Epoch:       make([]uint64, 0),
-		StateRoot:   make([]string, 0),
-		NodeVersion: make([]string, 0),
-		Location:    make([]string, 0),
-		Network:     make([]string, 0),
+		Node:                 make([]string, 0),
+		Slot:                 make([]uint64, 0),
+		Epoch:                make([]uint64, 0),
+		StateRoot:            make([]string, 0),
+		NodeVersion:          make([]string, 0),
+		Location:             make([]string, 0),
+		Network:              make([]string, 0),
+		BeaconImplementation: make([]string, 0),
 	}
 	query := i.db.WithContext(ctx).Model(&BeaconState{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
@@ -237,6 +239,8 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 					results.Location = append(results.Location, values[i].(string))
 				case "network":
 					results.Network = append(results.Network, values[i].(string))
+				case "beacon_implementation":
+					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
 				}
 				valueSets[field][values[i]] = true
 			}

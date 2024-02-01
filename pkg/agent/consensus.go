@@ -74,7 +74,10 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		StateRoot:   wrapperspb.String(rootAsString),
 		Location:    wrapperspb.String(location),
 		NodeVersion: wrapperspb.String(s.beacon.Metadata().NodeVersion(ctx)),
-		FetchedAt:   timestamppb.New(now),
+		BeaconImplementation: wrapperspb.String(
+			s.beacon.Metadata().Client(ctx),
+		),
+		FetchedAt: timestamppb.New(now),
 	}
 
 	// Index the state

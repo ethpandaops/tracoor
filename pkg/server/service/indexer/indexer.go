@@ -129,15 +129,16 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 
 	// Create the state
 	state := &indexer.BeaconState{
-		Id:          wrapperspb.String(uuid.New().String()),
-		Node:        req.GetNode(),
-		Network:     req.GetNetwork(),
-		Slot:        req.GetSlot(),
-		Epoch:       req.GetEpoch(),
-		StateRoot:   req.GetStateRoot(),
-		NodeVersion: req.GetNodeVersion(),
-		Location:    req.GetLocation(),
-		FetchedAt:   req.GetFetchedAt(),
+		Id:                   wrapperspb.String(uuid.New().String()),
+		Node:                 req.GetNode(),
+		Network:              req.GetNetwork(),
+		Slot:                 req.GetSlot(),
+		Epoch:                req.GetEpoch(),
+		StateRoot:            req.GetStateRoot(),
+		NodeVersion:          req.GetNodeVersion(),
+		Location:             req.GetLocation(),
+		FetchedAt:            req.GetFetchedAt(),
+		BeaconImplementation: req.GetBeaconImplementation(),
 	}
 
 	if err := state.Validate(); err != nil {
@@ -145,14 +146,15 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	logFields := logrus.Fields{
-		"node":         req.GetNode().GetValue(),
-		"network":      req.GetNetwork().GetValue(),
-		"slot":         req.GetSlot().GetValue(),
-		"epoch":        req.GetEpoch().GetValue(),
-		"state_root":   req.GetStateRoot().GetValue(),
-		"node_version": req.GetNodeVersion().GetValue(),
-		"location":     req.GetLocation().GetValue(),
-		"fetched_at":   req.GetFetchedAt().AsTime(),
+		"node":                  req.GetNode().GetValue(),
+		"network":               req.GetNetwork().GetValue(),
+		"slot":                  req.GetSlot().GetValue(),
+		"epoch":                 req.GetEpoch().GetValue(),
+		"state_root":            req.GetStateRoot().GetValue(),
+		"node_version":          req.GetNodeVersion().GetValue(),
+		"location":              req.GetLocation().GetValue(),
+		"fetched_at":            req.GetFetchedAt().AsTime(),
+		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
 	}
 
 	if err := e.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
@@ -211,8 +213,12 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 		filter.AddAfter(req.After.AsTime())
 	}
 
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
 	pagination := &persistence.PaginationCursor{
-		Limit:   100,
+		Limit:   1000,
 		Offset:  0,
 		OrderBy: "fetched_at DESC",
 	}
@@ -258,6 +264,8 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 			fields[idx] = "location"
 		case indexer.ListUniqueBeaconStateValuesRequest_NETWORK:
 			fields[idx] = "network"
+		case indexer.ListUniqueBeaconStateValuesRequest_BEACON_IMPLEMENTATION:
+			fields[idx] = "beacon_implementation"
 		}
 	}
 
@@ -267,13 +275,14 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 	}
 
 	response := &indexer.ListUniqueBeaconStateValuesResponse{
-		Node:        distinctValues.Node,
-		Slot:        distinctValues.Slot,
-		Epoch:       distinctValues.Epoch,
-		StateRoot:   distinctValues.StateRoot,
-		NodeVersion: distinctValues.NodeVersion,
-		Location:    distinctValues.Location,
-		Network:     distinctValues.Network,
+		Node:                 distinctValues.Node,
+		Slot:                 distinctValues.Slot,
+		Epoch:                distinctValues.Epoch,
+		StateRoot:            distinctValues.StateRoot,
+		NodeVersion:          distinctValues.NodeVersion,
+		Location:             distinctValues.Location,
+		Network:              distinctValues.Network,
+		BeaconImplementation: distinctValues.BeaconImplementation,
 	}
 
 	return response, nil

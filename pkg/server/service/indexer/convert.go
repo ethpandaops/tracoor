@@ -9,29 +9,31 @@ import (
 
 func ProtoBeaconStateToDBBeaconState(bs *indexer.BeaconState) *persistence.BeaconState {
 	return &persistence.BeaconState{
-		ID:          bs.GetId().GetValue(),
-		Node:        bs.GetNode().GetValue(),
-		Slot:        int64(bs.GetSlot().GetValue()),
-		Epoch:       int64(bs.GetEpoch().GetValue()),
-		StateRoot:   bs.GetStateRoot().GetValue(),
-		FetchedAt:   bs.GetFetchedAt().AsTime(),
-		NodeVersion: bs.GetNodeVersion().GetValue(),
-		Location:    bs.GetLocation().GetValue(),
-		Network:     bs.GetNetwork().GetValue(),
+		ID:                   bs.GetId().GetValue(),
+		Node:                 bs.GetNode().GetValue(),
+		Slot:                 int64(bs.GetSlot().GetValue()),
+		Epoch:                int64(bs.GetEpoch().GetValue()),
+		StateRoot:            bs.GetStateRoot().GetValue(),
+		FetchedAt:            bs.GetFetchedAt().AsTime(),
+		NodeVersion:          bs.GetNodeVersion().GetValue(),
+		Location:             bs.GetLocation().GetValue(),
+		Network:              bs.GetNetwork().GetValue(),
+		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
 	}
 }
 
 func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.BeaconState {
 	return &indexer.BeaconState{
-		Id:          &wrapperspb.StringValue{Value: bs.ID},
-		Node:        &wrapperspb.StringValue{Value: bs.Node},
-		Slot:        &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
-		Epoch:       &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
-		StateRoot:   &wrapperspb.StringValue{Value: bs.StateRoot},
-		FetchedAt:   timestamppb.New(bs.FetchedAt),
-		NodeVersion: &wrapperspb.StringValue{Value: bs.NodeVersion},
-		Location:    &wrapperspb.StringValue{Value: bs.Location},
-		Network:     &wrapperspb.StringValue{Value: bs.Network},
+		Id:                   &wrapperspb.StringValue{Value: bs.ID},
+		Node:                 &wrapperspb.StringValue{Value: bs.Node},
+		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
+		StateRoot:            &wrapperspb.StringValue{Value: bs.StateRoot},
+		FetchedAt:            timestamppb.New(bs.FetchedAt),
+		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
+		Location:             &wrapperspb.StringValue{Value: bs.Location},
+		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
 	}
 }
 

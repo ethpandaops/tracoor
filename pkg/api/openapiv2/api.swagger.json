@@ -25,7 +25,8 @@
         "epoch",
         "state_root",
         "node_version",
-        "network"
+        "network",
+        "beacon_implementation"
       ],
       "default": "node"
     },
@@ -57,6 +58,9 @@
           "type": "string"
         },
         "network": {
+          "type": "string"
+        },
+        "beacon_implementation": {
           "type": "string"
         }
       }
@@ -109,6 +113,12 @@
           }
         },
         "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "beacon_implementation": {
           "type": "array",
           "items": {
             "type": "string"

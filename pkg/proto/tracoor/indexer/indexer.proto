@@ -17,6 +17,7 @@ message BeaconState {
   google.protobuf.StringValue node_version = 7 [json_name = "node_version"];
   google.protobuf.StringValue location = 8;
   google.protobuf.StringValue network = 9;
+  google.protobuf.StringValue beacon_implementation = 10 [json_name = "beacon_implementation"];
 }
 
 service Indexer {
@@ -45,6 +46,7 @@ message CreateBeaconStateRequest {
   google.protobuf.StringValue node_version = 6 [json_name = "node_version"];
   google.protobuf.StringValue location = 7;
   google.protobuf.StringValue network = 8;
+  google.protobuf.StringValue beacon_implementation = 9 [json_name = "beacon_implementation"];
 }
 
 message CreateBeaconStateResponse {
@@ -60,6 +62,7 @@ message ListUniqueBeaconStateValuesRequest {
     NODE_VERSION = 4;
     LOCATION = 5;
     NETWORK = 6;
+    BEACON_IMPLEMENTATION = 7;
   }
   repeated Field fields = 1;
 }
@@ -72,6 +75,7 @@ message ListUniqueBeaconStateValuesResponse {
   repeated string node_version = 5 [json_name = "node_version"];
   repeated string location = 6;
   repeated string network = 7;
+  repeated string beacon_implementation = 8 [json_name = "beacon_implementation"];
 }
 
 message ListBeaconStateRequest {
@@ -87,6 +91,7 @@ message ListBeaconStateRequest {
 
   PaginationCursor pagination = 10;
   string id = 11;
+  string beacon_implementation = 12 [json_name = "beacon_implementation"];
 }
 
 message ListBeaconStateResponse {

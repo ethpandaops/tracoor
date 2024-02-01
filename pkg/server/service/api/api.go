@@ -81,14 +81,15 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	}
 
 	rq := &indexer.ListBeaconStateRequest{
-		Node:        req.Node,
-		Slot:        req.Slot,
-		Epoch:       req.Epoch,
-		StateRoot:   req.StateRoot,
-		NodeVersion: req.NodeVersion,
-		Network:     req.Network,
-		Before:      req.Before,
-		After:       req.After,
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		StateRoot:            req.StateRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		Before:               req.Before,
+		After:                req.After,
+		BeaconImplementation: req.BeaconImplementation,
 
 		Pagination: pagination,
 	}
@@ -101,14 +102,15 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	protoBeaconStates := make([]*api.BeaconState, len(resp.BeaconStates))
 	for i, state := range resp.BeaconStates {
 		protoBeaconStates[i] = &api.BeaconState{
-			Id:          state.Id,
-			Node:        state.Node,
-			Slot:        state.Slot,
-			Epoch:       state.Epoch,
-			StateRoot:   state.StateRoot,
-			NodeVersion: state.NodeVersion,
-			Network:     state.Network,
-			FetchedAt:   state.FetchedAt,
+			Id:                   state.Id,
+			Node:                 state.Node,
+			Slot:                 state.Slot,
+			Epoch:                state.Epoch,
+			StateRoot:            state.StateRoot,
+			NodeVersion:          state.NodeVersion,
+			Network:              state.Network,
+			FetchedAt:            state.FetchedAt,
+			BeaconImplementation: state.BeaconImplementation,
 		}
 	}
 
@@ -143,6 +145,8 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 			f = indexer.ListUniqueBeaconStateValuesRequest_EPOCH
 		case api.ListUniqueBeaconStateValuesRequest_state_root:
 			f = indexer.ListUniqueBeaconStateValuesRequest_STATE_ROOT
+		case api.ListUniqueBeaconStateValuesRequest_beacon_implementation:
+			f = indexer.ListUniqueBeaconStateValuesRequest_BEACON_IMPLEMENTATION
 		default:
 			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
 		}
@@ -158,12 +162,13 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 
 	// Convert the response
 	response := &api.ListUniqueBeaconStateValuesResponse{
-		Node:        resp.Node,
-		Slot:        resp.Slot,
-		Epoch:       resp.Epoch,
-		StateRoot:   resp.StateRoot,
-		NodeVersion: resp.NodeVersion,
-		Network:     resp.Network,
+		Node:                 resp.Node,
+		Slot:                 resp.Slot,
+		Epoch:                resp.Epoch,
+		StateRoot:            resp.StateRoot,
+		NodeVersion:          resp.NodeVersion,
+		Network:              resp.Network,
+		BeaconImplementation: resp.BeaconImplementation,
 	}
 
 	return response, nil
