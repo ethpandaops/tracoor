@@ -19,9 +19,23 @@ message BeaconState {
   google.protobuf.StringValue beacon_implementation = 9 [json_name = "beacon_implementation"];
 }
 
+message ExecutionBlockTrace {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3 [json_name = "fetched_at"];
+  google.protobuf.StringValue block_hash = 4 [json_name = "block_hash"];
+  google.protobuf.Int64Value block_number = 5 [json_name = "block_number"];
+  google.protobuf.StringValue network = 6;
+  google.protobuf.StringValue execution_implementation = 7 [json_name = "execution_implementation"];
+  google.protobuf.StringValue node_version = 8 [json_name = "node_version"];
+}
+
 service API {
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
   rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest) returns (ListUniqueBeaconStateValuesResponse) {}
+
+  rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest) returns (ListExecutionBlockTraceResponse) {}
+  rpc ListUniqueExecutionBlockTraceValues(ListUniqueExecutionBlockTraceValuesRequest) returns (ListUniqueExecutionBlockTraceValuesResponse) {}
 }
 
 message ListBeaconStateRequest {
@@ -70,4 +84,37 @@ message PaginationCursor {
   int32 limit = 1;
   int32 offset = 2;
   string order_by = 3;
+}
+
+message ListExecutionBlockTraceRequest {
+  string node = 1;
+  int64 block_number = 2;
+  string block_hash = 3;
+  string network = 5;
+  google.protobuf.Timestamp before = 6;
+  google.protobuf.Timestamp after = 7;
+
+  PaginationCursor pagination = 8;
+  string id = 9;
+}
+
+message ListExecutionBlockTraceResponse {
+  repeated ExecutionBlockTrace execution_block_traces = 1;
+}
+
+message ListUniqueExecutionBlockTraceValuesRequest {
+  enum Field {
+    NODE = 0;
+    BLOCK_HASH = 1;
+    BLOCK_NUMBER = 2;
+    NETWORK = 3;
+  }
+  repeated Field fields = 1;
+}
+
+message ListUniqueExecutionBlockTraceValuesResponse {
+  repeated string node = 1;
+  repeated string block_hash = 2;
+  repeated int64 block_number = 3;
+  repeated string network = 4;
 }

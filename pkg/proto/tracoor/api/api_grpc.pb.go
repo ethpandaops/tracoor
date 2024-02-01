@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	API_ListBeaconState_FullMethodName             = "/api.API/ListBeaconState"
-	API_ListUniqueBeaconStateValues_FullMethodName = "/api.API/ListUniqueBeaconStateValues"
+	API_ListBeaconState_FullMethodName                     = "/api.API/ListBeaconState"
+	API_ListUniqueBeaconStateValues_FullMethodName         = "/api.API/ListUniqueBeaconStateValues"
+	API_ListExecutionBlockTrace_FullMethodName             = "/api.API/ListExecutionBlockTrace"
+	API_ListUniqueExecutionBlockTraceValues_FullMethodName = "/api.API/ListUniqueExecutionBlockTraceValues"
 )
 
 // APIClient is the client API for API service.
@@ -29,6 +31,8 @@ const (
 type APIClient interface {
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
+	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
+	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 }
 
 type aPIClient struct {
@@ -57,12 +61,32 @@ func (c *aPIClient) ListUniqueBeaconStateValues(ctx context.Context, in *ListUni
 	return out, nil
 }
 
+func (c *aPIClient) ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error) {
+	out := new(ListExecutionBlockTraceResponse)
+	err := c.cc.Invoke(ctx, API_ListExecutionBlockTrace_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
+	out := new(ListUniqueExecutionBlockTraceValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueExecutionBlockTraceValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // APIServer is the server API for API service.
 // All implementations must embed UnimplementedAPIServer
 // for forward compatibility
 type APIServer interface {
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
+	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
+	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 	mustEmbedUnimplementedAPIServer()
 }
 
@@ -75,6 +99,12 @@ func (UnimplementedAPIServer) ListBeaconState(context.Context, *ListBeaconStateR
 }
 func (UnimplementedAPIServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
+}
+func (UnimplementedAPIServer) ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBlockTrace not implemented")
+}
+func (UnimplementedAPIServer) ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBlockTraceValues not implemented")
 }
 func (UnimplementedAPIServer) mustEmbedUnimplementedAPIServer() {}
 
@@ -125,6 +155,42 @@ func _API_ListUniqueBeaconStateValues_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _API_ListExecutionBlockTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExecutionBlockTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListExecutionBlockTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListExecutionBlockTrace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListExecutionBlockTrace(ctx, req.(*ListExecutionBlockTraceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListUniqueExecutionBlockTraceValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueExecutionBlockTraceValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListUniqueExecutionBlockTraceValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListUniqueExecutionBlockTraceValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListUniqueExecutionBlockTraceValues(ctx, req.(*ListUniqueExecutionBlockTraceValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // API_ServiceDesc is the grpc.ServiceDesc for API service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -139,6 +205,14 @@ var API_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUniqueBeaconStateValues",
 			Handler:    _API_ListUniqueBeaconStateValues_Handler,
+		},
+		{
+			MethodName: "ListExecutionBlockTrace",
+			Handler:    _API_ListExecutionBlockTrace_Handler,
+		},
+		{
+			MethodName: "ListUniqueExecutionBlockTraceValues",
+			Handler:    _API_ListUniqueExecutionBlockTraceValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

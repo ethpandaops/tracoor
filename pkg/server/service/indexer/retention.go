@@ -20,6 +20,10 @@ func (e *Indexer) startRetentionWatchers(ctx context.Context) {
 			e.log.WithError(err).Error("Failed to delete old beacon states")
 		}
 
+		if err := e.purgeOldExecutionTraces(ctx); err != nil {
+			e.log.WithError(err).Error("Failed to delete old execution traces")
+		}
+
 		select {
 		case <-time.After(1 * time.Minute):
 		case <-ctx.Done():
@@ -69,6 +73,52 @@ func (e *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 				"id":      state.ID,
 			},
 		).Debug("Deleted beacon state")
+	}
+
+	return nil
+}
+
+func (e *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
+	before := time.Now().Add(-e.config.Retention.ExecutionTraces.Duration)
+
+	filter := &persistence.ExecutionBlockTraceFilter{
+		Before: &before,
+	}
+
+	traces, err := e.db.ListExecutionBlockTrace(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 1, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	e.log.WithField("before", before).Debugf("Purging %d old execution block traces", len(traces))
+
+	for _, trace := range traces {
+		// Delete from the store first
+		if err := e.store.DeleteExecutionBlockTrace(ctx, trace.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				e.log.WithField("trace", trace).Warn("Execution block trace not found in store")
+			} else {
+				e.log.WithError(err).WithField("trace", trace).Error("Failed to delete execution block trace from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := e.db.DeleteExecutionBlockTrace(ctx, trace.ID)
+		if err != nil {
+			e.log.WithError(err).WithField("trace", trace).Error("Failed to delete execution block trace")
+
+			continue
+		}
+
+		e.log.WithFields(
+			logrus.Fields{
+				"node":         trace.Node,
+				"network":      trace.Network,
+				"block_number": trace.BlockNumber,
+				"id":           trace.ID,
+			},
+		).Debug("Deleted execution block trace")
 	}
 
 	return nil

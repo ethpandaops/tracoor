@@ -287,3 +287,137 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 
 	return response, nil
 }
+
+func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.CreateExecutionBlockTraceRequest) (*indexer.CreateExecutionBlockTraceResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Create the execution block trace
+	trace := &indexer.ExecutionBlockTrace{
+		Id:                      wrapperspb.String(uuid.New().String()),
+		Node:                    req.GetNode(),
+		FetchedAt:               req.GetFetchedAt(),
+		BlockHash:               req.GetBlockHash(),
+		BlockNumber:             req.GetBlockNumber(),
+		Location:                req.GetLocation(),
+		Network:                 req.GetNetwork(),
+		ExecutionImplementation: req.GetExecutionImplementation(),
+		NodeVersion:             req.GetNodeVersion(),
+	}
+
+	if err := trace.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := i.db.InsertExecutionBlockTrace(ctx, ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace)); err != nil {
+		return nil, status.Error(codes.Internal, "failed to insert execution block trace")
+	}
+
+	return &indexer.CreateExecutionBlockTraceResponse{
+		Id: trace.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.ListExecutionBlockTraceRequest) (*indexer.ListExecutionBlockTraceResponse, error) {
+	filter := &persistence.ExecutionBlockTraceFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.BlockNumber != 0 {
+		filter.AddBlockNumber(req.BlockNumber)
+	}
+
+	if req.BlockHash != "" {
+		filter.AddBlockHash(req.BlockHash)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	executionBlockTraces, err := i.db.ListExecutionBlockTrace(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoExecutionBlockTraces := make([]*indexer.ExecutionBlockTrace, len(executionBlockTraces))
+	for i, trace := range executionBlockTraces {
+		protoExecutionBlockTraces[i] = DBExecutionBlockTraceToProtoExecutionBlockTrace(trace)
+	}
+
+	return &indexer.ListExecutionBlockTraceResponse{
+		ExecutionBlockTraces: protoExecutionBlockTraces,
+	}, nil
+}
+
+func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *indexer.ListUniqueExecutionBlockTraceValuesRequest) (*indexer.ListUniqueExecutionBlockTraceValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH:
+			fields[idx] = "block_hash"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER:
+			fields[idx] = "block_number"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NETWORK:
+			fields[idx] = "network"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_EXECUTION_IMPLEMENTATION:
+			fields[idx] = "execution_implementation"
+		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		}
+	}
+
+	distinctValues, err := i.db.DistinctExecutionBlockTraceValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueExecutionBlockTraceValuesResponse{
+		Node:                    distinctValues.Node,
+		BlockHash:               distinctValues.BlockHash,
+		BlockNumber:             distinctValues.BlockNumber,
+		Location:                distinctValues.Location,
+		Network:                 distinctValues.Network,
+		ExecutionImplementation: distinctValues.ExecutionImplementation,
+		NodeVersion:             distinctValues.NodeVersion,
+	}
+
+	return response, nil
+}

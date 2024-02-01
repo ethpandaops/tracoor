@@ -29,6 +29,13 @@ type Store interface {
 	// DeleteBeaconState deletes a beacon state from the store
 	DeleteBeaconState(ctx context.Context, location string) error
 
+	// SaveExecutionBlockTrace saves an execution block trace to the store
+	SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error)
+	// GetExecutionBlockTrace fetches an execution block trace from the store
+	GetExecutionBlockTrace(ctx context.Context, id string) (*[]byte, error)
+	// DeleteExecutionBlockTrace deletes an execution block trace from the store
+	DeleteExecutionBlockTrace(ctx context.Context, location string) error
+
 	// PathPrefix returns the path prefix for the store
 	PathPrefix() string
 }

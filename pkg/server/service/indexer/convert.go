@@ -37,6 +37,34 @@ func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.Beaco
 	}
 }
 
+func ProtoExecutionBlockTraceToDBExecutionBlockTrace(eb *indexer.ExecutionBlockTrace) *persistence.ExecutionBlockTrace {
+	return &persistence.ExecutionBlockTrace{
+		BlockHash:               eb.GetBlockHash().GetValue(),
+		BlockNumber:             int64(eb.GetBlockNumber().GetValue()),
+		Node:                    eb.GetNode().GetValue(),
+		NodeVersion:             eb.GetNodeVersion().GetValue(),
+		FetchedAt:               eb.GetFetchedAt().AsTime(),
+		Location:                eb.GetLocation().GetValue(),
+		Network:                 eb.GetNetwork().GetValue(),
+		ExecutionImplementation: eb.GetExecutionImplementation().GetValue(),
+		ID:                      eb.GetId().GetValue(),
+	}
+}
+
+func DBExecutionBlockTraceToProtoExecutionBlockTrace(eb *persistence.ExecutionBlockTrace) *indexer.ExecutionBlockTrace {
+	return &indexer.ExecutionBlockTrace{
+		BlockHash:               &wrapperspb.StringValue{Value: eb.BlockHash},
+		BlockNumber:             &wrapperspb.Int64Value{Value: eb.BlockNumber},
+		Node:                    &wrapperspb.StringValue{Value: eb.Node},
+		NodeVersion:             &wrapperspb.StringValue{Value: eb.NodeVersion},
+		FetchedAt:               timestamppb.New(eb.FetchedAt),
+		Location:                &wrapperspb.StringValue{Value: eb.Location},
+		Network:                 &wrapperspb.StringValue{Value: eb.Network},
+		ExecutionImplementation: &wrapperspb.StringValue{Value: eb.ExecutionImplementation},
+		Id:                      &wrapperspb.StringValue{Value: eb.ID},
+	}
+}
+
 func ProtoPaginationCursorToDBPaginationCursor(pc *indexer.PaginationCursor) *persistence.PaginationCursor {
 	return &persistence.PaginationCursor{
 		Offset:  int(pc.GetOffset()),

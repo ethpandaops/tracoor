@@ -174,3 +174,100 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 	return response, nil
 
 }
+
+func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutionBlockTraceRequest) (*api.ListExecutionBlockTraceResponse, error) {
+	pagination := &indexer.PaginationCursor{
+		Limit:   100,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = &indexer.PaginationCursor{
+			Limit:   req.Pagination.Limit,
+			Offset:  req.Pagination.Offset,
+			OrderBy: req.Pagination.OrderBy,
+		}
+	}
+
+	rq := &indexer.ListExecutionBlockTraceRequest{
+		Node:        req.Node,
+		BlockNumber: req.BlockNumber,
+		BlockHash:   req.BlockHash,
+		Network:     req.Network,
+		Before:      req.Before,
+		After:       req.After,
+		Id:          req.Id,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListExecutionBlockTrace(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list execution block traces: %w", err).Error())
+	}
+
+	protoExecutionBlockTraces := make([]*api.ExecutionBlockTrace, len(resp.ExecutionBlockTraces))
+	for i, trace := range resp.ExecutionBlockTraces {
+		protoExecutionBlockTraces[i] = &api.ExecutionBlockTrace{
+			Id:                      trace.Id,
+			Node:                    trace.Node,
+			FetchedAt:               trace.FetchedAt,
+			BlockHash:               trace.BlockHash,
+			BlockNumber:             trace.BlockNumber,
+			Network:                 trace.Network,
+			ExecutionImplementation: trace.ExecutionImplementation,
+			NodeVersion:             trace.NodeVersion,
+		}
+	}
+
+	return &api.ListExecutionBlockTraceResponse{
+		ExecutionBlockTraces: protoExecutionBlockTraces,
+	}, nil
+}
+
+func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.ListUniqueExecutionBlockTraceValuesRequest) (*api.ListUniqueExecutionBlockTraceValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueExecutionBlockTraceValuesRequest{
+		Fields: []indexer.ListUniqueExecutionBlockTraceValuesRequest_Field{},
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueExecutionBlockTraceValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueExecutionBlockTraceValuesRequest_NODE:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE
+		case api.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH
+		case api.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER
+		case api.ListUniqueExecutionBlockTraceValuesRequest_NETWORK:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_NETWORK
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueExecutionBlockTraceValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique execution block trace values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueExecutionBlockTraceValuesResponse{
+		Node:        resp.Node,
+		BlockHash:   resp.BlockHash,
+		BlockNumber: resp.BlockNumber,
+		Network:     resp.Network,
+	}
+
+	return response, nil
+}

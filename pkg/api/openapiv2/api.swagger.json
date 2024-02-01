@@ -17,19 +17,6 @@
   ],
   "paths": {},
   "definitions": {
-    "ListUniqueBeaconStateValuesRequestField": {
-      "type": "string",
-      "enum": [
-        "node",
-        "slot",
-        "epoch",
-        "state_root",
-        "node_version",
-        "network",
-        "beacon_implementation"
-      ],
-      "default": "node"
-    },
     "apiBeaconState": {
       "type": "object",
       "properties": {
@@ -65,6 +52,37 @@
         }
       }
     },
+    "apiExecutionBlockTrace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "fetched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "block_hash": {
+          "type": "string"
+        },
+        "block_number": {
+          "type": "string",
+          "format": "int64"
+        },
+        "network": {
+          "type": "string"
+        },
+        "execution_implementation": {
+          "type": "string"
+        },
+        "node_version": {
+          "type": "string"
+        }
+      }
+    },
     "apiListBeaconStateResponse": {
       "type": "object",
       "properties": {
@@ -76,6 +94,31 @@
           }
         }
       }
+    },
+    "apiListExecutionBlockTraceResponse": {
+      "type": "object",
+      "properties": {
+        "executionBlockTraces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/apiExecutionBlockTrace"
+          }
+        }
+      }
+    },
+    "apiListUniqueBeaconStateValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "node",
+        "slot",
+        "epoch",
+        "state_root",
+        "node_version",
+        "network",
+        "beacon_implementation"
+      ],
+      "default": "node"
     },
     "apiListUniqueBeaconStateValuesResponse": {
       "type": "object",
@@ -119,6 +162,46 @@
           }
         },
         "beacon_implementation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "apiListUniqueExecutionBlockTraceValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "NODE",
+        "BLOCK_HASH",
+        "BLOCK_NUMBER",
+        "NETWORK"
+      ],
+      "default": "NODE"
+    },
+    "apiListUniqueExecutionBlockTraceValuesResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockHash": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockNumber": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "network": {
           "type": "array",
           "items": {
             "type": "string"

@@ -36,11 +36,11 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		StateRoot: rootAsString,
 	})
 	if err != nil {
-		s.log.WithField("state_root", root).WithField("slot", slot).WithError(err).Error("Failed to check if beacon state is already indexed")
+		s.log.WithField("state_root", rootAsString).WithField("slot", slot).WithError(err).Error("Failed to check if beacon state is already indexed")
 	}
 
 	if rsp != nil && len(rsp.BeaconStates) > 0 {
-		s.log.WithField("state_root", root).WithField("slot", slot).Debug("Beacon state already indexed")
+		s.log.WithField("state_root", rootAsString).WithField("slot", slot).Debug("Beacon state already indexed")
 
 		return nil
 	}
