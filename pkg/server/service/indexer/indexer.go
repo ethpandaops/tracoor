@@ -242,6 +242,59 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	}, nil
 }
 
+func (i *Indexer) CountBeaconState(ctx context.Context, req *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
+	filter := &persistence.BeaconStateFilter{}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.StateRoot != "" {
+		filter.AddStateRoot(req.StateRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	beaconStates, err := i.db.CountBeaconState(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountBeaconStateResponse{
+		Count: wrapperspb.UInt64(uint64(beaconStates)),
+	}, nil
+}
+
 func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.ListUniqueBeaconStateValuesRequest) (*indexer.ListUniqueBeaconStateValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -364,6 +417,14 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 		filter.AddAfter(req.After.AsTime())
 	}
 
+	if req.ExecutionImplementation != "" {
+		filter.AddExecutionImplementation(req.ExecutionImplementation)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
@@ -386,6 +447,55 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 
 	return &indexer.ListExecutionBlockTraceResponse{
 		ExecutionBlockTraces: protoExecutionBlockTraces,
+	}, nil
+}
+
+func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.CountExecutionBlockTraceRequest) (*indexer.CountExecutionBlockTraceResponse, error) {
+	filter := &persistence.ExecutionBlockTraceFilter{}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.BlockNumber != 0 {
+		filter.AddBlockNumber(req.BlockNumber)
+	}
+
+	if req.BlockHash != "" {
+		filter.AddBlockHash(req.BlockHash)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.ExecutionImplementation != "" {
+		filter.AddExecutionImplementation(req.ExecutionImplementation)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	executionBlockTraces, err := i.db.CountExecutionBlockTrace(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountExecutionBlockTraceResponse{
+		Count: wrapperspb.UInt64(uint64(executionBlockTraces)),
 	}, nil
 }
 

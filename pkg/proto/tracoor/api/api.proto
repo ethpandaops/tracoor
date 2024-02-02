@@ -32,9 +32,11 @@ message ExecutionBlockTrace {
 
 service API {
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
+  rpc CountBeaconState(CountBeaconStateRequest) returns (CountBeaconStateResponse) {}
   rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest) returns (ListUniqueBeaconStateValuesResponse) {}
 
   rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest) returns (ListExecutionBlockTraceResponse) {}
+  rpc CountExecutionBlockTrace(CountExecutionBlockTraceRequest) returns (CountExecutionBlockTraceResponse) {}
   rpc ListUniqueExecutionBlockTraceValues(ListUniqueExecutionBlockTraceValuesRequest) returns (ListUniqueExecutionBlockTraceValuesResponse) {}
 }
 
@@ -55,6 +57,22 @@ message ListBeaconStateRequest {
 
 message ListBeaconStateResponse {
   repeated BeaconState beacon_states = 1 [json_name = "beacon_states"];
+}
+
+message CountBeaconStateRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string state_root = 4 [json_name = "state_root"];
+  string node_version = 5 [json_name = "node_version"];
+  string network = 6;
+  string beacon_implementation = 7 [json_name = "beacon_implementation"];
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+}
+
+message CountBeaconStateResponse {
+  google.protobuf.UInt64Value count = 1;
 }
 
 message ListUniqueBeaconStateValuesRequest {
@@ -88,18 +106,36 @@ message PaginationCursor {
 
 message ListExecutionBlockTraceRequest {
   string node = 1;
-  int64 block_number = 2;
-  string block_hash = 3;
+  int64 block_number = 2 [json_name = "block_number"];
+  string block_hash = 3 [json_name = "block_hash"];
   string network = 5;
   google.protobuf.Timestamp before = 6;
   google.protobuf.Timestamp after = 7;
 
   PaginationCursor pagination = 8;
   string id = 9;
+
+  string execution_implementation = 10 [json_name = "execution_implementation"];
+  string node_version = 11 [json_name = "node_version"];
 }
 
 message ListExecutionBlockTraceResponse {
   repeated ExecutionBlockTrace execution_block_traces = 1 [json_name = "execution_block_traces"];
+}
+
+message CountExecutionBlockTraceRequest {
+  string node = 1;
+  int64 block_number = 2 [json_name = "block_number"];
+  string block_hash = 3;
+  string network = 5;
+  string execution_implementation = 6 [json_name = "execution_implementation"];
+  google.protobuf.Timestamp before = 7;
+  google.protobuf.Timestamp after = 8;
+  string node_version = 9 [json_name = "node_version"];
+}
+
+message CountExecutionBlockTraceResponse {
+  google.protobuf.UInt64Value count = 1;
 }
 
 message ListUniqueExecutionBlockTraceValuesRequest {

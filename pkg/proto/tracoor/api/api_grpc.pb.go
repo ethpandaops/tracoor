@@ -20,8 +20,10 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	API_ListBeaconState_FullMethodName                     = "/api.API/ListBeaconState"
+	API_CountBeaconState_FullMethodName                    = "/api.API/CountBeaconState"
 	API_ListUniqueBeaconStateValues_FullMethodName         = "/api.API/ListUniqueBeaconStateValues"
 	API_ListExecutionBlockTrace_FullMethodName             = "/api.API/ListExecutionBlockTrace"
+	API_CountExecutionBlockTrace_FullMethodName            = "/api.API/CountExecutionBlockTrace"
 	API_ListUniqueExecutionBlockTraceValues_FullMethodName = "/api.API/ListUniqueExecutionBlockTraceValues"
 )
 
@@ -30,8 +32,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type APIClient interface {
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
+	CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
 	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
+	CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 }
 
@@ -46,6 +50,15 @@ func NewAPIClient(cc grpc.ClientConnInterface) APIClient {
 func (c *aPIClient) ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error) {
 	out := new(ListBeaconStateResponse)
 	err := c.cc.Invoke(ctx, API_ListBeaconState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error) {
+	out := new(CountBeaconStateResponse)
+	err := c.cc.Invoke(ctx, API_CountBeaconState_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +83,15 @@ func (c *aPIClient) ListExecutionBlockTrace(ctx context.Context, in *ListExecuti
 	return out, nil
 }
 
+func (c *aPIClient) CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error) {
+	out := new(CountExecutionBlockTraceResponse)
+	err := c.cc.Invoke(ctx, API_CountExecutionBlockTrace_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *aPIClient) ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	out := new(ListUniqueExecutionBlockTraceValuesResponse)
 	err := c.cc.Invoke(ctx, API_ListUniqueExecutionBlockTraceValues_FullMethodName, in, out, opts...)
@@ -84,8 +106,10 @@ func (c *aPIClient) ListUniqueExecutionBlockTraceValues(ctx context.Context, in 
 // for forward compatibility
 type APIServer interface {
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
+	CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
 	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
+	CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 	mustEmbedUnimplementedAPIServer()
 }
@@ -97,11 +121,17 @@ type UnimplementedAPIServer struct {
 func (UnimplementedAPIServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
 }
+func (UnimplementedAPIServer) CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountBeaconState not implemented")
+}
 func (UnimplementedAPIServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
 }
 func (UnimplementedAPIServer) ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBlockTrace not implemented")
+}
+func (UnimplementedAPIServer) CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountExecutionBlockTrace not implemented")
 }
 func (UnimplementedAPIServer) ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBlockTraceValues not implemented")
@@ -133,6 +163,24 @@ func _API_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(APIServer).ListBeaconState(ctx, req.(*ListBeaconStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_CountBeaconState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountBeaconStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).CountBeaconState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_CountBeaconState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).CountBeaconState(ctx, req.(*CountBeaconStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -173,6 +221,24 @@ func _API_ListExecutionBlockTrace_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _API_CountExecutionBlockTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountExecutionBlockTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).CountExecutionBlockTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_CountExecutionBlockTrace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).CountExecutionBlockTrace(ctx, req.(*CountExecutionBlockTraceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _API_ListUniqueExecutionBlockTraceValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListUniqueExecutionBlockTraceValuesRequest)
 	if err := dec(in); err != nil {
@@ -203,12 +269,20 @@ var API_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _API_ListBeaconState_Handler,
 		},
 		{
+			MethodName: "CountBeaconState",
+			Handler:    _API_CountBeaconState_Handler,
+		},
+		{
 			MethodName: "ListUniqueBeaconStateValues",
 			Handler:    _API_ListUniqueBeaconStateValues_Handler,
 		},
 		{
 			MethodName: "ListExecutionBlockTrace",
 			Handler:    _API_ListExecutionBlockTrace_Handler,
+		},
+		{
+			MethodName: "CountExecutionBlockTrace",
+			Handler:    _API_CountExecutionBlockTrace_Handler,
 		},
 		{
 			MethodName: "ListUniqueExecutionBlockTraceValues",

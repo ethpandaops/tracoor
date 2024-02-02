@@ -52,6 +52,24 @@
         }
       }
     },
+    "apiCountBeaconStateResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
+    "apiCountExecutionBlockTraceResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
     "apiExecutionBlockTrace": {
       "type": "object",
       "properties": {

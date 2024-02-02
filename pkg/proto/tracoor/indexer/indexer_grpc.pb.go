@@ -22,9 +22,11 @@ const (
 	Indexer_GetStorageHandshakeToken_FullMethodName            = "/indexer.Indexer/GetStorageHandshakeToken"
 	Indexer_CreateBeaconState_FullMethodName                   = "/indexer.Indexer/CreateBeaconState"
 	Indexer_ListBeaconState_FullMethodName                     = "/indexer.Indexer/ListBeaconState"
+	Indexer_CountBeaconState_FullMethodName                    = "/indexer.Indexer/CountBeaconState"
 	Indexer_ListUniqueBeaconStateValues_FullMethodName         = "/indexer.Indexer/ListUniqueBeaconStateValues"
 	Indexer_CreateExecutionBlockTrace_FullMethodName           = "/indexer.Indexer/CreateExecutionBlockTrace"
 	Indexer_ListExecutionBlockTrace_FullMethodName             = "/indexer.Indexer/ListExecutionBlockTrace"
+	Indexer_CountExecutionBlockTrace_FullMethodName            = "/indexer.Indexer/CountExecutionBlockTrace"
 	Indexer_ListUniqueExecutionBlockTraceValues_FullMethodName = "/indexer.Indexer/ListUniqueExecutionBlockTraceValues"
 )
 
@@ -36,10 +38,12 @@ type IndexerClient interface {
 	// BeaconState
 	CreateBeaconState(ctx context.Context, in *CreateBeaconStateRequest, opts ...grpc.CallOption) (*CreateBeaconStateResponse, error)
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
+	CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
 	// ExecutionBlockTrace
 	CreateExecutionBlockTrace(ctx context.Context, in *CreateExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CreateExecutionBlockTraceResponse, error)
 	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
+	CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 }
 
@@ -78,6 +82,15 @@ func (c *indexerClient) ListBeaconState(ctx context.Context, in *ListBeaconState
 	return out, nil
 }
 
+func (c *indexerClient) CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error) {
+	out := new(CountBeaconStateResponse)
+	err := c.cc.Invoke(ctx, Indexer_CountBeaconState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *indexerClient) ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error) {
 	out := new(ListUniqueBeaconStateValuesResponse)
 	err := c.cc.Invoke(ctx, Indexer_ListUniqueBeaconStateValues_FullMethodName, in, out, opts...)
@@ -105,6 +118,15 @@ func (c *indexerClient) ListExecutionBlockTrace(ctx context.Context, in *ListExe
 	return out, nil
 }
 
+func (c *indexerClient) CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error) {
+	out := new(CountExecutionBlockTraceResponse)
+	err := c.cc.Invoke(ctx, Indexer_CountExecutionBlockTrace_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *indexerClient) ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	out := new(ListUniqueExecutionBlockTraceValuesResponse)
 	err := c.cc.Invoke(ctx, Indexer_ListUniqueExecutionBlockTraceValues_FullMethodName, in, out, opts...)
@@ -122,10 +144,12 @@ type IndexerServer interface {
 	// BeaconState
 	CreateBeaconState(context.Context, *CreateBeaconStateRequest) (*CreateBeaconStateResponse, error)
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
+	CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
 	// ExecutionBlockTrace
 	CreateExecutionBlockTrace(context.Context, *CreateExecutionBlockTraceRequest) (*CreateExecutionBlockTraceResponse, error)
 	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
+	CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
 	mustEmbedUnimplementedIndexerServer()
 }
@@ -143,6 +167,9 @@ func (UnimplementedIndexerServer) CreateBeaconState(context.Context, *CreateBeac
 func (UnimplementedIndexerServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
 }
+func (UnimplementedIndexerServer) CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountBeaconState not implemented")
+}
 func (UnimplementedIndexerServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
 }
@@ -151,6 +178,9 @@ func (UnimplementedIndexerServer) CreateExecutionBlockTrace(context.Context, *Cr
 }
 func (UnimplementedIndexerServer) ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBlockTrace not implemented")
+}
+func (UnimplementedIndexerServer) CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountExecutionBlockTrace not implemented")
 }
 func (UnimplementedIndexerServer) ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBlockTraceValues not implemented")
@@ -222,6 +252,24 @@ func _Indexer_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Indexer_CountBeaconState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountBeaconStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CountBeaconState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CountBeaconState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CountBeaconState(ctx, req.(*CountBeaconStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Indexer_ListUniqueBeaconStateValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListUniqueBeaconStateValuesRequest)
 	if err := dec(in); err != nil {
@@ -276,6 +324,24 @@ func _Indexer_ListExecutionBlockTrace_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Indexer_CountExecutionBlockTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountExecutionBlockTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CountExecutionBlockTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CountExecutionBlockTrace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CountExecutionBlockTrace(ctx, req.(*CountExecutionBlockTraceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Indexer_ListUniqueExecutionBlockTraceValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListUniqueExecutionBlockTraceValuesRequest)
 	if err := dec(in); err != nil {
@@ -314,6 +380,10 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Indexer_ListBeaconState_Handler,
 		},
 		{
+			MethodName: "CountBeaconState",
+			Handler:    _Indexer_CountBeaconState_Handler,
+		},
+		{
 			MethodName: "ListUniqueBeaconStateValues",
 			Handler:    _Indexer_ListUniqueBeaconStateValues_Handler,
 		},
@@ -324,6 +394,10 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListExecutionBlockTrace",
 			Handler:    _Indexer_ListExecutionBlockTrace_Handler,
+		},
+		{
+			MethodName: "CountExecutionBlockTrace",
+			Handler:    _Indexer_CountExecutionBlockTrace_Handler,
 		},
 		{
 			MethodName: "ListUniqueExecutionBlockTraceValues",

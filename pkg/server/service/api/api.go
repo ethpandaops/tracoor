@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const (
@@ -119,6 +120,29 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	}, nil
 }
 
+func (i *API) CountBeaconState(ctx context.Context, req *api.CountBeaconStateRequest) (*api.CountBeaconStateResponse, error) {
+	rq := &indexer.CountBeaconStateRequest{
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		StateRoot:            req.StateRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		BeaconImplementation: req.BeaconImplementation,
+		Before:               req.Before,
+		After:                req.After,
+	}
+
+	resp, err := i.indexer.CountBeaconState(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count beacon states: %w", err).Error())
+	}
+
+	return &api.CountBeaconStateResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
 func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniqueBeaconStateValuesRequest) (*api.ListUniqueBeaconStateValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
@@ -223,6 +247,28 @@ func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutio
 
 	return &api.ListExecutionBlockTraceResponse{
 		ExecutionBlockTraces: protoExecutionBlockTraces,
+	}, nil
+}
+
+func (i *API) CountExecutionBlockTrace(ctx context.Context, req *api.CountExecutionBlockTraceRequest) (*api.CountExecutionBlockTraceResponse, error) {
+	rq := &indexer.CountExecutionBlockTraceRequest{
+		Node:                    req.Node,
+		BlockNumber:             req.BlockNumber,
+		BlockHash:               req.BlockHash,
+		Network:                 req.Network,
+		Before:                  req.Before,
+		After:                   req.After,
+		ExecutionImplementation: req.ExecutionImplementation,
+		NodeVersion:             req.NodeVersion,
+	}
+
+	resp, err := i.indexer.CountExecutionBlockTrace(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count execution block traces: %w", err).Error())
+	}
+
+	return &api.CountExecutionBlockTraceResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
 	}, nil
 }
 

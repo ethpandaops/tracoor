@@ -9,9 +9,15 @@ http:
     - selector: api.API.ListUniqueBeaconStateValues
       post: /v1/api/list-unique-beacon-state-values
       body: "*"
+    - selector: api.API.CountBeaconState
+      post: /v1/api/count-beacon-state
+      body: "*"
     - selector: api.API.ListExecutionBlockTrace
       post: /v1/api/list-execution-block-trace
       body: "*"
     - selector: api.API.ListUniqueExecutionBlockTraceValues
       post: /v1/api/list-unique-execution-block-trace-values
+      body: "*"
+    - selector: api.API.CountExecutionBlockTrace
+      post: /v1/api/count-execution-block-trace
       body: "*"
