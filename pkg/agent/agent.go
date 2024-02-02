@@ -31,7 +31,7 @@ import (
 type agent struct {
 	Config *Config
 
-	beacon *ethereum.BeaconNode
+	node *ethereum.Node
 
 	log logrus.FieldLogger
 
@@ -53,10 +53,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		return nil, err
 	}
 
-	beacon, err := ethereum.NewBeaconNode(ctx, config.Name, &config.Ethereum, log)
-	if err != nil {
-		return nil, err
-	}
+	node := ethereum.NewNode(ctx, log, &config.Ethereum, config.Name)
 
 	indexerClient, err := indexer.NewClient(config.Indexer, log)
 	if err != nil {
@@ -70,7 +67,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 
 	return &agent{
 		Config:    config,
-		beacon:    beacon,
+		node:      node,
 		log:       log,
 		metrics:   NewMetrics("tracoor_agent"),
 		scheduler: gocron.NewScheduler(time.Local),
@@ -95,14 +92,55 @@ func (s *agent) Start(ctx context.Context) error {
 		WithField("version", tracoor.Full()).
 		Info("Starting tracoor in agent mode")
 
-	s.beacon.OnReady(ctx, func(ctx context.Context) error {
-		s.log.Info("Internal beacon node is ready, subscribing to events")
+	s.node.OnReady(ctx, func(ctx context.Context) error {
+		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
-		if s.beacon.Metadata().Network.Name == networks.NetworkNameUnknown {
+		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
+			logCtx := logrus.WithFields(logrus.Fields{
+				"event_slot": event.Slot,
+				"event_root": fmt.Sprintf("%#x", event.Block),
+				"purpose":    "execution_block_trace",
+			})
+
+			logCtx.Debug("New beacon block")
+
+			// Fetch the beacon block from the beacon node.
+			block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%#x", event.Block))
+			if err != nil {
+				logCtx.WithError(err).Error("Failed to fetch beacon block")
+
+				return err
+			}
+
+			// Rip out the execution block number from the block
+			executionBlockNumber, err := block.ExecutionBlockNumber()
+			if err != nil {
+				logCtx.WithError(err).Error("Failed to get execution block number from beacon block")
+
+				return err
+			}
+
+			executionBlockHash, err := block.ExecutionBlockHash()
+			if err != nil {
+				logCtx.WithError(err).Error("Failed to get execution block hash from beacon block")
+
+				return err
+			}
+
+			return s.fetchAndIndexExecutionBlockTrace(ctx, executionBlockNumber, executionBlockHash.String())
+		})
+
+		return nil
+	})
+
+	s.node.Beacon().OnReady(ctx, func(ctx context.Context) error {
+		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
+
+		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
 		}
 
-		s.beacon.Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
+		s.node.Beacon().Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
 			// Fetch the slot for `slot -1`
 			slotNumber := slot.Number() - 1
 
@@ -115,7 +153,7 @@ func (s *agent) Start(ctx context.Context) error {
 			}
 		})
 
-		s.beacon.Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
+		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
 			s.log.WithFields(
 				logrus.Fields{
 					"old_head_state": chainReorg.OldHeadState,
@@ -128,7 +166,7 @@ func (s *agent) Start(ctx context.Context) error {
 			).Info("Chain reorg detected")
 
 			// Go back and fetch all the new beacon states
-			headSlot, _, err := s.beacon.Metadata().Wallclock().Now()
+			headSlot, _, err := s.node.Beacon().Metadata().Wallclock().Now()
 			if err != nil {
 				return err
 			}
@@ -155,7 +193,7 @@ func (s *agent) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.beacon.Start(ctx); err != nil {
+	if err := s.node.Start(ctx); err != nil {
 		return err
 	}
 

@@ -110,6 +110,7 @@ message ListUniqueExecutionBlockTraceValuesRequest {
     NETWORK = 4;
     EXECUTION_IMPLEMENTATION = 5;
     NODE_VERSION = 6;
+    CLIENT_VERSION = 7;
   }
   repeated Field fields = 1;
 }
@@ -122,6 +123,7 @@ message ListUniqueExecutionBlockTraceValuesResponse {
   repeated string network = 5;
   repeated string execution_implementation = 6;
   repeated string node_version = 7;
+  repeated string client_version = 8;
 }
 
 message ListUniqueBeaconStateValuesRequest {

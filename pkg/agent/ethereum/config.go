@@ -1,22 +1,29 @@
 package ethereum
 
-import "errors"
+import (
+	"fmt"
+
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
+)
 
 type Config struct {
-	// The address of the Beacon node to connect to
-	BeaconNodeAddress string `yaml:"beaconNodeAddress"`
+	// Execution configuration
+	Execution *execution.Config `yaml:"execution"`
+	// Beacon configuration
+	Beacon *beacon.Config `yaml:"beacon"`
 	// OverrideNetworkName is the name of the network to use for the agent.
 	// If not set, the network name will be retrieved from the beacon node.
 	OverrideNetworkName string `yaml:"overrideNetworkName"  default:""`
-	// BeaconNodeHeaders is a map of headers to send to the beacon node.
-	BeaconNodeHeaders map[string]string `yaml:"beaconNodeHeaders"`
-	// BeaconSubscriptions is a list of beacon subscriptions to subscribe to.
-	BeaconSubscriptions *[]string `yaml:"beaconSubscriptions"`
 }
 
 func (c *Config) Validate() error {
-	if c.BeaconNodeAddress == "" {
-		return errors.New("beaconNodeAddress is required")
+	if err := c.Execution.Validate(); err != nil {
+		return fmt.Errorf("invalid execution configuration: %w", err)
+	}
+
+	if err := c.Beacon.Validate(); err != nil {
+		return fmt.Errorf("invalid beacon configuration: %w", err)
 	}
 
 	return nil

@@ -314,6 +314,16 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		return nil, status.Error(codes.Internal, "failed to insert execution block trace")
 	}
 
+	logFields := logrus.Fields{
+		"node":         req.GetNode().GetValue(),
+		"network":      req.GetNetwork().GetValue(),
+		"node_version": req.GetNodeVersion().GetValue(),
+		"location":     req.GetLocation().GetValue(),
+		"fetched_at":   req.GetFetchedAt().AsTime(),
+	}
+
+	i.log.WithFields(logFields).WithField("id", trace.GetId().GetValue()).Debug("Indexed execution block trace")
+
 	return &indexer.CreateExecutionBlockTraceResponse{
 		Id: trace.GetId(),
 	}, nil

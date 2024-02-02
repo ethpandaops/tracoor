@@ -93,3 +93,10 @@ func (c *Client) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetS
 
 	return c.pb.GetStorageHandshakeToken(ctx, req)
 }
+
+func (c *Client) CreateExecutionBlockTrace(ctx context.Context, req *indexer.CreateExecutionBlockTraceRequest) (*indexer.CreateExecutionBlockTraceResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreateExecutionBlockTrace(ctx, req, grpc.UseCompressor(gzip.Name))
+}

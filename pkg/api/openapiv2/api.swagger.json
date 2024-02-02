@@ -98,7 +98,7 @@
     "apiListExecutionBlockTraceResponse": {
       "type": "object",
       "properties": {
-        "executionBlockTraces": {
+        "execution_block_traces": {
           "type": "array",
           "items": {
             "type": "object",
@@ -172,12 +172,14 @@
     "apiListUniqueExecutionBlockTraceValuesRequestField": {
       "type": "string",
       "enum": [
-        "NODE",
-        "BLOCK_HASH",
-        "BLOCK_NUMBER",
-        "NETWORK"
+        "node",
+        "block_hash",
+        "block_number",
+        "network",
+        "node_version",
+        "execution_implementation"
       ],
-      "default": "NODE"
+      "default": "node"
     },
     "apiListUniqueExecutionBlockTraceValuesResponse": {
       "type": "object",
@@ -188,13 +190,13 @@
             "type": "string"
           }
         },
-        "blockHash": {
+        "block_hash": {
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-        "blockNumber": {
+        "block_number": {
           "type": "array",
           "items": {
             "type": "string",
@@ -202,6 +204,18 @@
           }
         },
         "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "node_version": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "execution_implementation": {
           "type": "array",
           "items": {
             "type": "string"

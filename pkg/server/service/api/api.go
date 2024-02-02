@@ -240,14 +240,18 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 		var f indexer.ListUniqueExecutionBlockTraceValuesRequest_Field
 
 		switch field {
-		case api.ListUniqueExecutionBlockTraceValuesRequest_NODE:
+		case api.ListUniqueExecutionBlockTraceValuesRequest_node:
 			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE
-		case api.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH:
+		case api.ListUniqueExecutionBlockTraceValuesRequest_block_hash:
 			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH
-		case api.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER:
+		case api.ListUniqueExecutionBlockTraceValuesRequest_block_number:
 			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER
-		case api.ListUniqueExecutionBlockTraceValuesRequest_NETWORK:
+		case api.ListUniqueExecutionBlockTraceValuesRequest_network:
 			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_NETWORK
+		case api.ListUniqueExecutionBlockTraceValuesRequest_execution_implementation:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_EXECUTION_IMPLEMENTATION
+		case api.ListUniqueExecutionBlockTraceValuesRequest_node_version:
+			f = indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE_VERSION
 		default:
 			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
 		}
@@ -263,10 +267,12 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 
 	// Convert the response
 	response := &api.ListUniqueExecutionBlockTraceValuesResponse{
-		Node:        resp.Node,
-		BlockHash:   resp.BlockHash,
-		BlockNumber: resp.BlockNumber,
-		Network:     resp.Network,
+		Node:                    resp.Node,
+		BlockHash:               resp.BlockHash,
+		BlockNumber:             resp.BlockNumber,
+		Network:                 resp.Network,
+		ExecutionImplementation: resp.ExecutionImplementation,
+		NodeVersion:             resp.NodeVersion,
 	}
 
 	return response, nil

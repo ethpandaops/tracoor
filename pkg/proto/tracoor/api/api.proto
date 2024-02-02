@@ -99,22 +99,26 @@ message ListExecutionBlockTraceRequest {
 }
 
 message ListExecutionBlockTraceResponse {
-  repeated ExecutionBlockTrace execution_block_traces = 1;
+  repeated ExecutionBlockTrace execution_block_traces = 1 [json_name = "execution_block_traces"];
 }
 
 message ListUniqueExecutionBlockTraceValuesRequest {
   enum Field {
-    NODE = 0;
-    BLOCK_HASH = 1;
-    BLOCK_NUMBER = 2;
-    NETWORK = 3;
+    node = 0;
+    block_hash = 1;
+    block_number = 2;
+    network = 3;
+    node_version = 4;
+    execution_implementation = 5;
   }
-  repeated Field fields = 1;
+  repeated Field fields = 1 [json_name = "fields"];
 }
 
 message ListUniqueExecutionBlockTraceValuesResponse {
   repeated string node = 1;
-  repeated string block_hash = 2;
-  repeated int64 block_number = 3;
+  repeated string block_hash = 2 [json_name = "block_hash"];
+  repeated int64 block_number = 3 [json_name = "block_number"];
   repeated string network = 4;
+  repeated string node_version = 5 [json_name = "node_version"];
+  repeated string execution_implementation = 6 [json_name = "execution_implementation"];
 }

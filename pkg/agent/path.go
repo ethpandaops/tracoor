@@ -22,3 +22,19 @@ func CreateBeaconStateFileName(
 		stateRoot,
 	)
 }
+
+func CreateExecutionBlockTraceFileName(
+	node string,
+	network string,
+	blockNumber uint64,
+	blockHash string,
+) string {
+	return path.Join(
+		"execution_block_traces",
+		network,
+		"blocks",
+		fmt.Sprintf("%d", blockNumber),
+		node,
+		blockHash,
+	)
+}

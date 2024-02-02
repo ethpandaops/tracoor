@@ -79,7 +79,7 @@ func (e *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 }
 
 func (e *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
-	before := time.Now().Add(-e.config.Retention.ExecutionTraces.Duration)
+	before := time.Now().Add(-e.config.Retention.ExecutionBlockTraces.Duration)
 
 	filter := &persistence.ExecutionBlockTraceFilter{
 		Before: &before,

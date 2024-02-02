@@ -13,7 +13,7 @@ import (
 
 func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) error {
 	// Fetch the state root
-	root, err := s.beacon.Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
+	root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	location := CreateBeaconStateFileName(
 		s.Config.Name,
-		string(s.beacon.Metadata().Network.Name),
+		string(s.node.Beacon().Metadata().Network.Name),
 		slot,
 		rootAsString,
 	)
@@ -48,7 +48,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	now := time.Now()
 
 	// Fetch the state
-	state, err := s.beacon.Node().FetchRawBeaconState(ctx, rootAsString, "application/octet-stream")
+	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, rootAsString, "application/octet-stream")
 	if err != nil {
 		return err
 	}
@@ -64,18 +64,18 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	// Sleep for 1s to give the store time to update
 	time.Sleep(1 * time.Second)
 
-	spec, err := s.beacon.Node().Spec()
+	spec, err := s.node.Beacon().Node().Spec()
 
 	req := &indexer.CreateBeaconStateRequest{
 		Node:        wrapperspb.String(s.Config.Name),
-		Network:     wrapperspb.String(string(s.beacon.Metadata().Network.Name)),
+		Network:     wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
 		Slot:        wrapperspb.UInt64(uint64(slot)),
 		Epoch:       wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
 		StateRoot:   wrapperspb.String(rootAsString),
 		Location:    wrapperspb.String(location),
-		NodeVersion: wrapperspb.String(s.beacon.Metadata().NodeVersion(ctx)),
+		NodeVersion: wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 		BeaconImplementation: wrapperspb.String(
-			s.beacon.Metadata().Client(ctx),
+			s.node.Beacon().Metadata().Client(ctx),
 		),
 		FetchedAt: timestamppb.New(now),
 	}

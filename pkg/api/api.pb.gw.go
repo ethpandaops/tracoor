@@ -232,7 +232,7 @@ func RegisterAPIHandlerServer(ctx context.Context, mux *runtime.ServeMux, server
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/api.API/ListExecutionBlockTrace", runtime.WithHTTPPathPattern("/api.API/ListExecutionBlockTrace"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/api.API/ListExecutionBlockTrace", runtime.WithHTTPPathPattern("/v1/api/list-execution-block-trace"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -257,7 +257,7 @@ func RegisterAPIHandlerServer(ctx context.Context, mux *runtime.ServeMux, server
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/api.API/ListUniqueExecutionBlockTraceValues", runtime.WithHTTPPathPattern("/api.API/ListUniqueExecutionBlockTraceValues"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/api.API/ListUniqueExecutionBlockTraceValues", runtime.WithHTTPPathPattern("/v1/api/list-unique-execution-block-trace-values"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -365,7 +365,7 @@ func RegisterAPIHandlerClient(ctx context.Context, mux *runtime.ServeMux, client
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/api.API/ListExecutionBlockTrace", runtime.WithHTTPPathPattern("/api.API/ListExecutionBlockTrace"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/api.API/ListExecutionBlockTrace", runtime.WithHTTPPathPattern("/v1/api/list-execution-block-trace"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -387,7 +387,7 @@ func RegisterAPIHandlerClient(ctx context.Context, mux *runtime.ServeMux, client
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/api.API/ListUniqueExecutionBlockTraceValues", runtime.WithHTTPPathPattern("/api.API/ListUniqueExecutionBlockTraceValues"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/api.API/ListUniqueExecutionBlockTraceValues", runtime.WithHTTPPathPattern("/v1/api/list-unique-execution-block-trace-values"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -411,9 +411,9 @@ var (
 
 	pattern_API_ListUniqueBeaconStateValues_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "api", "list-unique-beacon-state-values"}, ""))
 
-	pattern_API_ListExecutionBlockTrace_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"api.API", "ListExecutionBlockTrace"}, ""))
+	pattern_API_ListExecutionBlockTrace_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "api", "list-execution-block-trace"}, ""))
 
-	pattern_API_ListUniqueExecutionBlockTraceValues_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"api.API", "ListUniqueExecutionBlockTraceValues"}, ""))
+	pattern_API_ListUniqueExecutionBlockTraceValues_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "api", "list-unique-execution-block-trace-values"}, ""))
 )
 
 var (

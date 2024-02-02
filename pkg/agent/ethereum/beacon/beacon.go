@@ -1,4 +1,4 @@
-package ethereum
+package beacon
 
 import (
 	"context"
@@ -6,31 +6,31 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/beacon/pkg/beacon"
-	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/services"
+	bn "github.com/ethpandaops/beacon/pkg/beacon"
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/go-co-op/gocron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type BeaconNode struct {
+type Node struct {
 	config *Config
 	log    logrus.FieldLogger
 
-	beacon beacon.Node
+	beacon bn.Node
 
 	services []services.Service
 
 	onReadyCallbacks []func(ctx context.Context) error
 }
 
-func NewBeaconNode(ctx context.Context, name string, config *Config, log logrus.FieldLogger) (*BeaconNode, error) {
-	opts := *beacon.
+func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkName string, config *Config) *Node {
+	opts := *bn.
 		DefaultOptions().
 		DisablePrometheusMetrics()
 
 	if config.BeaconSubscriptions != nil {
-		opts.BeaconSubscription = beacon.BeaconSubscriptionOptions{
+		opts.BeaconSubscription = bn.BeaconSubscriptionOptions{
 			Enabled: true,
 			Topics:  *config.BeaconSubscriptions,
 		}
@@ -41,13 +41,13 @@ func NewBeaconNode(ctx context.Context, name string, config *Config, log logrus.
 	opts.HealthCheck.Interval.Duration = time.Second * 3
 	opts.HealthCheck.SuccessfulResponses = 1
 
-	node := beacon.NewNode(log, &beacon.Config{
+	node := bn.NewNode(log, &bn.Config{
 		Name:    name,
-		Addr:    config.BeaconNodeAddress,
-		Headers: config.BeaconNodeHeaders,
+		Addr:    config.NodeAddress,
+		Headers: config.NodeHeaders,
 	}, "tracoor_agent", opts)
 
-	metadata := services.NewMetadataService(log, node, config.OverrideNetworkName)
+	metadata := services.NewMetadataService(log, node, overrideNetworkName)
 	duties := services.NewDutiesService(log, node, &metadata)
 
 	svcs := []services.Service{
@@ -55,15 +55,15 @@ func NewBeaconNode(ctx context.Context, name string, config *Config, log logrus.
 		&duties,
 	}
 
-	return &BeaconNode{
+	return &Node{
 		config:   config,
 		log:      log.WithField("module", "agent/ethereum/beacon"),
 		beacon:   node,
 		services: svcs,
-	}, nil
+	}
 }
 
-func (b *BeaconNode) Start(ctx context.Context) error {
+func (b *Node) Start(ctx context.Context) error {
 	s := gocron.NewScheduler(time.Local)
 
 	errs := make(chan error, 1)
@@ -114,11 +114,11 @@ func (b *BeaconNode) Start(ctx context.Context) error {
 	}
 }
 
-func (b *BeaconNode) Node() beacon.Node {
+func (b *Node) Node() bn.Node {
 	return b.beacon
 }
 
-func (b *BeaconNode) getServiceByName(name services.Name) (services.Service, error) {
+func (b *Node) getServiceByName(name services.Name) (services.Service, error) {
 	for _, service := range b.services {
 		if service.Name() == name {
 			return service, nil
@@ -128,7 +128,7 @@ func (b *BeaconNode) getServiceByName(name services.Name) (services.Service, err
 	return nil, errors.New("service not found")
 }
 
-func (b *BeaconNode) Metadata() *services.MetadataService {
+func (b *Node) Metadata() *services.MetadataService {
 	service, err := b.getServiceByName("metadata")
 	if err != nil {
 		// This should never happen. If it does, good luck.
@@ -138,7 +138,7 @@ func (b *BeaconNode) Metadata() *services.MetadataService {
 	return service.(*services.MetadataService)
 }
 
-func (b *BeaconNode) Duties() *services.DutiesService {
+func (b *Node) Duties() *services.DutiesService {
 	service, err := b.getServiceByName("duties")
 	if err != nil {
 		// This should never happen. If it does, good luck.
@@ -148,11 +148,11 @@ func (b *BeaconNode) Duties() *services.DutiesService {
 	return service.(*services.DutiesService)
 }
 
-func (b *BeaconNode) OnReady(_ context.Context, callback func(ctx context.Context) error) {
+func (b *Node) OnReady(_ context.Context, callback func(ctx context.Context) error) {
 	b.onReadyCallbacks = append(b.onReadyCallbacks, callback)
 }
 
-func (b *BeaconNode) Synced(ctx context.Context) error {
+func (b *Node) Synced(ctx context.Context) error {
 	status := b.beacon.Status()
 	if status == nil {
 		return errors.New("missing beacon status")

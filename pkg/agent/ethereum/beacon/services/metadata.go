@@ -38,7 +38,7 @@ type MetadataService struct {
 func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, overrideNetworkName string) MetadataService {
 	return MetadataService{
 		beacon:              sbeacon,
-		log:                 log.WithField("module", "agent/ethereum/metadata"),
+		log:                 log.WithField("module", "agent/ethereum/beacon/metadata"),
 		Network:             &networks.Network{Name: networks.NetworkNameNone},
 		onReadyCallbacks:    []func(context.Context) error{},
 		mu:                  sync.Mutex{},
@@ -49,6 +49,12 @@ func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, overrideNet
 func (m *MetadataService) Start(ctx context.Context) error {
 	go func() {
 		operation := func() error {
+			if !m.beacon.Healthy() {
+				m.log.Info("Waiting for beacon node to be healthy")
+
+				m.WaitForHealthyBeaconNode(ctx)
+			}
+
 			if err := m.RefreshAll(ctx); err != nil {
 				return err
 			}
@@ -94,6 +100,18 @@ func (m *MetadataService) Stop(ctx context.Context) error {
 
 func (m *MetadataService) OnReady(ctx context.Context, cb func(context.Context) error) {
 	m.onReadyCallbacks = append(m.onReadyCallbacks, cb)
+}
+
+func (m *MetadataService) WaitForHealthyBeaconNode(ctx context.Context) {
+	operation := func() error {
+		if !m.beacon.Healthy() {
+			return errors.New("beacon node is not healthy")
+		}
+
+		return nil
+	}
+
+	backoff.Retry(operation, backoff.NewExponentialBackOff())
 }
 
 func (m *MetadataService) Ready(ctx context.Context) error {
