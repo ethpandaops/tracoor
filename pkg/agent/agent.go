@@ -42,6 +42,9 @@ type agent struct {
 	indexer *indexer.Client
 
 	store store.Store
+
+	beaconStateQueue         chan *BeaconStateRequest
+	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
 }
 
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
@@ -66,13 +69,15 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}
 
 	return &agent{
-		Config:    config,
-		node:      node,
-		log:       log,
-		metrics:   NewMetrics("tracoor_agent"),
-		scheduler: gocron.NewScheduler(time.Local),
-		indexer:   indexerClient,
-		store:     st,
+		Config:                   config,
+		node:                     node,
+		log:                      log,
+		metrics:                  NewMetrics("tracoor_agent"),
+		scheduler:                gocron.NewScheduler(time.Local),
+		indexer:                  indexerClient,
+		store:                    st,
+		beaconStateQueue:         make(chan *BeaconStateRequest, 1000),
+		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
 	}, nil
 }
 
@@ -92,6 +97,9 @@ func (s *agent) Start(ctx context.Context) error {
 		WithField("version", tracoor.Full()).
 		Info("Starting tracoor in agent mode")
 
+	go s.processBeaconStateQueue(ctx)
+	go s.processExecutionBlockTraceQueue(ctx)
+
 	s.node.OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
@@ -101,8 +109,6 @@ func (s *agent) Start(ctx context.Context) error {
 				"event_root": fmt.Sprintf("%#x", event.Block),
 				"purpose":    "execution_block_trace",
 			})
-
-			logCtx.Debug("New beacon block")
 
 			// Fetch the beacon block from the beacon node.
 			block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%#x", event.Block))
@@ -141,27 +147,32 @@ func (s *agent) Start(ctx context.Context) error {
 		}
 
 		s.node.Beacon().Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
-			// Fetch the slot for `slot -1`
-			slotNumber := slot.Number() - 1
+			// Sleep for a tiny amount to give the beacon node a chance to do any processing it needs to do.
+			time.Sleep(500 * time.Millisecond)
 
-			if slotNumber < 0 {
-				slotNumber = 0
+			// Fetch the state root
+			root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot.Number()))
+			if err != nil {
+				s.log.
+					WithError(err).
+					WithField("slot", slot.Number()).
+					Error("Failed to fetch beacon state root when handling new slot event")
+
+				return
 			}
 
-			if err := s.fetchAndIndexBeaconState(ctx, phase0.Slot(slotNumber)); err != nil {
-				s.log.WithError(err).Error("Failed to fetch and index beacon state")
-			}
+			s.enqueueBeaconState(ctx, root, phase0.Slot(slot.Number()))
 		})
 
 		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
 			s.log.WithFields(
 				logrus.Fields{
-					"old_head_state": chainReorg.OldHeadState,
-					"new_head_state": chainReorg.NewHeadState,
+					"old_head_state": rootAsString(chainReorg.OldHeadState),
+					"new_head_state": rootAsString(chainReorg.NewHeadState),
 					"depth":          chainReorg.Depth,
 					"slot":           chainReorg.Slot,
-					"old_head_block": chainReorg.OldHeadBlock,
-					"new_head_block": chainReorg.NewHeadBlock,
+					"old_head_block": rootAsString(chainReorg.OldHeadBlock),
+					"new_head_block": rootAsString(chainReorg.NewHeadBlock),
 				},
 			).Info("Chain reorg detected")
 
@@ -174,9 +185,13 @@ func (s *agent) Start(ctx context.Context) error {
 			for slot := chainReorg.Slot; slot < phase0.Slot(headSlot.Number()); slot++ {
 				s.log.WithField("slot", slot).Info("Fetching and indexing beacon state from reorg event")
 
-				if err := s.fetchAndIndexBeaconState(ctx, phase0.Slot(slot)); err != nil {
-					s.log.WithError(err).Error("Failed to fetch and index beacon state from reorg")
+				// Fetch the state root
+				root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
+				if err != nil {
+					return err
 				}
+
+				s.enqueueBeaconState(ctx, root, slot)
 			}
 
 			return nil
@@ -291,4 +306,8 @@ func (s *agent) ServePProf(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func rootAsString(r phase0.Root) string {
+	return fmt.Sprintf("%#x", r)
 }

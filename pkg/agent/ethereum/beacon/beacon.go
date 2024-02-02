@@ -48,11 +48,9 @@ func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkN
 	}, "tracoor_agent", opts)
 
 	metadata := services.NewMetadataService(log, node, overrideNetworkName)
-	duties := services.NewDutiesService(log, node, &metadata)
 
 	svcs := []services.Service{
 		&metadata,
-		&duties,
 	}
 
 	return &Node{
@@ -136,16 +134,6 @@ func (b *Node) Metadata() *services.MetadataService {
 	}
 
 	return service.(*services.MetadataService)
-}
-
-func (b *Node) Duties() *services.DutiesService {
-	service, err := b.getServiceByName("duties")
-	if err != nil {
-		// This should never happen. If it does, good luck.
-		return nil
-	}
-
-	return service.(*services.DutiesService)
 }
 
 func (b *Node) OnReady(_ context.Context, callback func(ctx context.Context) error) {

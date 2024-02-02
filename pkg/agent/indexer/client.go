@@ -100,3 +100,10 @@ func (c *Client) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cre
 
 	return c.pb.CreateExecutionBlockTrace(ctx, req, grpc.UseCompressor(gzip.Name))
 }
+
+func (c *Client) ListExecutionBlockTrace(ctx context.Context, req *indexer.ListExecutionBlockTraceRequest) (*indexer.ListExecutionBlockTraceResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.ListExecutionBlockTrace(ctx, req, grpc.UseCompressor(gzip.Name))
+}

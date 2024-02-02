@@ -11,8 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) error {
-	// Fetch the state root
+func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, slot phase0.Slot) error {
 	root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
 		return err
@@ -32,15 +31,21 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	// Check if we've somehow already indexed this beacon state
 	rsp, err := s.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
 		Node:      s.Config.Name,
-		Slot:      uint64(slot),
 		StateRoot: rootAsString,
 	})
 	if err != nil {
-		s.log.WithField("state_root", rootAsString).WithField("slot", slot).WithError(err).Error("Failed to check if beacon state is already indexed")
+		s.log.
+			WithField("state_root", rootAsString).
+			WithField("slot", slot).
+			WithError(err).
+			Error("Failed to check if beacon state is already indexed")
 	}
 
 	if rsp != nil && len(rsp.BeaconStates) > 0 {
-		s.log.WithField("state_root", rootAsString).WithField("slot", slot).Debug("Beacon state already indexed")
+		s.log.
+			WithField("state_root", rootAsString).
+			WithField("slot", slot).
+			Debug("Beacon state already indexed")
 
 		return nil
 	}
@@ -85,7 +90,10 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
-	s.log.WithField("state_root", root).WithField("slot", slot).Debug("Indexed beacon state")
+	s.log.
+		WithField("state_root", root).
+		WithField("slot", slot).
+		Debug("Indexed beacon state")
 
 	return nil
 }
