@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os/signal"
@@ -47,6 +48,9 @@ type Server struct {
 
 	grpcClientConn string
 	grpcClientOpts []grpc.DialOption
+
+	frontend   http.Handler
+	frontendFS fs.FS
 }
 
 func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Server, error) {
@@ -234,7 +238,15 @@ func (x *Server) startGrpcServer(ctx context.Context) error {
 }
 
 func (x *Server) startGrpcGateway(ctx context.Context) error {
-	mux := runtime.NewServeMux()
+	frontend := NewFrontend(x.log)
+
+	if err := frontend.Start(); err != nil {
+		return fmt.Errorf("failed to start frontend: %v", err)
+	}
+
+	mux := runtime.NewServeMux(
+		runtime.WithRoutingErrorHandler(frontend.customRoutingErrorHandler),
+	)
 
 	downloader := NewObjectDownloader(x.log, x.store, mux, x.grpcClientConn, x.grpcClientOpts)
 
