@@ -31,10 +31,7 @@ func (n *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case stateRequest := <-s.beaconStateQueue:
+	for stateRequest := range s.beaconStateQueue {
 		if err := s.fetchAndIndexBeaconState(ctx, stateRequest.Root, stateRequest.Slot); err != nil {
 			s.log.
 				WithError(err).
@@ -42,16 +39,15 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) error {
 				WithField("slot", stateRequest.Slot).
 				Error("Failed to fetch and index beacon state")
 		}
+
+		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue))
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case traceRequest := <-s.executionBlockTraceQueue:
+	for traceRequest := range s.executionBlockTraceQueue {
 		if err := s.fetchAndIndexExecutionBlockTrace(ctx, traceRequest.BlockNumber, traceRequest.BlockHash); err != nil {
 			s.log.
 				WithError(err).
@@ -59,7 +55,9 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) error {
 				WithField("block_number", traceRequest.BlockNumber).
 				Error("Failed to fetch and index execution block trace")
 		}
+
+		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue))
 	}
 
-	return nil
+	return ctx.Err()
 }

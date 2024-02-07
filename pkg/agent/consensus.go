@@ -12,6 +12,17 @@ import (
 )
 
 func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, slot phase0.Slot) error {
+	start := time.Now()
+	defer func() {
+		s.metrics.ObserveQueueItemProcessingTime(
+			BeaconStateQueue,
+			time.Now().Sub(start),
+		)
+	}()
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
 		return err
@@ -32,6 +43,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, 
 	rsp, err := s.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
 		Node:      s.Config.Name,
 		StateRoot: rootAsString,
+		Slot:      uint64(slot),
 	})
 	if err != nil {
 		s.log.
@@ -91,7 +103,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, 
 	}
 
 	s.log.
-		WithField("state_root", root).
+		WithField("state_root", rootAsString).
 		WithField("slot", slot).
 		Debug("Indexed beacon state")
 

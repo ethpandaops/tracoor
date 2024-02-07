@@ -12,13 +12,28 @@ import (
 )
 
 func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumber uint64, blockHash string) error {
+	start := time.Now()
+	defer func() {
+		s.metrics.ObserveQueueItemProcessingTime(
+			ExecutionBlockTraceQueue,
+			time.Now().Sub(start),
+		)
+	}()
+
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
 	// Check if we've somehow already indexed this execution block trace.
 	rsp, err := s.indexer.ListExecutionBlockTrace(ctx, &indexer.ListExecutionBlockTraceRequest{
 		Node:      s.Config.Name,
 		BlockHash: blockHash,
 	})
 	if err != nil {
-		s.log.WithField("block_hash", blockHash).WithField("block_number", blockNumber).WithError(err).Warn("Failed to check if execution block trace is already indexed. Will attempt to fetch and index anyway")
+		s.log.
+			WithField("block_hash", blockHash).
+			WithField("block_number", blockNumber).
+			WithError(err).
+			Warn("Failed to check if execution block trace is already indexed. Will attempt to fetch and index anyway")
 	} else {
 		if rsp != nil && len(rsp.ExecutionBlockTraces) > 0 {
 			s.log.WithField("block_hash", blockHash).WithField("block_number", blockNumber).Debug("Execution block trace already indexed")
@@ -66,7 +81,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	}
 
 	s.log.
-		WithField("id", rrsp.Id).
+		WithField("id", rrsp.GetId().GetValue()).
 		WithField("location", location).
 		Debug("Execution block trace indexed")
 

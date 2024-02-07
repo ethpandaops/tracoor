@@ -118,6 +118,12 @@ func (s *agent) Start(ctx context.Context) error {
 				return err
 			}
 
+			if block == nil {
+				logCtx.Error("Failed to fetch beacon block - the beacon node returned a nil block.")
+
+				return errors.New("failed to fetch beacon block")
+			}
+
 			// Rip out the execution block number from the block
 			executionBlockNumber, err := block.ExecutionBlockNumber()
 			if err != nil {
