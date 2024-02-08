@@ -1,0 +1,90 @@
+name: Smoke Test
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sentry-smoke-test:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install Kurtosis
+      run: |
+        echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
+        sudo apt update
+        sudo apt install kurtosis-cli
+    - name: Create Kurtosis config file
+      run: |
+        cat <<EOF > network_params.yaml
+          participants:
+            - el_client_type: geth
+              cl_client_type: teku
+              cl_client_image: ethpandaops/teku:master-16c4354
+            - el_client_type: nethermind
+              cl_client_type: prysm
+            - el_client_type: erigon
+              cl_client_type: lighthouse
+            - el_client_type: besu
+              cl_client_type: lighthouse
+            - el_client_type: reth
+              cl_client_type: lodestar
+            - el_client_type: ethereumjs
+              cl_client_type: nimbus
+          additional_services: []
+          network_parans:
+            genesis_delay: 180
+        <<EOF
+
+    - name: Start Ethereum network with Kurtosis and Run Tracoor stack in parallel
+      timeout-minutes: 20
+      shell: bash
+      run: |
+        echo "Starting Kurtosis..."
+        kurtosis run --enclave tracoor-net github.com/kurtosis-tech/ethereum-package --args-file network_params.yaml & 
+        KURTOSIS_PID=$!
+
+        echo "Starting Tracoor stack..."
+        docker compose up --detach --quiet-pull &
+        TRACOOR_STACK_PID=$!
+
+        echo "Waiting for Kurtosis to start..."
+        wait $KURTOSIS_PID
+        KURTOSIS_EXIT_CODE=$?
+
+        if [ $KURTOSIS_EXIT_CODE -ne 0 ]; then
+          echo "Kurtosis failed to start."
+          exit $KURTOSIS_EXIT_CODE
+        fi
+
+        echo "Waiting for Tracoor stack to start..."
+        wait $TRACOOR_STACK_PID
+        TRACOOR_STACK_EXIT_CODE=$?
+
+        if [ $TRACOOR_STACK_EXIT_CODE -ne 0 ]; then
+          echo "tracoor stack failed to start."
+          exit $TRACOOR_STACK_EXIT_CODE
+        fi
+
+        echo "Kurtosis and Tracoor stack have started successfully."
+    - name: Generate Tracoor agent config
+      run: |
+        all_participants=($(kurtosis enclave inspect tracoor-net | grep cl- | grep http | awk '{ print $2 }' | grep -v validator | sed 's/^cl-//'))
+    - name: Collect docker logs on failure
+      if: failure()
+      uses: jwalton/gh-docker-logs@v2
+      with:
+        dest: './logs'
+    - name: Tar logs
+      if: failure()
+      run: tar cvzf ./logs.tgz ./logs
+    - name: Upload logs to GitHub
+      if: failure()
+      uses: actions/upload-artifact@master
+      with:
+        name: logs.tgz
+        path: ./logs.tgz
