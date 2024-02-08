@@ -231,3 +231,9 @@ func (m *MetadataService) NodeVersion(_ context.Context) string {
 func (m *MetadataService) Client(ctx context.Context) string {
 	return string(ClientFromString(m.NodeVersion(ctx)))
 }
+
+func (m *MetadataService) Synced() bool {
+	return !m.beacon.Status().Syncing() &&
+		m.beacon.Status().SyncState().HeadSlot > 0 &&
+		m.beacon.Status().SyncState().SyncDistance <= 16
+}

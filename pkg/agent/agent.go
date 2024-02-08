@@ -112,6 +112,12 @@ func (s *agent) Start(ctx context.Context) error {
 				"purpose":    "execution_block_trace",
 			})
 
+			if !s.node.Execution().Metadata().IsSynced() {
+				logCtx.Debug("Skipping queueing execution block trace as the execution node is not yet synced")
+
+				return nil
+			}
+
 			// Fetch the beacon block from the beacon node.
 			block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%#x", event.Block))
 			if err != nil {
@@ -161,6 +167,12 @@ func (s *agent) Start(ctx context.Context) error {
 		s.node.Beacon().Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
 			// Sleep for a tiny amount to give the beacon node a chance to do any processing it needs to do.
 			time.Sleep(500 * time.Millisecond)
+
+			if !s.node.Beacon().Metadata().Synced() {
+				s.log.Debug("Skipping queueing beacon state as the beacon node is not yet synced")
+
+				return
+			}
 
 			s.enqueueBeaconState(ctx, phase0.Slot(slot.Number()))
 		})

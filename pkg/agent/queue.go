@@ -38,6 +38,8 @@ func (n *agent) enqueueBadBlock(ctx context.Context) {
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
 	for stateRequest := range s.beaconStateQueue {
+		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue))
+
 		start := time.Now()
 
 		if err := s.fetchAndIndexBeaconState(ctx, stateRequest.Slot); err != nil {
@@ -51,13 +53,13 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 			BeaconStateQueue,
 			time.Since(start),
 		)
-
-		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue))
 	}
 }
 
 func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 	for traceRequest := range s.executionBlockTraceQueue {
+		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue))
+
 		start := time.Now()
 
 		if err := s.fetchAndIndexExecutionBlockTrace(ctx, traceRequest.BlockNumber, traceRequest.BlockHash); err != nil {
@@ -72,13 +74,13 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 			ExecutionBlockTraceQueue,
 			time.Since(start),
 		)
-
-		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue))
 	}
 }
 
 func (s *agent) processBadBlockQueue(ctx context.Context) {
 	for range s.executionBadBlockQueue {
+		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue))
+
 		start := time.Now()
 
 		if err := s.fetchAndIndexBadBlocks(ctx); err != nil {
@@ -91,7 +93,5 @@ func (s *agent) processBadBlockQueue(ctx context.Context) {
 			ExecutionBlockTraceQueue,
 			time.Since(start),
 		)
-
-		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue))
 	}
 }

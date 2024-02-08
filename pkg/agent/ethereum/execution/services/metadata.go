@@ -23,6 +23,8 @@ type MetadataService struct {
 
 	nodeVersion string
 
+	synced bool
+
 	mu sync.Mutex
 }
 
@@ -65,6 +67,14 @@ func (m *MetadataService) Start(ctx context.Context) error {
 
 	if _, err := s.Every("5m").Do(func() {
 		_ = m.RefreshAll(ctx)
+	}); err != nil {
+		return err
+	}
+
+	if _, err := s.Every("15s").Do(func() {
+		if err := m.updateSyncStatus(ctx); err != nil {
+			m.log.WithError(err).Warn("Failed to update sync status")
+		}
 	}); err != nil {
 		return err
 	}
@@ -122,4 +132,25 @@ func (m *MetadataService) Client(ctx context.Context) string {
 
 func (m *MetadataService) ClientVersion() string {
 	return m.nodeVersion
+}
+
+func (m *MetadataService) updateSyncStatus(ctx context.Context) error {
+	status, err := m.rpc.SyncProgress(ctx)
+	if err != nil {
+		return err
+	}
+
+	if status == nil {
+		m.synced = true
+
+		return nil
+	}
+
+	m.synced = false
+
+	return nil
+}
+
+func (m *MetadataService) IsSynced() bool {
+	return m.synced
 }
