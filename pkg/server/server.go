@@ -49,7 +49,10 @@ type Server struct {
 	grpcClientConn string
 	grpcClientOpts []grpc.DialOption
 
-	frontend   http.Handler
+	//nolint:unused // Required
+	frontend http.Handler
+
+	//nolint:unused // Required
 	frontendFS fs.FS
 }
 

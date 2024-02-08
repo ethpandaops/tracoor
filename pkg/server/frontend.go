@@ -52,8 +52,5 @@ func (f *Frontend) customRoutingErrorHandler(ctx context.Context, mux *runtime.S
 
 func (f *Frontend) fileExists(path string) bool {
 	_, err := fs.Stat(f.filesystem, path)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }

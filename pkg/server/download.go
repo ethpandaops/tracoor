@@ -43,7 +43,9 @@ func (d *ObjectDownloader) Start() error {
 
 	d.indexer = indexer.NewIndexerClient(conn)
 
-	d.mux.HandlePath("GET", "/download/beacon_state/{id}", d.beaconStateHandler)
+	if err := d.mux.HandlePath("GET", "/download/beacon_state/{id}", d.beaconStateHandler); err != nil {
+		return fmt.Errorf("failed to register beacon state download: %v", err)
+	}
 
 	return nil
 }
@@ -53,7 +55,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 
 	id := pathParams["id"]
 	if id == "" {
-		writeJSONError(w, "No ID provided", http.StatusBadRequest)
+		d.writeJSONError(w, "No ID provided", http.StatusBadRequest)
 
 		return
 	}
@@ -67,19 +69,19 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		d.log.WithError(err).Errorf("Failed to list beacon states for ID %s", id)
 
-		writeJSONError(w, "Failed to list beacon states", http.StatusInternalServerError)
+		d.writeJSONError(w, "Failed to list beacon states", http.StatusInternalServerError)
 
 		return
 	}
 
 	if len(resp.BeaconStates) == 0 {
-		writeJSONError(w, "No beacon states found", http.StatusNotFound)
+		d.writeJSONError(w, "No beacon states found", http.StatusNotFound)
 
 		return
 	}
 
 	if len(resp.BeaconStates) > 1 {
-		writeJSONError(w, "More than one beacon state found", http.StatusInternalServerError)
+		d.writeJSONError(w, "More than one beacon state found", http.StatusInternalServerError)
 
 		return
 	}
@@ -90,13 +92,14 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		d.log.WithError(err).Errorf("Failed to get beacon state from store for ID %s from %s", id, state.Location.Value)
 
-		writeJSONError(w, "Failed to get beacon state", http.StatusInternalServerError)
+		d.writeJSONError(w, "Failed to get beacon state", http.StatusInternalServerError)
 
 		return
 	}
 
 	if err := setResponseCompression(w, r, data); err != nil {
-		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
+
 		return
 	}
 
@@ -104,7 +107,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 
 	_, err = w.Write(*data)
 	if err != nil {
-		writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
 	}
 }
 
@@ -141,10 +144,12 @@ func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte
 	return nil
 }
 
-func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
+func (d *ObjectDownloader) writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(statusCode)
 
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		d.log.WithError(err).Error("Failed to write error response")
+	}
 }

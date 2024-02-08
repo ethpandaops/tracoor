@@ -111,7 +111,11 @@ func (m *MetadataService) WaitForHealthyBeaconNode(ctx context.Context) {
 		return nil
 	}
 
-	backoff.Retry(operation, backoff.NewExponentialBackOff())
+	if err := backoff.Retry(operation, backoff.NewExponentialBackOff()); err != nil {
+		m.log.WithError(err).Warn("Failed to wait for healthy beacon node")
+
+		m.log.Fatal(err)
+	}
 }
 
 func (m *MetadataService) Ready(ctx context.Context) error {

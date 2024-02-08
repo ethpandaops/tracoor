@@ -15,14 +15,6 @@ import (
 )
 
 func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumber uint64, blockHash string) error {
-	start := time.Now()
-	defer func() {
-		s.metrics.ObserveQueueItemProcessingTime(
-			ExecutionBlockTraceQueue,
-			time.Now().Sub(start),
-		)
-	}()
-
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -108,6 +100,9 @@ func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
 }
 
 func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
 	// Check if we've already indexed this execution bad blocks.
 	// The bad blocks RPC returns the most recent bad blocks so theres a high likelyhood we've already indexed them.
 	rsp, err := s.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
@@ -150,7 +145,7 @@ func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) er
 	// Upload the execution block trace to the store.
 	location, err = s.store.SaveExecutionBadBlock(ctx, &rawBlockData, location)
 	if err != nil {
-		errors.Wrap(err, "failed to save execution bad block to store")
+		return errors.Wrap(err, "failed to save execution bad block to store")
 	}
 
 	req := &indexer.CreateExecutionBadBlockRequest{

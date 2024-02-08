@@ -106,7 +106,6 @@ func (s *agent) Start(ctx context.Context) error {
 		go s.processBadBlockQueue(ctx)
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
-
 			logCtx := logrus.WithFields(logrus.Fields{
 				"event_slot": event.Slot,
 				"event_root": fmt.Sprintf("%#x", event.Block),
@@ -142,7 +141,9 @@ func (s *agent) Start(ctx context.Context) error {
 				return err
 			}
 
-			return s.fetchAndIndexExecutionBlockTrace(ctx, executionBlockNumber, executionBlockHash.String())
+			s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
+
+			return nil
 		})
 
 		return nil
@@ -161,29 +162,24 @@ func (s *agent) Start(ctx context.Context) error {
 			// Sleep for a tiny amount to give the beacon node a chance to do any processing it needs to do.
 			time.Sleep(500 * time.Millisecond)
 
-			// Fetch the state root
-			root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot.Number()))
-			if err != nil {
-				s.log.
-					WithError(err).
-					WithField("slot", slot.Number()).
-					Error("Failed to fetch beacon state root when handling new slot event")
-
-				return
-			}
-
-			s.enqueueBeaconState(ctx, root, phase0.Slot(slot.Number()))
+			s.enqueueBeaconState(ctx, phase0.Slot(slot.Number()))
 		})
 
 		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
-			s.log.WithFields(
+			logCtx := logrus.WithFields(
 				logrus.Fields{
-					"old_head_state": rootAsString(chainReorg.OldHeadState),
-					"new_head_state": rootAsString(chainReorg.NewHeadState),
-					"depth":          chainReorg.Depth,
-					"slot":           chainReorg.Slot,
-					"old_head_block": rootAsString(chainReorg.OldHeadBlock),
-					"new_head_block": rootAsString(chainReorg.NewHeadBlock),
+					"event_old_head_block": rootAsString(chainReorg.OldHeadBlock),
+					"event_new_head_block": rootAsString(chainReorg.NewHeadBlock),
+					"event_depth":          chainReorg.Depth,
+					"purpose":              "chain_reorg",
+					"event_slot":           chainReorg.Slot,
+				},
+			)
+
+			logCtx.WithFields(
+				logrus.Fields{
+					"event_old_head_state": rootAsString(chainReorg.OldHeadState),
+					"event_new_head_state": rootAsString(chainReorg.NewHeadState),
 				},
 			).Info("Chain reorg detected")
 
@@ -194,17 +190,53 @@ func (s *agent) Start(ctx context.Context) error {
 			}
 
 			for slot := chainReorg.Slot; slot < phase0.Slot(headSlot.Number()); slot++ {
-				s.log.WithField("slot", slot).Info("Fetching and indexing beacon state from reorg event")
+				logCtx.WithField("target_slot", slot).Info("Queueing up a fresh beacon state index from reorg event")
 
-				// Fetch the state root
-				root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
-				if err != nil {
-					return err
-				}
-
-				s.enqueueBeaconState(ctx, root, slot)
+				s.enqueueBeaconState(ctx, slot)
 			}
 
+			// Go back and fetch all the new execution block traces
+			for slot := chainReorg.Slot; slot < phase0.Slot(headSlot.Number()); slot++ {
+				logCtx := logrus.WithField("target_slot", slot)
+
+				block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%d", slot))
+				if err != nil {
+					logCtx.
+						WithError(err).
+						Error("Failed to fetch beacon block when processing chain reorg")
+
+					continue
+				}
+
+				if block == nil {
+					logCtx.Error("Failed to fetch beacon block - the beacon node returned a nil block.")
+
+					continue
+				}
+
+				// Rip out the execution block number from the block
+				executionBlockNumber, err := block.ExecutionBlockNumber()
+				if err != nil {
+					logCtx.WithError(err).Error("Failed to get execution block number from beacon block")
+
+					continue
+				}
+
+				executionBlockHash, err := block.ExecutionBlockHash()
+				if err != nil {
+					logCtx.WithError(err).Error("Failed to get execution block hash from beacon block")
+
+					continue
+				}
+
+				logCtx.WithFields(logrus.Fields{
+					"execution_block_number": executionBlockNumber,
+					"execution_block_hash":   executionBlockHash.String(),
+				}).Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
+
+				s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
+
+			}
 			return nil
 		})
 
@@ -215,9 +247,12 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.WithField("network", s.Config.Ethereum.OverrideNetworkName).Info("Overriding network name")
 	}
 
-	s.scheduler.Every(90).Seconds().Do(func() {
+	_, err := s.scheduler.Every(90).Seconds().Do(func() {
 		s.enqueueBadBlock(ctx)
 	})
+	if err != nil {
+		return err
+	}
 
 	s.scheduler.StartAsync()
 

@@ -11,15 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, slot phase0.Slot) error {
-	start := time.Now()
-	defer func() {
-		s.metrics.ObserveQueueItemProcessingTime(
-			BeaconStateQueue,
-			time.Now().Sub(start),
-		)
-	}()
-
+func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -82,6 +74,9 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, root phase0.Root, 
 	time.Sleep(1 * time.Second)
 
 	spec, err := s.node.Beacon().Node().Spec()
+	if err != nil {
+		return err
+	}
 
 	req := &indexer.CreateBeaconStateRequest{
 		Node:        wrapperspb.String(s.Config.Name),
