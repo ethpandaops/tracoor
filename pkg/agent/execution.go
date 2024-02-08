@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -84,6 +87,111 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		WithField("id", rrsp.GetId().GetValue()).
 		WithField("location", location).
 		Debug("Execution block trace indexed")
+
+	return nil
+}
+
+func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
+	// Fetch the bad blocks from the execution node.
+	blocks, err := s.node.Execution().GetBadBlocks(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, block := range *blocks {
+		if err := s.indexBadBlock(ctx, &block); err != nil {
+			s.log.WithError(err).Error("Failed to index execution bad block")
+		}
+	}
+
+	return nil
+}
+
+func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) error {
+	// Check if we've already indexed this execution bad blocks.
+	// The bad blocks RPC returns the most recent bad blocks so theres a high likelyhood we've already indexed them.
+	rsp, err := s.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
+		Node:      s.Config.Name,
+		BlockHash: block.Hash,
+	})
+	if err != nil {
+		s.log.
+			WithField("block_hash", block.Hash).
+			WithError(err).
+			Warn("Failed to check if execution bad block is already indexed. Since these blocks are heavy we will NOT attempt to fetch and index anyway")
+
+		return fmt.Errorf("failed to check if execution bad block is already indexed: %w", err)
+	}
+
+	if rsp != nil && len(rsp.ExecutionBadBlocks) > 0 {
+		s.log.
+			WithField("block_hash", block.Hash).
+			Debug("Execution bad block already indexed")
+
+		return nil
+	}
+
+	// Convert it to a byte array.
+	rawBlockData, err := json.Marshal(block)
+	if err != nil {
+		s.log.WithError(err).Error("Failed to marshal execution bad block to JSON")
+
+		return err
+	}
+
+	location := CreateExecutionBadBlockFileName(
+		s.Config.Name,
+		string(s.node.Beacon().Metadata().Network.Name),
+		block.Hash,
+	)
+
+	location = fmt.Sprintf("%s.json", location)
+
+	// Upload the execution block trace to the store.
+	location, err = s.store.SaveExecutionBadBlock(ctx, &rawBlockData, location)
+	if err != nil {
+		errors.Wrap(err, "failed to save execution bad block to store")
+	}
+
+	req := &indexer.CreateExecutionBadBlockRequest{
+		Node:                    wrapperspb.String(s.Config.Name),
+		BlockHash:               wrapperspb.String(block.Hash),
+		FetchedAt:               timestamppb.New(time.Now()),
+		Location:                wrapperspb.String(location),
+		Network:                 wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
+		ExecutionImplementation: wrapperspb.String(s.node.Execution().Metadata().Client(ctx)),
+		NodeVersion:             wrapperspb.String(s.node.Execution().Metadata().ClientVersion()),
+	}
+
+	// Attempt to parse the block number from the json of the block.
+	// If the block is so bad that it doesn't even have a block number, we'll just go without.
+	header, err := block.ParseBlockHeader()
+	if err != nil {
+		s.log.WithError(err).Error("Failed to parse block data from bad block")
+	} else {
+		if header != nil {
+			if header.Number != nil {
+				req.BlockNumber = wrapperspb.Int64(int64(header.Number.Int64()))
+			}
+
+			if header.Extra != nil {
+				sanitizedExtra := strings.ToValidUTF8(string(header.Extra), "")
+
+				req.BlockExtraData = wrapperspb.String(sanitizedExtra)
+			}
+		}
+	}
+
+	// Index the execution block trace.
+	rrsp, err := s.indexer.CreateExecutionBadBlock(ctx, req)
+	if err != nil {
+		return errors.Wrapf(err, "failed to index execution bad block: %v", block.Hash)
+	}
+
+	s.log.
+		WithField("id", rrsp.GetId().GetValue()).
+		WithField("location", location).
+		Debug("Execution bad block indexed")
 
 	return nil
 }

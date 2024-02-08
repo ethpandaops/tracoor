@@ -38,3 +38,16 @@ func CreateExecutionBlockTraceFileName(
 		blockHash,
 	)
 }
+
+func CreateExecutionBadBlockFileName(
+	node string,
+	network string,
+	blockHash string,
+) string {
+	return path.Join(
+		"execution_bad_blocks",
+		network,
+		node,
+		blockHash,
+	)
+}

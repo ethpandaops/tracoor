@@ -12,7 +12,9 @@ import (
 
 func (e *Indexer) startRetentionWatchers(ctx context.Context) {
 	e.log.WithFields(logrus.Fields{
-		"beacon_state": e.config.Retention.BeaconStates.Duration,
+		"beacon_state":          e.config.Retention.BeaconStates.Duration,
+		"execution_block_trace": e.config.Retention.ExecutionBlockTraces.Duration,
+		"execution_bad_block":   e.config.Retention.ExecutionBadBlocks.Duration,
 	}).Info("Starting retention watcher")
 
 	for {
@@ -22,6 +24,10 @@ func (e *Indexer) startRetentionWatchers(ctx context.Context) {
 
 		if err := e.purgeOldExecutionTraces(ctx); err != nil {
 			e.log.WithError(err).Error("Failed to delete old execution traces")
+		}
+
+		if err := e.purgeOldExecutionBadBlocks(ctx); err != nil {
+			e.log.WithError(err).Error("Failed to delete old execution bad blocks")
 		}
 
 		select {
@@ -50,9 +56,9 @@ func (e *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 		// Delete from the store first
 		if err := e.store.DeleteBeaconState(ctx, state.Location); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				e.log.WithField("state", state).Warn("Beacon state not found in store")
+				e.log.WithField("state_id", state.ID).Warn("Beacon state not found in store")
 			} else {
-				e.log.WithError(err).WithField("state", state).Error("Failed to delete beacon state from store, will retry next time")
+				e.log.WithError(err).WithField("state_id", state.ID).Error("Failed to delete beacon state from store, will retry next time")
 
 				continue
 			}
@@ -60,7 +66,7 @@ func (e *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 
 		err := e.db.DeleteBeaconState(ctx, state.ID)
 		if err != nil {
-			e.log.WithError(err).WithField("state", state).Error("Failed to delete beacon state")
+			e.log.WithError(err).WithField("state_id", state.ID).Error("Failed to delete beacon state")
 
 			continue
 		}
@@ -96,9 +102,9 @@ func (e *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 		// Delete from the store first
 		if err := e.store.DeleteExecutionBlockTrace(ctx, trace.Location); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				e.log.WithField("trace", trace).Warn("Execution block trace not found in store")
+				e.log.WithField("trace_id", trace.ID).Warn("Execution block trace not found in store")
 			} else {
-				e.log.WithError(err).WithField("trace", trace).Error("Failed to delete execution block trace from store, will retry next time")
+				e.log.WithError(err).WithField("trace_id", trace.ID).Error("Failed to delete execution block trace from store, will retry next time")
 
 				continue
 			}
@@ -106,7 +112,7 @@ func (e *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 
 		err := e.db.DeleteExecutionBlockTrace(ctx, trace.ID)
 		if err != nil {
-			e.log.WithError(err).WithField("trace", trace).Error("Failed to delete execution block trace")
+			e.log.WithError(err).WithField("trace_id", trace.ID).Error("Failed to delete execution block trace")
 
 			continue
 		}
@@ -117,6 +123,52 @@ func (e *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 				"network":      trace.Network,
 				"block_number": trace.BlockNumber,
 				"id":           trace.ID,
+			},
+		).Debug("Deleted execution block trace")
+	}
+
+	return nil
+}
+
+func (e *Indexer) purgeOldExecutionBadBlocks(ctx context.Context) error {
+	before := time.Now().Add(-e.config.Retention.ExecutionBadBlocks.Duration)
+
+	filter := &persistence.ExecutionBadBlockFilter{
+		Before: &before,
+	}
+
+	blocks, err := e.db.ListExecutionBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 1, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	e.log.WithField("before", before).Debugf("Purging %d old execution bad blocks", len(blocks))
+
+	for _, block := range blocks {
+		// Delete from the store first
+		if err := e.store.DeleteExecutionBadBlock(ctx, block.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				e.log.WithField("block_id", block.ID).Warn("Execution bad block not found in store")
+			} else {
+				e.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete execution bad block from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := e.db.DeleteExecutionBadBlock(ctx, block.ID)
+		if err != nil {
+			e.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete execution bad block")
+
+			continue
+		}
+
+		e.log.WithFields(
+			logrus.Fields{
+				"node":       block.Node,
+				"network":    block.Network,
+				"block_hash": block.BlockHash,
+				"id":         block.ID,
 			},
 		).Debug("Deleted execution block trace")
 	}

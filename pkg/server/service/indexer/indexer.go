@@ -541,3 +541,216 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 
 	return response, nil
 }
+
+func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.CreateExecutionBadBlockRequest) (*indexer.CreateExecutionBadBlockResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Create the execution bad block
+	block := &indexer.ExecutionBadBlock{
+		Id:                      wrapperspb.String(uuid.New().String()),
+		Node:                    req.GetNode(),
+		FetchedAt:               req.GetFetchedAt(),
+		BlockHash:               req.GetBlockHash(),
+		BlockNumber:             req.GetBlockNumber(),
+		BlockExtraData:          req.GetBlockExtraData(),
+		Location:                req.GetLocation(),
+		Network:                 req.GetNetwork(),
+		ExecutionImplementation: req.GetExecutionImplementation(),
+		NodeVersion:             req.GetNodeVersion(),
+	}
+
+	if err := block.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := i.db.InsertExecutionBadBlock(ctx, ProtoExecutionBadBlockToDBExecutionBadBlock(block)); err != nil {
+		return nil, status.Error(codes.Internal, "failed to insert execution bad block")
+	}
+
+	logFields := logrus.Fields{
+		"node":         req.GetNode().GetValue(),
+		"network":      req.GetNetwork().GetValue(),
+		"node_version": req.GetNodeVersion().GetValue(),
+		"location":     req.GetLocation().GetValue(),
+		"fetched_at":   req.GetFetchedAt().AsTime(),
+	}
+
+	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed execution bad block")
+
+	return &indexer.CreateExecutionBadBlockResponse{
+		Id: block.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListExecutionBadBlockRequest) (*indexer.ListExecutionBadBlockResponse, error) {
+	filter := &persistence.ExecutionBadBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.BlockNumber != 0 {
+		filter.AddBlockNumber(req.BlockNumber)
+	}
+
+	if req.BlockHash != "" {
+		filter.AddBlockHash(req.BlockHash)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.ExecutionImplementation != "" {
+		filter.AddExecutionImplementation(req.ExecutionImplementation)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.BlockExtraData != "" {
+		filter.AddBlockExtraData(req.BlockExtraData)
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	executionBadBlocks, err := i.db.ListExecutionBadBlock(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoExecutionBadBlocks := make([]*indexer.ExecutionBadBlock, len(executionBadBlocks))
+	for i, block := range executionBadBlocks {
+		protoExecutionBadBlocks[i] = DBExecutionBadBlockToProtoExecutionBadBlock(block)
+	}
+
+	return &indexer.ListExecutionBadBlockResponse{
+		ExecutionBadBlocks: protoExecutionBadBlocks,
+	}, nil
+}
+
+func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.CountExecutionBadBlockRequest) (*indexer.CountExecutionBadBlockResponse, error) {
+	filter := &persistence.ExecutionBadBlockFilter{}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.BlockNumber != 0 {
+		filter.AddBlockNumber(req.BlockNumber)
+	}
+
+	if req.BlockHash != "" {
+		filter.AddBlockHash(req.BlockHash)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.ExecutionImplementation != "" {
+		filter.AddExecutionImplementation(req.ExecutionImplementation)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.BlockExtraData != "" {
+		filter.AddBlockExtraData(req.BlockExtraData)
+	}
+
+	executionBadBlocks, err := i.db.CountExecutionBadBlock(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountExecutionBadBlockResponse{
+		Count: wrapperspb.UInt64(uint64(executionBadBlocks)),
+	}, nil
+}
+
+func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *indexer.ListUniqueExecutionBadBlockValuesRequest) (*indexer.ListUniqueExecutionBadBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_HASH:
+			fields[idx] = "block_hash"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_NUMBER:
+			fields[idx] = "block_number"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_NETWORK:
+			fields[idx] = "network"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_EXECUTION_IMPLEMENTATION:
+			fields[idx] = "execution_implementation"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_EXTRA_DATA:
+			fields[idx] = "block_extra_data"
+		}
+	}
+
+	distinctValues, err := i.db.DistinctExecutionBadBlockValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueExecutionBadBlockValuesResponse{
+		Node:                    distinctValues.Node,
+		BlockHash:               distinctValues.BlockHash,
+		BlockNumber:             distinctValues.BlockNumber,
+		BlockExtraData:          distinctValues.BlockExtraData,
+		Location:                distinctValues.Location,
+		Network:                 distinctValues.Network,
+		ExecutionImplementation: distinctValues.ExecutionImplementation,
+		NodeVersion:             distinctValues.NodeVersion,
+	}
+
+	return response, nil
+}

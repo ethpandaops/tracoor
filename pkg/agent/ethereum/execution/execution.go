@@ -136,3 +136,31 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash string) (*[]byte,
 
 	return &s, nil
 }
+
+func (n *Node) GetBadBlocks(ctx context.Context) (*BadBlocksResponse, error) {
+	data := jsonrpc.Message{}
+
+	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
+		"debug_getBadBlocks",
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(rsp, &data); err != nil {
+		return nil, err
+	}
+
+	badBlocks := []BadBlock{}
+	if err := json.Unmarshal([]byte(data.Result), &badBlocks); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal bad blocks: %w", err)
+	}
+
+	s := BadBlocksResponse{}
+
+	for _, block := range badBlocks {
+		s[block.Hash] = block
+	}
+
+	return &s, nil
+}

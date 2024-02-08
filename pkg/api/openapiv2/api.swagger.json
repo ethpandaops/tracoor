@@ -61,12 +61,55 @@
         }
       }
     },
+    "apiCountExecutionBadBlockResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
     "apiCountExecutionBlockTraceResponse": {
       "type": "object",
       "properties": {
         "count": {
           "type": "string",
           "format": "uint64"
+        }
+      }
+    },
+    "apiExecutionBadBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "fetched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "block_hash": {
+          "type": "string"
+        },
+        "block_number": {
+          "type": "string",
+          "format": "int64"
+        },
+        "network": {
+          "type": "string"
+        },
+        "execution_implementation": {
+          "type": "string"
+        },
+        "node_version": {
+          "type": "string"
+        },
+        "block_extra_data": {
+          "type": "string"
         }
       }
     },
@@ -109,6 +152,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/apiBeaconState"
+          }
+        }
+      }
+    },
+    "apiListExecutionBadBlockResponse": {
+      "type": "object",
+      "properties": {
+        "execution_bad_blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/apiExecutionBadBlock"
           }
         }
       }
@@ -180,6 +235,67 @@
           }
         },
         "beacon_implementation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "apiListUniqueExecutionBadBlockValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "node",
+        "block_hash",
+        "block_number",
+        "network",
+        "node_version",
+        "execution_implementation",
+        "block_extra_data"
+      ],
+      "default": "node"
+    },
+    "apiListUniqueExecutionBadBlockValuesResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block_hash": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block_number": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "node_version": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "execution_implementation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block_extra_data": {
           "type": "array",
           "items": {
             "type": "string"

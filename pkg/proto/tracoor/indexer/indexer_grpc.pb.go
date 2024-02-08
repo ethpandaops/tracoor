@@ -28,6 +28,10 @@ const (
 	Indexer_ListExecutionBlockTrace_FullMethodName             = "/indexer.Indexer/ListExecutionBlockTrace"
 	Indexer_CountExecutionBlockTrace_FullMethodName            = "/indexer.Indexer/CountExecutionBlockTrace"
 	Indexer_ListUniqueExecutionBlockTraceValues_FullMethodName = "/indexer.Indexer/ListUniqueExecutionBlockTraceValues"
+	Indexer_CreateExecutionBadBlock_FullMethodName             = "/indexer.Indexer/CreateExecutionBadBlock"
+	Indexer_ListExecutionBadBlock_FullMethodName               = "/indexer.Indexer/ListExecutionBadBlock"
+	Indexer_CountExecutionBadBlock_FullMethodName              = "/indexer.Indexer/CountExecutionBadBlock"
+	Indexer_ListUniqueExecutionBadBlockValues_FullMethodName   = "/indexer.Indexer/ListUniqueExecutionBadBlockValues"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -45,6 +49,11 @@ type IndexerClient interface {
 	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
+	// ExecutionBadBlock
+	CreateExecutionBadBlock(ctx context.Context, in *CreateExecutionBadBlockRequest, opts ...grpc.CallOption) (*CreateExecutionBadBlockResponse, error)
+	ListExecutionBadBlock(ctx context.Context, in *ListExecutionBadBlockRequest, opts ...grpc.CallOption) (*ListExecutionBadBlockResponse, error)
+	CountExecutionBadBlock(ctx context.Context, in *CountExecutionBadBlockRequest, opts ...grpc.CallOption) (*CountExecutionBadBlockResponse, error)
+	ListUniqueExecutionBadBlockValues(ctx context.Context, in *ListUniqueExecutionBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBadBlockValuesResponse, error)
 }
 
 type indexerClient struct {
@@ -136,6 +145,42 @@ func (c *indexerClient) ListUniqueExecutionBlockTraceValues(ctx context.Context,
 	return out, nil
 }
 
+func (c *indexerClient) CreateExecutionBadBlock(ctx context.Context, in *CreateExecutionBadBlockRequest, opts ...grpc.CallOption) (*CreateExecutionBadBlockResponse, error) {
+	out := new(CreateExecutionBadBlockResponse)
+	err := c.cc.Invoke(ctx, Indexer_CreateExecutionBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) ListExecutionBadBlock(ctx context.Context, in *ListExecutionBadBlockRequest, opts ...grpc.CallOption) (*ListExecutionBadBlockResponse, error) {
+	out := new(ListExecutionBadBlockResponse)
+	err := c.cc.Invoke(ctx, Indexer_ListExecutionBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) CountExecutionBadBlock(ctx context.Context, in *CountExecutionBadBlockRequest, opts ...grpc.CallOption) (*CountExecutionBadBlockResponse, error) {
+	out := new(CountExecutionBadBlockResponse)
+	err := c.cc.Invoke(ctx, Indexer_CountExecutionBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) ListUniqueExecutionBadBlockValues(ctx context.Context, in *ListUniqueExecutionBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBadBlockValuesResponse, error) {
+	out := new(ListUniqueExecutionBadBlockValuesResponse)
+	err := c.cc.Invoke(ctx, Indexer_ListUniqueExecutionBadBlockValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexerServer is the server API for Indexer service.
 // All implementations must embed UnimplementedIndexerServer
 // for forward compatibility
@@ -151,6 +196,11 @@ type IndexerServer interface {
 	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
+	// ExecutionBadBlock
+	CreateExecutionBadBlock(context.Context, *CreateExecutionBadBlockRequest) (*CreateExecutionBadBlockResponse, error)
+	ListExecutionBadBlock(context.Context, *ListExecutionBadBlockRequest) (*ListExecutionBadBlockResponse, error)
+	CountExecutionBadBlock(context.Context, *CountExecutionBadBlockRequest) (*CountExecutionBadBlockResponse, error)
+	ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error)
 	mustEmbedUnimplementedIndexerServer()
 }
 
@@ -184,6 +234,18 @@ func (UnimplementedIndexerServer) CountExecutionBlockTrace(context.Context, *Cou
 }
 func (UnimplementedIndexerServer) ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBlockTraceValues not implemented")
+}
+func (UnimplementedIndexerServer) CreateExecutionBadBlock(context.Context, *CreateExecutionBadBlockRequest) (*CreateExecutionBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateExecutionBadBlock not implemented")
+}
+func (UnimplementedIndexerServer) ListExecutionBadBlock(context.Context, *ListExecutionBadBlockRequest) (*ListExecutionBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBadBlock not implemented")
+}
+func (UnimplementedIndexerServer) CountExecutionBadBlock(context.Context, *CountExecutionBadBlockRequest) (*CountExecutionBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountExecutionBadBlock not implemented")
+}
+func (UnimplementedIndexerServer) ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBadBlockValues not implemented")
 }
 func (UnimplementedIndexerServer) mustEmbedUnimplementedIndexerServer() {}
 
@@ -360,6 +422,78 @@ func _Indexer_ListUniqueExecutionBlockTraceValues_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Indexer_CreateExecutionBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateExecutionBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CreateExecutionBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CreateExecutionBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CreateExecutionBadBlock(ctx, req.(*CreateExecutionBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_ListExecutionBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExecutionBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).ListExecutionBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_ListExecutionBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).ListExecutionBadBlock(ctx, req.(*ListExecutionBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_CountExecutionBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountExecutionBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CountExecutionBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CountExecutionBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CountExecutionBadBlock(ctx, req.(*CountExecutionBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_ListUniqueExecutionBadBlockValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueExecutionBadBlockValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).ListUniqueExecutionBadBlockValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_ListUniqueExecutionBadBlockValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).ListUniqueExecutionBadBlockValues(ctx, req.(*ListUniqueExecutionBadBlockValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Indexer_ServiceDesc is the grpc.ServiceDesc for Indexer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +536,22 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUniqueExecutionBlockTraceValues",
 			Handler:    _Indexer_ListUniqueExecutionBlockTraceValues_Handler,
+		},
+		{
+			MethodName: "CreateExecutionBadBlock",
+			Handler:    _Indexer_CreateExecutionBadBlock_Handler,
+		},
+		{
+			MethodName: "ListExecutionBadBlock",
+			Handler:    _Indexer_ListExecutionBadBlock_Handler,
+		},
+		{
+			MethodName: "CountExecutionBadBlock",
+			Handler:    _Indexer_CountExecutionBadBlock_Handler,
+		},
+		{
+			MethodName: "ListUniqueExecutionBadBlockValues",
+			Handler:    _Indexer_ListUniqueExecutionBadBlockValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

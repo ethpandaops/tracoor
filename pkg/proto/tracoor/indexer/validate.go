@@ -168,3 +168,79 @@ func (r *ListUniqueExecutionBlockTraceValuesRequest) Validate() error {
 
 	return nil
 }
+
+func (req *CreateExecutionBadBlockRequest) Validate() error {
+	if req.GetLocation().GetValue() == "" {
+		return fmt.Errorf("location is required")
+	}
+
+	if req.GetNode().GetValue() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if req.GetBlockHash().GetValue() == "" {
+		return fmt.Errorf("block_hash is required")
+	}
+
+	if req.GetBlockNumber() == nil {
+		return fmt.Errorf("block_number is required")
+	}
+
+	if req.GetExecutionImplementation().GetValue() == "" {
+		return fmt.Errorf("execution_implementation is required")
+	}
+
+	if req.GetNodeVersion().GetValue() == "" {
+		return fmt.Errorf("node_version is required")
+	}
+
+	if req.GetNetwork().GetValue() == "" {
+		return fmt.Errorf("network is required")
+	}
+
+	return nil
+}
+
+func (t *ExecutionBadBlock) Validate() error {
+	if t == nil {
+		return errors.New("execution block trace is nil")
+	}
+
+	if t.GetLocation().GetValue() == "" {
+		return fmt.Errorf("location is required")
+	}
+
+	if t.GetNode().GetValue() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if t.GetBlockHash().GetValue() == "" {
+		return fmt.Errorf("block_hash is required")
+	}
+
+	if t.GetExecutionImplementation().GetValue() == "" {
+		return fmt.Errorf("execution_implementation is required")
+	}
+
+	if t.GetNodeVersion().GetValue() == "" {
+		return fmt.Errorf("node_version is required")
+	}
+
+	if t.GetNetwork().GetValue() == "" {
+		return fmt.Errorf("network is required")
+	}
+
+	return nil
+}
+
+func (r *ListUniqueExecutionBadBlockValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}

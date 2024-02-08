@@ -36,6 +36,13 @@ type Store interface {
 	// DeleteExecutionBlockTrace deletes an execution block trace from the store
 	DeleteExecutionBlockTrace(ctx context.Context, location string) error
 
+	// SaveExecutionBlockTrace saves an execution block trace to the store
+	SaveExecutionBadBlock(ctx context.Context, data *[]byte, location string) (string, error)
+	// GetExecutionBadBlock fetches an execution block trace from the store
+	GetExecutionBadBlock(ctx context.Context, id string) (*[]byte, error)
+	// DeleteExecutionBadBlock deletes an execution block trace from the store
+	DeleteExecutionBadBlock(ctx context.Context, location string) error
+
 	// PathPrefix returns the path prefix for the store
 	PathPrefix() string
 }

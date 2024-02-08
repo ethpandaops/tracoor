@@ -46,3 +46,15 @@ func (r *ListUniqueExecutionBlockTraceValuesRequest) Validate() error {
 
 	return nil
 }
+
+func (r *ListUniqueExecutionBadBlockValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}

@@ -3,6 +3,7 @@ config_version: 3
 
 http:
   rules:
+
     - selector: api.API.ListBeaconState
       post: /v1/api/list-beacon-state
       body: "*"
@@ -12,6 +13,7 @@ http:
     - selector: api.API.CountBeaconState
       post: /v1/api/count-beacon-state
       body: "*"
+
     - selector: api.API.ListExecutionBlockTrace
       post: /v1/api/list-execution-block-trace
       body: "*"
@@ -20,4 +22,14 @@ http:
       body: "*"
     - selector: api.API.CountExecutionBlockTrace
       post: /v1/api/count-execution-block-trace
+      body: "*"
+
+    - selector: api.API.ListExecutionBadBlock
+      post: /v1/api/list-execution-bad-block
+      body: "*"
+    - selector: api.API.ListUniqueExecutionBadBlockValues
+      post: /v1/api/list-unique-execution-bad-block-values
+      body: "*"
+    - selector: api.API.CountExecutionBadBlock
+      post: /v1/api/count-execution-bad-block
       body: "*"

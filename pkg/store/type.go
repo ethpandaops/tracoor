@@ -21,5 +21,6 @@ type DataType string
 const (
 	UnknownDataType     DataType = "unknown"
 	BeaconStateDataType DataType = "beacon_state"
-	BlockTraceDataType  DataType = "block_trace"
+	BlockTraceDataType  DataType = "execution_block_trace"
+	BadBlockDataType    DataType = "execution_bad_block"
 )

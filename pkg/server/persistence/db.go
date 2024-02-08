@@ -77,6 +77,11 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate execution block trace")
 	}
 
+	err = i.db.AutoMigrate(&ExecutionBadBlock{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate execution bad block")
+	}
+
 	return nil
 }
 

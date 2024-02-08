@@ -107,3 +107,17 @@ func (c *Client) ListExecutionBlockTrace(ctx context.Context, req *indexer.ListE
 
 	return c.pb.ListExecutionBlockTrace(ctx, req, grpc.UseCompressor(gzip.Name))
 }
+
+func (c *Client) CreateExecutionBadBlock(ctx context.Context, req *indexer.CreateExecutionBadBlockRequest) (*indexer.CreateExecutionBadBlockResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreateExecutionBadBlock(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
+func (c *Client) ListExecutionBadBlock(ctx context.Context, req *indexer.ListExecutionBadBlockRequest) (*indexer.ListExecutionBadBlockResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.ListExecutionBadBlock(ctx, req, grpc.UseCompressor(gzip.Name))
+}

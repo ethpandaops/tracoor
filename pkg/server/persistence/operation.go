@@ -16,4 +16,10 @@ const (
 	OperationCountExecutionBlockTrace  Operation = "count_execution_block_trace"
 	OperationListExecutionBlockTrace   Operation = "list_execution_block_trace"
 	OperationUpdateExecutionBlockTrace Operation = "update_execution_block_trace"
+
+	OperationInsertExecutionBadBlock Operation = "insert_execution_bad_block"
+	OperationDeleteExecutionBadBlock Operation = "delete_execution_bad_block"
+	OperationCountExecutionBadBlock  Operation = "count_execution_bad_block"
+	OperationListExecutionBadBlock   Operation = "list_execution_bad_block"
+	OperationUpdateExecutionBadBlock Operation = "update_execution_bad_block"
 )

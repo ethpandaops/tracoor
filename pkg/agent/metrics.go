@@ -16,6 +16,7 @@ type Queue string
 var (
 	BeaconStateQueue         Queue = "beacon_state"
 	ExecutionBlockTraceQueue Queue = "execution_block_trace"
+	ExecutionBadBlockQueue   Queue = "execution_bad_block"
 )
 
 func NewMetrics(namespace string) *Metrics {

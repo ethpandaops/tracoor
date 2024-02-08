@@ -1,6 +1,8 @@
 package indexer
 
 import (
+	"database/sql"
+
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -62,6 +64,36 @@ func DBExecutionBlockTraceToProtoExecutionBlockTrace(eb *persistence.ExecutionBl
 		Network:                 &wrapperspb.StringValue{Value: eb.Network},
 		ExecutionImplementation: &wrapperspb.StringValue{Value: eb.ExecutionImplementation},
 		Id:                      &wrapperspb.StringValue{Value: eb.ID},
+	}
+}
+
+func ProtoExecutionBadBlockToDBExecutionBadBlock(eb *indexer.ExecutionBadBlock) *persistence.ExecutionBadBlock {
+	return &persistence.ExecutionBadBlock{
+		BlockHash:               eb.GetBlockHash().GetValue(),
+		BlockNumber:             sql.NullInt64{Int64: eb.GetBlockNumber().GetValue(), Valid: true},
+		Node:                    eb.GetNode().GetValue(),
+		NodeVersion:             eb.GetNodeVersion().GetValue(),
+		FetchedAt:               eb.GetFetchedAt().AsTime(),
+		Location:                eb.GetLocation().GetValue(),
+		Network:                 eb.GetNetwork().GetValue(),
+		ExecutionImplementation: eb.GetExecutionImplementation().GetValue(),
+		ID:                      eb.GetId().GetValue(),
+		BlockExtraData:          sql.NullString{String: eb.GetBlockExtraData().GetValue(), Valid: true},
+	}
+}
+
+func DBExecutionBadBlockToProtoExecutionBadBlock(eb *persistence.ExecutionBadBlock) *indexer.ExecutionBadBlock {
+	return &indexer.ExecutionBadBlock{
+		BlockHash:               &wrapperspb.StringValue{Value: eb.BlockHash},
+		BlockNumber:             &wrapperspb.Int64Value{Value: eb.BlockNumber.Int64},
+		Node:                    &wrapperspb.StringValue{Value: eb.Node},
+		NodeVersion:             &wrapperspb.StringValue{Value: eb.NodeVersion},
+		FetchedAt:               timestamppb.New(eb.FetchedAt),
+		Location:                &wrapperspb.StringValue{Value: eb.Location},
+		Network:                 &wrapperspb.StringValue{Value: eb.Network},
+		ExecutionImplementation: &wrapperspb.StringValue{Value: eb.ExecutionImplementation},
+		Id:                      &wrapperspb.StringValue{Value: eb.ID},
+		BlockExtraData:          &wrapperspb.StringValue{Value: eb.BlockExtraData.String},
 	}
 }
 

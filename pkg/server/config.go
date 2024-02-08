@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	// The address to listen on.
+	// The address to listen for GRPC requests on.
 	Addr string `yaml:"addr" default:":8080"`
 	// PreStopSleepSeconds is the number of seconds to sleep before stopping.
 	// Useful for giving kubernetes time to drain connections.
@@ -30,8 +30,6 @@ type Config struct {
 	Store store.Config `yaml:"store"`
 	// Services is the list of services to run.
 	Services service.Config `yaml:"services"`
-	// RetentionPeriod is the retention configuration.
-	RetentionHours int64 `yaml:"retentionHours" default:"24"`
 }
 
 func (c *Config) Validate() error {

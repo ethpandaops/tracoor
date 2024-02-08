@@ -30,6 +30,18 @@ message ExecutionBlockTrace {
   google.protobuf.StringValue node_version = 8 [json_name = "node_version"];
 }
 
+message ExecutionBadBlock {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3 [json_name = "fetched_at"];
+  google.protobuf.StringValue block_hash = 4 [json_name = "block_hash"];
+  google.protobuf.Int64Value block_number = 5 [json_name = "block_number"];
+  google.protobuf.StringValue network = 6;
+  google.protobuf.StringValue execution_implementation = 7 [json_name = "execution_implementation"];
+  google.protobuf.StringValue node_version = 8 [json_name = "node_version"];
+  google.protobuf.StringValue block_extra_data = 9 [json_name = "block_extra_data"];
+}
+
 service API {
   rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
   rpc CountBeaconState(CountBeaconStateRequest) returns (CountBeaconStateResponse) {}
@@ -38,6 +50,10 @@ service API {
   rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest) returns (ListExecutionBlockTraceResponse) {}
   rpc CountExecutionBlockTrace(CountExecutionBlockTraceRequest) returns (CountExecutionBlockTraceResponse) {}
   rpc ListUniqueExecutionBlockTraceValues(ListUniqueExecutionBlockTraceValuesRequest) returns (ListUniqueExecutionBlockTraceValuesResponse) {}
+
+  rpc ListExecutionBadBlock(ListExecutionBadBlockRequest) returns (ListExecutionBadBlockResponse) {}
+  rpc CountExecutionBadBlock(CountExecutionBadBlockRequest) returns (CountExecutionBadBlockResponse) {}
+  rpc ListUniqueExecutionBadBlockValues(ListUniqueExecutionBadBlockValuesRequest) returns (ListUniqueExecutionBadBlockValuesResponse) {}
 }
 
 message ListBeaconStateRequest {
@@ -157,4 +173,66 @@ message ListUniqueExecutionBlockTraceValuesResponse {
   repeated string network = 4;
   repeated string node_version = 5 [json_name = "node_version"];
   repeated string execution_implementation = 6 [json_name = "execution_implementation"];
+}
+
+
+message ListExecutionBadBlockRequest {
+  string node = 1;
+  int64 block_number = 2 [json_name = "block_number"];
+  string block_hash = 3 [json_name = "block_hash"];
+  string network = 5;
+  google.protobuf.Timestamp before = 6;
+  google.protobuf.Timestamp after = 7;
+
+  PaginationCursor pagination = 8;
+  string id = 9;
+
+  string execution_implementation = 10 [json_name = "execution_implementation"];
+  string node_version = 11 [json_name = "node_version"];
+
+  string block_extra_data = 12 [json_name = "block_extra_data"];
+}
+
+message ListExecutionBadBlockResponse {
+  repeated ExecutionBadBlock execution_bad_blocks = 1 [json_name = "execution_bad_blocks"];
+}
+
+message CountExecutionBadBlockRequest {
+  string node = 1;
+  int64 block_number = 2 [json_name = "block_number"];
+  string block_hash = 3;
+  string network = 5;
+  string execution_implementation = 6 [json_name = "execution_implementation"];
+  google.protobuf.Timestamp before = 7;
+  google.protobuf.Timestamp after = 8;
+  string node_version = 9 [json_name = "node_version"];
+
+  string block_extra_data = 10 [json_name = "block_extra_data"];
+}
+
+message CountExecutionBadBlockResponse {
+  google.protobuf.UInt64Value count = 1;
+}
+
+message ListUniqueExecutionBadBlockValuesRequest {
+  enum Field {
+    node = 0;
+    block_hash = 1;
+    block_number = 2;
+    network = 3;
+    node_version = 4;
+    execution_implementation = 5;
+    block_extra_data = 6;
+  }
+  repeated Field fields = 1 [json_name = "fields"];
+}
+
+message ListUniqueExecutionBadBlockValuesResponse {
+  repeated string node = 1;
+  repeated string block_hash = 2 [json_name = "block_hash"];
+  repeated int64 block_number = 3 [json_name = "block_number"];
+  repeated string network = 4;
+  repeated string node_version = 5 [json_name = "node_version"];
+  repeated string execution_implementation = 6 [json_name = "execution_implementation"];
+  repeated string block_extra_data = 7 [json_name = "block_extra_data"];
 }

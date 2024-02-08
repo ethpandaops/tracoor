@@ -45,6 +45,7 @@ type agent struct {
 
 	beaconStateQueue         chan *BeaconStateRequest
 	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
+	executionBadBlockQueue   chan *BadBlockRequest
 }
 
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
@@ -78,6 +79,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		store:                    st,
 		beaconStateQueue:         make(chan *BeaconStateRequest, 1000),
 		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
+		executionBadBlockQueue:   make(chan *BadBlockRequest, 1000),
 	}, nil
 }
 
@@ -97,13 +99,14 @@ func (s *agent) Start(ctx context.Context) error {
 		WithField("version", tracoor.Full()).
 		Info("Starting tracoor in agent mode")
 
-	go s.processBeaconStateQueue(ctx)
-	go s.processExecutionBlockTraceQueue(ctx)
-
 	s.node.OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
+		go s.processExecutionBlockTraceQueue(ctx)
+		go s.processBadBlockQueue(ctx)
+
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
+
 			logCtx := logrus.WithFields(logrus.Fields{
 				"event_slot": event.Slot,
 				"event_root": fmt.Sprintf("%#x", event.Block),
@@ -147,6 +150,8 @@ func (s *agent) Start(ctx context.Context) error {
 
 	s.node.Beacon().OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
+
+		go s.processBeaconStateQueue(ctx)
 
 		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
@@ -209,6 +214,12 @@ func (s *agent) Start(ctx context.Context) error {
 	if s.Config.Ethereum.OverrideNetworkName != "" {
 		s.log.WithField("network", s.Config.Ethereum.OverrideNetworkName).Info("Overriding network name")
 	}
+
+	s.scheduler.Every(90).Seconds().Do(func() {
+		s.enqueueBadBlock(ctx)
+	})
+
+	s.scheduler.StartAsync()
 
 	if err := s.performTokenHandshake(ctx); err != nil {
 		return err

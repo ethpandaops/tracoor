@@ -16,6 +16,9 @@ type BeaconStateRequest struct {
 	Slot phase0.Slot
 }
 
+type BadBlockRequest struct {
+}
+
 func (n *agent) enqueueBeaconState(ctx context.Context, root phase0.Root, slot phase0.Slot) {
 	n.beaconStateQueue <- &BeaconStateRequest{
 		Root: root,
@@ -28,6 +31,10 @@ func (n *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 	}
+}
+
+func (n *agent) enqueueBadBlock(ctx context.Context) {
+	n.executionBadBlockQueue <- &BadBlockRequest{}
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) error {
@@ -57,6 +64,20 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) error {
 		}
 
 		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue))
+	}
+
+	return ctx.Err()
+}
+
+func (s *agent) processBadBlockQueue(ctx context.Context) error {
+	for _ = range s.executionBadBlockQueue {
+		if err := s.fetchAndIndexBadBlocks(ctx); err != nil {
+			s.log.
+				WithError(err).
+				Error("Failed to fetch and index execution bad blocks")
+		}
+
+		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue))
 	}
 
 	return ctx.Err()

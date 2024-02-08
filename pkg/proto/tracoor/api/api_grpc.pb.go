@@ -25,6 +25,9 @@ const (
 	API_ListExecutionBlockTrace_FullMethodName             = "/api.API/ListExecutionBlockTrace"
 	API_CountExecutionBlockTrace_FullMethodName            = "/api.API/CountExecutionBlockTrace"
 	API_ListUniqueExecutionBlockTraceValues_FullMethodName = "/api.API/ListUniqueExecutionBlockTraceValues"
+	API_ListExecutionBadBlock_FullMethodName               = "/api.API/ListExecutionBadBlock"
+	API_CountExecutionBadBlock_FullMethodName              = "/api.API/CountExecutionBadBlock"
+	API_ListUniqueExecutionBadBlockValues_FullMethodName   = "/api.API/ListUniqueExecutionBadBlockValues"
 )
 
 // APIClient is the client API for API service.
@@ -37,6 +40,9 @@ type APIClient interface {
 	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
+	ListExecutionBadBlock(ctx context.Context, in *ListExecutionBadBlockRequest, opts ...grpc.CallOption) (*ListExecutionBadBlockResponse, error)
+	CountExecutionBadBlock(ctx context.Context, in *CountExecutionBadBlockRequest, opts ...grpc.CallOption) (*CountExecutionBadBlockResponse, error)
+	ListUniqueExecutionBadBlockValues(ctx context.Context, in *ListUniqueExecutionBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBadBlockValuesResponse, error)
 }
 
 type aPIClient struct {
@@ -101,6 +107,33 @@ func (c *aPIClient) ListUniqueExecutionBlockTraceValues(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *aPIClient) ListExecutionBadBlock(ctx context.Context, in *ListExecutionBadBlockRequest, opts ...grpc.CallOption) (*ListExecutionBadBlockResponse, error) {
+	out := new(ListExecutionBadBlockResponse)
+	err := c.cc.Invoke(ctx, API_ListExecutionBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) CountExecutionBadBlock(ctx context.Context, in *CountExecutionBadBlockRequest, opts ...grpc.CallOption) (*CountExecutionBadBlockResponse, error) {
+	out := new(CountExecutionBadBlockResponse)
+	err := c.cc.Invoke(ctx, API_CountExecutionBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListUniqueExecutionBadBlockValues(ctx context.Context, in *ListUniqueExecutionBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBadBlockValuesResponse, error) {
+	out := new(ListUniqueExecutionBadBlockValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueExecutionBadBlockValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // APIServer is the server API for API service.
 // All implementations must embed UnimplementedAPIServer
 // for forward compatibility
@@ -111,6 +144,9 @@ type APIServer interface {
 	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
+	ListExecutionBadBlock(context.Context, *ListExecutionBadBlockRequest) (*ListExecutionBadBlockResponse, error)
+	CountExecutionBadBlock(context.Context, *CountExecutionBadBlockRequest) (*CountExecutionBadBlockResponse, error)
+	ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error)
 	mustEmbedUnimplementedAPIServer()
 }
 
@@ -135,6 +171,15 @@ func (UnimplementedAPIServer) CountExecutionBlockTrace(context.Context, *CountEx
 }
 func (UnimplementedAPIServer) ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBlockTraceValues not implemented")
+}
+func (UnimplementedAPIServer) ListExecutionBadBlock(context.Context, *ListExecutionBadBlockRequest) (*ListExecutionBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBadBlock not implemented")
+}
+func (UnimplementedAPIServer) CountExecutionBadBlock(context.Context, *CountExecutionBadBlockRequest) (*CountExecutionBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountExecutionBadBlock not implemented")
+}
+func (UnimplementedAPIServer) ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueExecutionBadBlockValues not implemented")
 }
 func (UnimplementedAPIServer) mustEmbedUnimplementedAPIServer() {}
 
@@ -257,6 +302,60 @@ func _API_ListUniqueExecutionBlockTraceValues_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _API_ListExecutionBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExecutionBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListExecutionBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListExecutionBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListExecutionBadBlock(ctx, req.(*ListExecutionBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_CountExecutionBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountExecutionBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).CountExecutionBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_CountExecutionBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).CountExecutionBadBlock(ctx, req.(*CountExecutionBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListUniqueExecutionBadBlockValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueExecutionBadBlockValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListUniqueExecutionBadBlockValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListUniqueExecutionBadBlockValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListUniqueExecutionBadBlockValues(ctx, req.(*ListUniqueExecutionBadBlockValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // API_ServiceDesc is the grpc.ServiceDesc for API service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -287,6 +386,18 @@ var API_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUniqueExecutionBlockTraceValues",
 			Handler:    _API_ListUniqueExecutionBlockTraceValues_Handler,
+		},
+		{
+			MethodName: "ListExecutionBadBlock",
+			Handler:    _API_ListExecutionBadBlock_Handler,
+		},
+		{
+			MethodName: "CountExecutionBadBlock",
+			Handler:    _API_CountExecutionBadBlock_Handler,
+		},
+		{
+			MethodName: "ListUniqueExecutionBadBlockValues",
+			Handler:    _API_ListUniqueExecutionBadBlockValues_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

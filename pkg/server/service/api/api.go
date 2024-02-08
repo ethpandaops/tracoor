@@ -323,3 +323,134 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 
 	return response, nil
 }
+
+func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionBadBlockRequest) (*api.ListExecutionBadBlockResponse, error) {
+	pagination := &indexer.PaginationCursor{
+		Limit:   100,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = &indexer.PaginationCursor{
+			Limit:   req.Pagination.Limit,
+			Offset:  req.Pagination.Offset,
+			OrderBy: req.Pagination.OrderBy,
+		}
+	}
+
+	rq := &indexer.ListExecutionBadBlockRequest{
+		Node:           req.Node,
+		BlockNumber:    req.BlockNumber,
+		BlockHash:      req.BlockHash,
+		Network:        req.Network,
+		Before:         req.Before,
+		After:          req.After,
+		Id:             req.Id,
+		BlockExtraData: req.BlockExtraData,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListExecutionBadBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list execution block traces: %w", err).Error())
+	}
+
+	protoExecutionBadBlocks := make([]*api.ExecutionBadBlock, len(resp.ExecutionBadBlocks))
+	for i, trace := range resp.ExecutionBadBlocks {
+		protoExecutionBadBlocks[i] = &api.ExecutionBadBlock{
+			Id:                      trace.Id,
+			Node:                    trace.Node,
+			FetchedAt:               trace.FetchedAt,
+			BlockHash:               trace.BlockHash,
+			BlockNumber:             trace.BlockNumber,
+			Network:                 trace.Network,
+			ExecutionImplementation: trace.ExecutionImplementation,
+			NodeVersion:             trace.NodeVersion,
+			BlockExtraData:          trace.BlockExtraData,
+		}
+	}
+
+	return &api.ListExecutionBadBlockResponse{
+		ExecutionBadBlocks: protoExecutionBadBlocks,
+	}, nil
+}
+
+func (i *API) CountExecutionBadBlock(ctx context.Context, req *api.CountExecutionBadBlockRequest) (*api.CountExecutionBadBlockResponse, error) {
+	rq := &indexer.CountExecutionBadBlockRequest{
+		Node:                    req.Node,
+		BlockNumber:             req.BlockNumber,
+		BlockHash:               req.BlockHash,
+		Network:                 req.Network,
+		Before:                  req.Before,
+		After:                   req.After,
+		ExecutionImplementation: req.ExecutionImplementation,
+		NodeVersion:             req.NodeVersion,
+		BlockExtraData:          req.BlockExtraData,
+	}
+
+	resp, err := i.indexer.CountExecutionBadBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count execution block traces: %w", err).Error())
+	}
+
+	return &api.CountExecutionBadBlockResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
+func (i *API) ListUniqueExecutionBadBlockValues(ctx context.Context, req *api.ListUniqueExecutionBadBlockValuesRequest) (*api.ListUniqueExecutionBadBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueExecutionBadBlockValuesRequest{
+		Fields: []indexer.ListUniqueExecutionBadBlockValuesRequest_Field{},
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueExecutionBadBlockValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueExecutionBadBlockValuesRequest_node:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_NODE
+		case api.ListUniqueExecutionBadBlockValuesRequest_block_hash:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_HASH
+		case api.ListUniqueExecutionBadBlockValuesRequest_block_number:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_NUMBER
+		case api.ListUniqueExecutionBadBlockValuesRequest_network:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_NETWORK
+		case api.ListUniqueExecutionBadBlockValuesRequest_execution_implementation:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_EXECUTION_IMPLEMENTATION
+		case api.ListUniqueExecutionBadBlockValuesRequest_node_version:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_NODE_VERSION
+		case api.ListUniqueExecutionBadBlockValuesRequest_block_extra_data:
+			f = indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_EXTRA_DATA
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueExecutionBadBlockValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique execution block trace values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueExecutionBadBlockValuesResponse{
+		Node:                    resp.Node,
+		BlockHash:               resp.BlockHash,
+		BlockNumber:             resp.BlockNumber,
+		Network:                 resp.Network,
+		ExecutionImplementation: resp.ExecutionImplementation,
+		NodeVersion:             resp.NodeVersion,
+		BlockExtraData:          resp.BlockExtraData,
+	}
+
+	return response, nil
+}
