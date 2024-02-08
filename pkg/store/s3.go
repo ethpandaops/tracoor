@@ -220,7 +220,7 @@ func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte,
 		return nil, err
 	}
 
-	if !strings.Contains(".gz", location) {
+	if !strings.Contains(location, ".gz") {
 		b := data.Bytes()
 
 		return &b, nil
@@ -317,7 +317,7 @@ func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (
 		return nil, err
 	}
 
-	if !strings.Contains(".gz", location) {
+	if !strings.Contains(location, ".gz") {
 		b := data.Bytes()
 
 		return &b, nil
@@ -395,7 +395,7 @@ func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[
 		return nil, err
 	}
 
-	if !strings.Contains(".gz", location) {
+	if !strings.Contains(location, ".gz") {
 		b := data.Bytes()
 
 		return &b, nil

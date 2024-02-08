@@ -11,6 +11,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/compress/snappy"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -44,7 +45,15 @@ func (d *ObjectDownloader) Start() error {
 	d.indexer = indexer.NewIndexerClient(conn)
 
 	if err := d.mux.HandlePath("GET", "/download/beacon_state/{id}", d.beaconStateHandler); err != nil {
-		return fmt.Errorf("failed to register beacon state download: %v", err)
+		return fmt.Errorf("failed to register beacon state download handler: %v", err)
+	}
+
+	if err := d.mux.HandlePath("GET", "/download/execution_block_trace/{id}", d.executionBlockTraceHandler); err != nil {
+		return fmt.Errorf("failed to register execution block trace download handler: %v", err)
+	}
+
+	if err := d.mux.HandlePath("GET", "/download/execution_bad_block/{id}", d.executionBadBlock); err != nil {
+		return fmt.Errorf("failed to register execution block trace download handler: %v", err)
 	}
 
 	return nil
@@ -111,15 +120,136 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	}
 }
 
+func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	ctx := r.Context()
+
+	id := pathParams["id"]
+	if id == "" {
+		d.writeJSONError(w, "No ID provided", http.StatusBadRequest)
+
+		return
+	}
+
+	resp, err := d.indexer.ListExecutionBlockTrace(ctx, &indexer.ListExecutionBlockTraceRequest{
+		Id: id,
+		Pagination: &indexer.PaginationCursor{
+			Limit: 1,
+		},
+	})
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to list execution block trace for ID %s", id)
+
+		d.writeJSONError(w, "Failed to list execution block trace", http.StatusInternalServerError)
+
+		return
+	}
+
+	if len(resp.ExecutionBlockTraces) == 0 {
+		d.writeJSONError(w, "No execution block trace found", http.StatusNotFound)
+
+		return
+	}
+
+	if len(resp.ExecutionBlockTraces) > 1 {
+		d.writeJSONError(w, "More than one execution block trace found", http.StatusInternalServerError)
+
+		return
+	}
+
+	state := resp.ExecutionBlockTraces[0]
+
+	data, err := d.store.GetExecutionBlockTrace(ctx, state.Location.Value)
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to get execution block trace from store for ID %s from %s", id, state.Location.Value)
+
+		d.writeJSONError(w, "Failed to get execution block trace", http.StatusInternalServerError)
+
+		return
+	}
+
+	if err := setResponseCompression(w, r, data); err != nil {
+		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	_, err = w.Write(*data)
+	if err != nil {
+		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
+func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	ctx := r.Context()
+
+	id := pathParams["id"]
+	if id == "" {
+		d.writeJSONError(w, "No ID provided", http.StatusBadRequest)
+
+		return
+	}
+
+	resp, err := d.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
+		Id: id,
+		Pagination: &indexer.PaginationCursor{
+			Limit: 1,
+		},
+	})
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to list execution bad block for ID %s", id)
+
+		d.writeJSONError(w, "Failed to list execution bad block", http.StatusInternalServerError)
+
+		return
+	}
+
+	if len(resp.ExecutionBadBlocks) == 0 {
+		d.writeJSONError(w, "No execution bad block found", http.StatusNotFound)
+
+		return
+	}
+
+	if len(resp.ExecutionBadBlocks) > 1 {
+		d.writeJSONError(w, "More than one execution bad block found", http.StatusInternalServerError)
+
+		return
+	}
+
+	state := resp.ExecutionBadBlocks[0]
+
+	data, err := d.store.GetExecutionBadBlock(ctx, state.Location.Value)
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to get execution bad block from store for ID %s from %s", id, state.Location.Value)
+
+		d.writeJSONError(w, "Failed to get execution bad block", http.StatusInternalServerError)
+
+		return
+	}
+
+	if err := setResponseCompression(w, r, data); err != nil {
+		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	_, err = w.Write(*data)
+	if err != nil {
+		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
 func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte) error {
-	compression := r.URL.Query().Get("compression")
+	compression := r.Header.Get("Accept-Encoding")
 	if compression == "" {
 		// If no compression is specified, directly write the data without compression.
 		return nil
 	}
 
-	switch strings.ToLower(compression) {
-	case "gzip":
+	if strings.Contains(compression, "gzip") {
 		w.Header().Set("Content-Encoding", "gzip")
 
 		var b bytes.Buffer
@@ -136,11 +266,29 @@ func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte
 
 		*data = b.Bytes()
 
-	case "none":
-		// No action needed for no compression, data is written as is.
-	default:
-		return fmt.Errorf("Unsupported compression method")
+		return nil
 	}
+
+	if strings.Contains(compression, "snappy") {
+		w.Header().Set("Content-Encoding", "snappy")
+
+		var b bytes.Buffer
+
+		df := snappy.NewWriter(&b)
+
+		if _, err := df.Write(*data); err != nil {
+			return err
+		}
+
+		if err := df.Close(); err != nil {
+			return err
+		}
+
+		*data = b.Bytes()
+
+		return nil
+	}
+
 	return nil
 }
 
