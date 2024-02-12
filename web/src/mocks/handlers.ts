@@ -31,9 +31,9 @@ export const beaconStatesUniqueValues: Required<V1ListUniqueBeaconStateValuesRes
 
 export const handlers: Array<RequestHandler> = [
   http.post(`${BASE_URL}v1/api/list-beacon-state`, () => {
-    return HttpResponse.json({ data: beaconStates });
+    return HttpResponse.json(beaconStates);
   }),
   http.post(`${BASE_URL}v1/api/list-unique-beacon-state-values`, () => {
-    return HttpResponse.json({ data: beaconStatesUniqueValues });
+    return HttpResponse.json(beaconStatesUniqueValues);
   }),
 ];
