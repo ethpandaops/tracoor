@@ -12,7 +12,7 @@ describe('useQuery', () => {
       });
 
       await waitFor(() => result.current.isSuccess);
-      await waitFor(() => expect(result.current).toEqual(beaconStates.beacon_states));
+      await waitFor(() => expect(result.current.data).toEqual(beaconStates.beacon_states));
     });
   });
 
@@ -23,7 +23,7 @@ describe('useQuery', () => {
       });
 
       await waitFor(() => result.current.isSuccess);
-      await waitFor(() => expect(result.current).toEqual(beaconStatesUniqueValues));
+      await waitFor(() => expect(result.current.data).toEqual(beaconStatesUniqueValues));
     });
   });
 });
