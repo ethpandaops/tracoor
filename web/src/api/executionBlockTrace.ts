@@ -1,6 +1,8 @@
 import {
   V1ListExecutionBlockTraceResponse,
   V1ListExecutionBlockTraceRequest,
+  V1CountExecutionBlockTraceResponse,
+  V1CountExecutionBlockTraceRequest,
   V1ListUniqueExecutionBlockTraceValuesResponse,
   V1ListUniqueExecutionBlockTraceValuesRequest,
   ExecutionBlockTrace,
@@ -27,6 +29,25 @@ export async function fetchListExecutionBlockTrace(
     throw new Error('No execution block trace data in response');
 
   return json.execution_block_traces as Required<ExecutionBlockTrace[]>;
+}
+
+export async function fetchCountExecutionBlockTrace(
+  payload: V1CountExecutionBlockTraceRequest,
+): Promise<number> {
+  const response = await fetch(`${BASE_URL}v1/api/count-execution-block-trace`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch count execution block trace data');
+  }
+  const json = (await response.json()) as V1CountExecutionBlockTraceResponse;
+
+  return json.count ?? 0;
 }
 
 export async function fetchListUniqueExecutionBlockTraceValues(

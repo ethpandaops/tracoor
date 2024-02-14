@@ -1,15 +1,17 @@
+import { ChangeEvent } from 'react';
+
 import { ChevronDoubleRightIcon } from '@heroicons/react/20/solid';
 import classNames from 'classnames';
 
 import Loading from '@components/Loading';
 import NetworkSelect from '@components/NetworkSelect';
 import useSelection, { Selection } from '@contexts/selection';
-import { useUniqueBeaconStateValues } from '@hooks/useQuery';
+import { useUniqueBeaconStateValues, useUniqueExecutionBlockTraceValues } from '@hooks/useQuery';
 
 const tabs: { id: Selection; name: string }[] = [
   { id: Selection.beacon_state, name: 'Beacon state' },
-  { id: Selection.execution_block_trace, name: 'Execution Block trace' },
-  { id: Selection.beacon_invalid_blocks, name: 'Invalid gossiped blocks' },
+  { id: Selection.execution_block_trace, name: 'Execution block trace' },
+  { id: Selection.execution_bad_block, name: 'Execution bad block' },
 ];
 
 export default function Selector() {
@@ -21,6 +23,15 @@ export default function Selector() {
     error: beaconStateError,
   } = useUniqueBeaconStateValues(['network'], currentSelection === Selection.beacon_state);
 
+  const {
+    data: executionBlockTraceData,
+    isLoading: executionBlockTraceIsLoading,
+    error: executionBlockTraceError,
+  } = useUniqueExecutionBlockTraceValues(
+    ['network'],
+    currentSelection === Selection.execution_block_trace,
+  );
+
   const handleTabClick = (selection: Selection) => {
     setSelection(selection);
   };
@@ -29,8 +40,6 @@ export default function Selector() {
   let error = undefined;
   let isLoading = true;
 
-  console.log('currentSelection', currentSelection);
-
   switch (currentSelection) {
     case Selection.beacon_state:
       data = beaconStateData?.network;
@@ -38,8 +47,11 @@ export default function Selector() {
       isLoading = beaconStateIsLoading;
       break;
     case Selection.execution_block_trace:
+      data = executionBlockTraceData?.network;
+      error = executionBlockTraceError;
+      isLoading = executionBlockTraceIsLoading;
       break;
-    case Selection.beacon_invalid_blocks:
+    case Selection.execution_bad_block:
       break;
   }
 
@@ -62,11 +74,16 @@ export default function Selector() {
         <select
           id="tabs"
           name="tabs"
-          className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-          defaultValue={currentSelection}
+          className="block w-full py-2 pl-3 pr-10 focus:outline-none sm:text-sm bg-white/35"
+          value={currentSelection}
+          onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+            handleTabClick(e.target.value as Selection);
+          }}
         >
           {tabs.map((tab) => (
-            <option key={tab.id}>{tab.name}</option>
+            <option key={tab.id} value={tab.id}>
+              {tab.name}
+            </option>
           ))}
         </select>
       </div>
@@ -90,7 +107,12 @@ export default function Selector() {
                 </a>
               ))}
             </div>
-            <div className="flex-none mr-14 bg-white/35">
+            <div
+              className={classNames(
+                isLoading || (data && data.length === 1) ? 'hidden' : '',
+                'flex-none mr-14 bg-white/35',
+              )}
+            >
               <div className="flex items-center justify-center pl-4 h-full ">
                 <span className="text-sm text-gray-600">Network:</span>
                 {network}

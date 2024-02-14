@@ -8,9 +8,9 @@ import ApplicationProvider from '@providers/application';
 export default function App() {
   return (
     <ApplicationProvider selection={{ selection: Selection.beacon_state }}>
-      <div className="h-screen w-screen flex flex-col">
+      <div className="flex flex-col min-h-screen">
         <Header />
-        <main className="flex-grow bg-gradient-to-r from-amber-400 to-amber-600 h-full">
+        <main className="flex-grow bg-gradient-to-r from-amber-400 to-amber-600">
           <Selector />
           <Filters />
           <Listing />
