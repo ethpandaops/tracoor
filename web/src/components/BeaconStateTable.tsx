@@ -217,23 +217,23 @@ export default function BeaconStateTable() {
                   <th
                     scope="col"
                     className={classNames(
-                      sortConfig.key !== 'execution_implementation' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'execution_implementation' &&
+                      sortConfig.key !== 'beacon_node_implementation' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'beacon_node_implementation' &&
                         sortConfig.direction === 'DESC'
                         ? 'cursor-n-resize'
                         : '',
-                      sortConfig.key === 'execution_implementation' &&
+                      sortConfig.key === 'beacon_node_implementation' &&
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
                       'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
-                    onClick={() => handleSort('execution_implementation')}
+                    onClick={() => handleSort('beacon_node_implementation')}
                   >
                     <div className="flex">
                       <span className="whitespace-nowrap">Beacon node Implementation</span>
                       <span>
-                        {sortConfig.key === 'execution_implementation' ? (
+                        {sortConfig.key === 'beacon_node_implementation' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -430,8 +430,8 @@ export default function BeaconStateTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
                           <div className="flex flex-row ">
                             <a
-                              href={`/download/execution_block_trace/${row.id}`}
-                              download={`execution_block_trace_${row.id}.json`}
+                              href={`/download/beacon_state/${row.id}`}
+                              download={`beacon_state_${row.id}.json`}
                               className="text-sky-500 hover:text-sky-600 px-2"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />

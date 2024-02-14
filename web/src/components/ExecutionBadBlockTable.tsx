@@ -425,14 +425,7 @@ export default function ExecutionBadBlockTable() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
-                          <span
-                            className="cursor-pointer hover:underline"
-                            onClick={() =>
-                              setValue('executionBadBlockBlockExtraData', row.block_extra_data)
-                            }
-                          >
-                            {row.block_extra_data}
-                          </span>
+                          {row.block_extra_data}
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
                           <div className="flex flex-row ">
