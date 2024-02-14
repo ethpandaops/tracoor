@@ -11,9 +11,9 @@ export default function useContext() {
 }
 
 export enum Selection {
-  beacon_state,
-  execution_block_trace,
-  beacon_invalid_blocks,
+  beacon_state = 'beacon_state',
+  execution_block_trace = 'execution_block_trace',
+  execution_bad_block = 'execution_bad_block',
 }
 
 export interface State {

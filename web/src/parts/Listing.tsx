@@ -1,13 +1,14 @@
-import { useEffect, useCallback, useRef } from 'react';
-
-import { useFormContext } from 'react-hook-form';
-
 import BeaconStateTable from '@components/BeaconStateTable';
+import ExecutionBadBlockTable from '@components/ExecutionBadBlockTable';
 import ExecutionBlockTraceTable from '@components/ExecutionBlockTraceTable';
+import Loading from '@components/Loading';
+import useNetwork from '@contexts/network';
 import useSelection, { Selection } from '@contexts/selection';
 
 export default function Listing() {
   const { selection: currentSelection } = useSelection();
+
+  const { network } = useNetwork();
 
   let table = undefined;
   switch (currentSelection) {
@@ -17,17 +18,14 @@ export default function Listing() {
     case Selection.execution_block_trace:
       table = <ExecutionBlockTraceTable />;
       break;
-    case Selection.beacon_invalid_blocks:
+    case Selection.execution_bad_block:
+      table = <ExecutionBadBlockTable />;
       break;
   }
 
-  return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="mt-8 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">{table}</div>
-        </div>
-      </div>
-    </div>
-  );
+  if (!network) {
+    table = <Loading message="Waiting for network selection" />;
+  }
+
+  return <div className="px-4 sm:px-6 lg:px-8">{table}</div>;
 }

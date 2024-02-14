@@ -5,6 +5,7 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   ArrowsUpDownIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
 import { useFormContext } from 'react-hook-form';
@@ -12,14 +13,14 @@ import TimeAgo from 'react-timeago';
 
 import Pagination from '@components/Pagination';
 import useNetwork from '@contexts/network';
-import { useBeaconStates, useBeaconStatesCount } from '@hooks/useQuery';
+import { useExecutionBadBlocks, useExecutionBadBlocksCount } from '@hooks/useQuery';
 
 type SortConfig = {
   key: string;
   direction: 'ASC' | 'DESC';
 };
 
-export default function BeaconStateTable() {
+export default function ExecutionBadBlockTable() {
   const { network } = useNetwork();
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: 'fetched_at',
@@ -42,30 +43,29 @@ export default function BeaconStateTable() {
   };
 
   const [
-    beaconStateSlot,
-    beaconStateEpoch,
-    beaconStateStateRoot,
-    beaconStateNode,
-    beaconStateNodeImplementation,
-    beaconStateNodeVersion,
+    executionBadBlockBlockHash,
+    executionBadBlockBlockNumber,
+    executionBadBlockNode,
+    executionBadBlockNodeImplementation,
+    executionBadBlockNodeVersion,
+    executionBadBlockBlockExtraData,
   ] = watch([
-    'beaconStateSlot',
-    'beaconStateEpoch',
-    'beaconStateStateRoot',
-    'beaconStateNode',
-    'beaconStateNodeImplementation',
-    'beaconStateNodeVersion',
+    'executionBadBlockBlockHash',
+    'executionBadBlockBlockNumber',
+    'executionBadBlockNode',
+    'executionBadBlockNodeImplementation',
+    'executionBadBlockNodeVersion',
+    'executionBadBlockBlockExtraData',
   ]);
 
-  const { data, isLoading, error } = useBeaconStates({
+  const { data, isLoading, error } = useExecutionBadBlocks({
     network: network ? network : undefined,
-    slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
-    epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
-    state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
-    node: beaconStateNode ? beaconStateNode : undefined,
-    node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
-    beacon_implementation: beaconStateNodeImplementation
-      ? beaconStateNodeImplementation
+    block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
+    block_number: executionBadBlockBlockNumber ? parseInt(executionBadBlockBlockNumber) : undefined,
+    node: executionBadBlockNode ? executionBadBlockNode : undefined,
+    node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
+    execution_implementation: executionBadBlockNodeImplementation
+      ? executionBadBlockNodeImplementation
       : undefined,
     pagination: {
       limit: itemsPerPage,
@@ -74,15 +74,14 @@ export default function BeaconStateTable() {
     },
   });
 
-  const { data: count } = useBeaconStatesCount({
+  const { data: count } = useExecutionBadBlocksCount({
     network: network ? network : undefined,
-    slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
-    epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
-    state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
-    node: beaconStateNode ? beaconStateNode : undefined,
-    node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
-    beacon_implementation: beaconStateNodeImplementation
-      ? beaconStateNodeImplementation
+    block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
+    block_number: executionBadBlockBlockNumber ? parseInt(executionBadBlockBlockNumber) : undefined,
+    node: executionBadBlockNode ? executionBadBlockNode : undefined,
+    node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
+    execution_implementation: executionBadBlockNodeImplementation
+      ? executionBadBlockNodeImplementation
       : undefined,
   });
 
@@ -118,6 +117,7 @@ export default function BeaconStateTable() {
 
   let otherComp = undefined;
 
+  // if loading or has error or has no data
   if (isLoading) {
     otherComp = loading;
   } else if (error) {
@@ -277,21 +277,21 @@ export default function BeaconStateTable() {
                   <th
                     scope="col"
                     className={classNames(
-                      sortConfig.key !== 'epoch' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'epoch' && sortConfig.direction === 'DESC'
+                      sortConfig.key !== 'block_hash' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'DESC'
                         ? 'cursor-n-resize'
                         : '',
-                      sortConfig.key === 'epoch' && sortConfig.direction === 'ASC'
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
                       'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
                     )}
-                    onClick={() => handleSort('epoch')}
+                    onClick={() => handleSort('block_hash')}
                   >
                     <div className="flex">
-                      <span className="whitespace-nowrap">Epoch</span>
+                      <span className="whitespace-nowrap">Block hash</span>
                       <span>
-                        {sortConfig.key === 'epoch' ? (
+                        {sortConfig.key === 'block_hash' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -306,50 +306,50 @@ export default function BeaconStateTable() {
                   <th
                     scope="col"
                     className={classNames(
-                      sortConfig.key !== 'slot' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'slot' && sortConfig.direction === 'DESC'
+                      sortConfig.key !== 'block_number' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_number' && sortConfig.direction === 'DESC'
                         ? 'cursor-n-resize'
                         : '',
-                      sortConfig.key === 'slot' && sortConfig.direction === 'ASC'
-                        ? 'cursor-s-resize'
-                        : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
-                    )}
-                    onClick={() => handleSort('slot')}
-                  >
-                    <div className="flex">
-                      <span className="whitespace-nowrap">Slot</span>
-                      <span>
-                        {sortConfig.key === 'slot' ? (
-                          sortConfig.direction === 'DESC' ? (
-                            <ArrowDownIcon className="ml-2 h-5 w-5" />
-                          ) : (
-                            <ArrowUpIcon className="ml-2 h-5 w-5" />
-                          )
-                        ) : (
-                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
-                        )}
-                      </span>
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className={classNames(
-                      sortConfig.key !== 'state_root' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'state_root' && sortConfig.direction === 'DESC'
-                        ? 'cursor-n-resize'
-                        : '',
-                      sortConfig.key === 'state_root' && sortConfig.direction === 'ASC'
+                      sortConfig.key === 'block_number' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
                       'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-10',
                     )}
-                    onClick={() => handleSort('state_root')}
+                    onClick={() => handleSort('block_number')}
                   >
                     <div className="flex">
-                      <span className="whitespace-nowrap">State root</span>
+                      <span className="whitespace-nowrap">Block number</span>
                       <span>
-                        {sortConfig.key === 'state_root' ? (
+                        {sortConfig.key === 'block_number' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'block_extra_data' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_extra_data' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'block_extra_data' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-10',
+                    )}
+                    onClick={() => handleSort('block_extra_data')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Block extra data</span>
+                      <span>
+                        {sortConfig.key === 'block_extra_data' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -380,7 +380,7 @@ export default function BeaconStateTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('beaconStateNode', row.node)}
+                            onClick={() => setValue('executionBadBlockNode', row.node)}
                           >
                             {row.node}
                           </span>
@@ -389,16 +389,21 @@ export default function BeaconStateTable() {
                           <span
                             className="cursor-pointer hover:underline"
                             onClick={() =>
-                              setValue('beaconStateNodeImplementation', row.beacon_implementation)
+                              setValue(
+                                'executionBadBlockNodeImplementation',
+                                row.execution_implementation,
+                              )
                             }
                           >
-                            {row.beacon_implementation}
+                            {row.execution_implementation}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('beaconStateNodeVersion', row.node_version)}
+                            onClick={() =>
+                              setValue('executionBadBlockNodeVersion', row.node_version)
+                            }
                           >
                             {row.node_version}
                           </span>
@@ -406,25 +411,29 @@ export default function BeaconStateTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('beaconStateEpoch', row.epoch)}
+                            onClick={() => setValue('executionBadBlockBlockHash', row.block_hash)}
                           >
-                            {row.epoch}
+                            {row.block_hash}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('beaconStateSlot', row.slot)}
+                            onClick={() =>
+                              setValue('executionBadBlockBlockNumber', row.block_number)
+                            }
                           >
-                            {row.slot}
+                            {row.block_number}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('beaconStateStateRoot', row.state_root)}
+                            onClick={() =>
+                              setValue('executionBadBlockBlockExtraData', row.block_extra_data)
+                            }
                           >
-                            {row.state_root}
+                            {row.block_extra_data}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">

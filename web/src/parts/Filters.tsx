@@ -1,4 +1,5 @@
 import BeaconStateFilter from '@components/BeaconStateFilter';
+import ExecutionBadBlockFilter from '@components/ExecutionBadBlockFilter';
 import ExecutionBlockTraceFilter from '@components/ExecutionBlockTraceFilter';
 import useSelection, { Selection } from '@contexts/selection';
 
@@ -23,7 +24,8 @@ export default function FilterForm() {
     case Selection.execution_block_trace:
       form = <ExecutionBlockTraceFilter />;
       break;
-    case Selection.beacon_invalid_blocks:
+    case Selection.execution_bad_block:
+      form = <ExecutionBadBlockFilter />;
       break;
   }
 

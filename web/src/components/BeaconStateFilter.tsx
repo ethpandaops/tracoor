@@ -1,11 +1,12 @@
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, Controller } from 'react-hook-form';
 
 import { CustomCombobox } from '@components/Combobox';
+import DebouncedInput from '@components/DebouncedInput';
 import ErrorAlert from '@components/ErrorAlert';
 import { useUniqueBeaconStateValues } from '@hooks/useQuery';
 
 export default function FilterForm() {
-  const { register } = useFormContext();
+  const { control } = useFormContext();
 
   const { data, isLoading, error } = useUniqueBeaconStateValues([
     'node',
@@ -26,43 +27,70 @@ export default function FilterForm() {
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
       <div className="sm:col-span-2 sm:col-start-1">
-        <label htmlFor="postal-code" className="block text-sm font-bold leading-6 text-gray-700">
+        <label
+          htmlFor="beaconStateSlot"
+          className="block text-sm font-bold leading-6 text-gray-700"
+        >
           Slot
         </label>
         <div className="mt-2">
-          <input
-            type="text"
-            {...register('beaconStateSlot')}
-            autoComplete="postal-code"
-            className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+          <Controller
+            control={control}
+            name="beaconStateSlot"
+            render={(props) => (
+              <DebouncedInput<'beaconStateSlot'>
+                controllerProps={props}
+                type="text"
+                name="beaconStateSlot"
+                className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+              />
+            )}
           />
         </div>
       </div>
 
       <div className="sm:col-span-2">
-        <label htmlFor="postal-code" className="block text-sm font-bold leading-6 text-gray-700">
+        <label
+          htmlFor="beaconStateEpoch"
+          className="block text-sm font-bold leading-6 text-gray-700"
+        >
           Epoch
         </label>
         <div className="mt-2">
-          <input
-            type="text"
-            {...register('beaconStateEpoch')}
-            autoComplete="postal-code"
-            className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+          <Controller
+            control={control}
+            name="beaconStateEpoch"
+            render={(props) => (
+              <DebouncedInput<'beaconStateEpoch'>
+                controllerProps={props}
+                type="text"
+                name="beaconStateEpoch"
+                className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+              />
+            )}
           />
         </div>
       </div>
 
       <div className="sm:col-span-2">
-        <label htmlFor="postal-code" className="block text-sm font-bold leading-6 text-gray-700">
+        <label
+          htmlFor="beaconStateStateRoot"
+          className="block text-sm font-bold leading-6 text-gray-700"
+        >
           State root
         </label>
         <div className="mt-2">
-          <input
-            type="text"
-            {...register('beaconStateStateRoot')}
-            autoComplete="postal-code"
-            className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+          <Controller
+            control={control}
+            name="beaconStateStateRoot"
+            render={(props) => (
+              <DebouncedInput<'beaconStateStateRoot'>
+                controllerProps={props}
+                type="text"
+                name="beaconStateStateRoot"
+                className="block w-full rounded-md border-0 bg-white/45 px-2.5 py-1.5 text-gray-600 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-sky-500 sm:text-sm sm:leading-6"
+              />
+            )}
           />
         </div>
       </div>
