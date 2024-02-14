@@ -48,14 +48,12 @@ export default function ExecutionBadBlockTable() {
     executionBadBlockNode,
     executionBadBlockNodeImplementation,
     executionBadBlockNodeVersion,
-    executionBadBlockBlockExtraData,
   ] = watch([
     'executionBadBlockBlockHash',
     'executionBadBlockBlockNumber',
     'executionBadBlockNode',
     'executionBadBlockNodeImplementation',
     'executionBadBlockNodeVersion',
-    'executionBadBlockBlockExtraData',
   ]);
 
   const { data, isLoading, error } = useExecutionBadBlocks({
@@ -166,7 +164,7 @@ export default function ExecutionBadBlockTable() {
                       sortConfig.key === 'fetched_at' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('fetched_at')}
                   >
@@ -195,7 +193,7 @@ export default function ExecutionBadBlockTable() {
                       sortConfig.key === 'node' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node')}
                   >
@@ -226,12 +224,12 @@ export default function ExecutionBadBlockTable() {
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('execution_implementation')}
                   >
                     <div className="flex">
-                      <span className="whitespace-nowrap">Beacon node Implementation</span>
+                      <span className="whitespace-nowrap">Execution Implementation</span>
                       <span>
                         {sortConfig.key === 'execution_implementation' ? (
                           sortConfig.direction === 'DESC' ? (
@@ -255,7 +253,7 @@ export default function ExecutionBadBlockTable() {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -263,35 +261,6 @@ export default function ExecutionBadBlockTable() {
                       <span className="whitespace-nowrap">Node version</span>
                       <span>
                         {sortConfig.key === 'node_version' ? (
-                          sortConfig.direction === 'DESC' ? (
-                            <ArrowDownIcon className="ml-2 h-5 w-5" />
-                          ) : (
-                            <ArrowUpIcon className="ml-2 h-5 w-5" />
-                          )
-                        ) : (
-                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
-                        )}
-                      </span>
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className={classNames(
-                      sortConfig.key !== 'block_hash' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'block_hash' && sortConfig.direction === 'DESC'
-                        ? 'cursor-n-resize'
-                        : '',
-                      sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
-                        ? 'cursor-s-resize'
-                        : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
-                    )}
-                    onClick={() => handleSort('block_hash')}
-                  >
-                    <div className="flex">
-                      <span className="whitespace-nowrap">Block hash</span>
-                      <span>
-                        {sortConfig.key === 'block_hash' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -321,6 +290,35 @@ export default function ExecutionBadBlockTable() {
                       <span className="whitespace-nowrap">Block number</span>
                       <span>
                         {sortConfig.key === 'block_number' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'block_hash' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                    )}
+                    onClick={() => handleSort('block_hash')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Block hash</span>
+                      <span>
+                        {sortConfig.key === 'block_hash' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -411,19 +409,19 @@ export default function ExecutionBadBlockTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('executionBadBlockBlockHash', row.block_hash)}
-                          >
-                            {row.block_hash}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
-                          <span
-                            className="cursor-pointer hover:underline"
                             onClick={() =>
                               setValue('executionBadBlockBlockNumber', row.block_number)
                             }
                           >
                             {row.block_number}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+                          <span
+                            className="cursor-pointer hover:underline"
+                            onClick={() => setValue('executionBadBlockBlockHash', row.block_hash)}
+                          >
+                            {row.block_hash}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
@@ -439,8 +437,8 @@ export default function ExecutionBadBlockTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
                           <div className="flex flex-row ">
                             <a
-                              href={`/download/execution_block_trace/${row.id}`}
-                              download={`execution_block_trace_${row.id}.json`}
+                              href={`/download/execution_bad_block/${row.id}`}
+                              download={`execution_bad_block_${row.id}.json`}
                               className="text-sky-500 hover:text-sky-600 px-2"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />

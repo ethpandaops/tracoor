@@ -166,7 +166,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'fetched_at' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('fetched_at')}
                   >
@@ -195,7 +195,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'node' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node')}
                   >
@@ -226,7 +226,7 @@ export default function BeaconStateTable() {
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('execution_implementation')}
                   >
@@ -255,7 +255,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -284,7 +284,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'epoch' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('epoch')}
                   >
@@ -313,7 +313,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'slot' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('slot')}
                   >
@@ -342,7 +342,7 @@ export default function BeaconStateTable() {
                       sortConfig.key === 'state_root' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-10',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
                     )}
                     onClick={() => handleSort('state_root')}
                   >

@@ -246,7 +246,7 @@ export default function ExecutionBlockTraceTable() {
                       sortConfig.key === 'fetched_at' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('fetched_at')}
                   >
@@ -275,7 +275,7 @@ export default function ExecutionBlockTraceTable() {
                       sortConfig.key === 'node' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node')}
                   >
@@ -306,12 +306,12 @@ export default function ExecutionBlockTraceTable() {
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('execution_implementation')}
                   >
                     <div className="flex">
-                      <span className="whitespace-nowrap">Beacon node Implementation</span>
+                      <span className="whitespace-nowrap">Execution Implementation</span>
                       <span>
                         {sortConfig.key === 'execution_implementation' ? (
                           sortConfig.direction === 'DESC' ? (
@@ -335,7 +335,7 @@ export default function ExecutionBlockTraceTable() {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -343,35 +343,6 @@ export default function ExecutionBlockTraceTable() {
                       <span className="whitespace-nowrap">Node version</span>
                       <span>
                         {sortConfig.key === 'node_version' ? (
-                          sortConfig.direction === 'DESC' ? (
-                            <ArrowDownIcon className="ml-2 h-5 w-5" />
-                          ) : (
-                            <ArrowUpIcon className="ml-2 h-5 w-5" />
-                          )
-                        ) : (
-                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
-                        )}
-                      </span>
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className={classNames(
-                      sortConfig.key !== 'block_hash' ? 'cursor-s-resize' : '',
-                      sortConfig.key === 'block_hash' && sortConfig.direction === 'DESC'
-                        ? 'cursor-n-resize'
-                        : '',
-                      sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
-                        ? 'cursor-s-resize'
-                        : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
-                    )}
-                    onClick={() => handleSort('block_hash')}
-                  >
-                    <div className="flex">
-                      <span className="whitespace-nowrap">Block hash</span>
-                      <span>
-                        {sortConfig.key === 'block_hash' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -401,6 +372,35 @@ export default function ExecutionBlockTraceTable() {
                       <span className="whitespace-nowrap">Block number</span>
                       <span>
                         {sortConfig.key === 'block_number' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'block_hash' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50',
+                    )}
+                    onClick={() => handleSort('block_hash')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Block hash</span>
+                      <span>
+                        {sortConfig.key === 'block_hash' ? (
                           sortConfig.direction === 'DESC' ? (
                             <ArrowDownIcon className="ml-2 h-5 w-5" />
                           ) : (
@@ -468,19 +468,19 @@ export default function ExecutionBlockTraceTable() {
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
                           <span
                             className="cursor-pointer hover:underline"
-                            onClick={() => setValue('executionBlockTraceBlockHash', row.block_hash)}
-                          >
-                            {row.block_hash}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
-                          <span
-                            className="cursor-pointer hover:underline"
                             onClick={() =>
                               setValue('executionBlockTraceBlockNumber', row.block_number)
                             }
                           >
                             {row.block_number}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+                          <span
+                            className="cursor-pointer hover:underline"
+                            onClick={() => setValue('executionBlockTraceBlockHash', row.block_hash)}
+                          >
+                            {row.block_hash}
                           </span>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
