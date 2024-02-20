@@ -6,7 +6,7 @@ import { BASE_URL } from '@utils/environment';
 export const beaconStates: Required<V1ListBeaconStateResponse> = {
   beacon_states: [
     {
-      id: 123,
+      id: '123',
       node: 'test-node',
       fetched_at: new Date().toISOString(),
       slot: 1,
