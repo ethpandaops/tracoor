@@ -1,7 +1,8 @@
-import { ChangeEvent } from 'react';
+import { ChangeEvent, useEffect } from 'react';
 
 import { ChevronDoubleRightIcon } from '@heroicons/react/20/solid';
 import classNames from 'classnames';
+import { useLocation, Link } from 'wouter';
 
 import Loading from '@components/Loading';
 import NetworkSelect from '@components/NetworkSelect';
@@ -16,6 +17,7 @@ const tabs: { id: Selection; name: string }[] = [
 
 export default function Selector() {
   const { selection: currentSelection, setSelection } = useSelection();
+  const [location, setLocation] = useLocation();
 
   const {
     data: beaconStateData,
@@ -33,8 +35,29 @@ export default function Selector() {
   );
 
   const handleTabClick = (selection: Selection) => {
+    setLocation(`/${selection}`);
     setSelection(selection);
   };
+
+  useEffect(() => {
+    const path = location.split('/')[1] as Selection;
+    switch (path) {
+      case Selection.beacon_state:
+        if (currentSelection !== Selection.beacon_state) setSelection(Selection.beacon_state);
+        break;
+      case Selection.execution_block_trace:
+        if (currentSelection !== Selection.execution_block_trace)
+          setSelection(Selection.execution_block_trace);
+        break;
+      case Selection.execution_bad_block:
+        if (currentSelection !== Selection.execution_bad_block)
+          setSelection(Selection.execution_bad_block);
+        break;
+      default:
+        if (currentSelection !== Selection.beacon_state) setSelection(Selection.beacon_state);
+        break;
+    }
+  }, [location]);
 
   let data = undefined;
   let error = undefined;

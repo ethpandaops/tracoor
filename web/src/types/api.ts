@@ -1,5 +1,5 @@
 export interface BeaconState {
-  id: number;
+  id: string;
   node: string;
   fetched_at: string;
   slot: number;
@@ -11,7 +11,7 @@ export interface BeaconState {
 }
 
 export interface ExecutionBlockTrace {
-  id: number;
+  id: string;
   node: string;
   fetched_at: string;
   block_hash: string;
@@ -22,7 +22,7 @@ export interface ExecutionBlockTrace {
 }
 
 export interface ExecutionBadBlock {
-  id: number;
+  id: string;
   node: string;
   fetched_at: string;
   block_hash: string;
@@ -76,7 +76,7 @@ export interface V1ListBeaconStateRequest {
   beacon_implementation?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 
@@ -90,7 +90,7 @@ export interface V1CountBeaconStateRequest {
   beacon_implementation?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 
@@ -107,7 +107,7 @@ export interface V1ListExecutionBlockTraceRequest {
   execution_implementation?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 
@@ -120,7 +120,7 @@ export interface V1CountExecutionBlockTraceRequest {
   execution_implementation?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 
@@ -138,7 +138,7 @@ export interface V1ListExecutionBadBlockRequest {
   block_extra_data?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 
@@ -152,7 +152,7 @@ export interface V1CountExecutionBadBlockRequest {
   block_extra_data?: string;
   before?: string;
   after?: string;
-  id?: number;
+  id?: string;
   pagination?: PaginationCursor;
 }
 

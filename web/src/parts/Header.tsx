@@ -101,8 +101,8 @@ export default function Header() {
                                 className="underline text-orange-500 hover:text-orange-600 dark:text-blue-200 dark:hover:text-blue-300"
                               >
                                 execution debug traces
-                              </a>{' '}
-                              and invalid gossiped verified blocks (see{' '}
+                              </a>
+                              , execution bad blocks and invalid gossiped verified blocks (see{' '}
                               <a
                                 href="https://lighthouse-book.sigmaprime.io/help_bn.html"
                                 className="underline text-orange-500 hover:text-orange-600 dark:text-blue-200 dark:hover:text-blue-300"

@@ -33,7 +33,7 @@ function DebouncedTextField<TName extends string>({
   const [innerValue, setInnerValue] = useState('');
 
   useEffect(() => {
-    if (field.value && typeof field.value === 'string') setInnerValue(field.value);
+    if (field.value !== undefined && typeof field.value === 'string') setInnerValue(field.value);
   }, [field.value, field.name]);
 
   const debouncedHandleChange = useDebouncedCallback((event) => {
