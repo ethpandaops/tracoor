@@ -459,7 +459,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                           <div className="flex flex-row ">
                             <a
                               href={`/download/beacon_state/${row.id}`}
-                              download={`beacon_state_${row.id}.json`}
+                              download={`${row.id}.ssz.gz`}
                               className="text-sky-500 hover:text-sky-600 px-2"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />

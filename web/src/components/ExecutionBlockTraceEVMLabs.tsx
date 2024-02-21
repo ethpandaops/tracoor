@@ -130,8 +130,12 @@ export default function ExecutionBlockTraceEVMLabs({
     if (tx.length === 0) return '';
     return `# Download the traces
 # Note: requires wget
-wget -O ${selected[0].id}.json -q ${window.location.origin}/download/execution_block_trace/${selected[0].id}
-wget -O ${selected[1].id}.json -q ${window.location.origin}/download/execution_block_trace/${selected[1].id}
+wget -O ${selected[0].id}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[0].id}
+wget -O ${selected[1].id}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[1].id}
+
+# Decompress the traces
+gzip -d ${selected[0].id}.json.gz
+gzip -d ${selected[1].id}.json.gz
 
 # Pull out the transaction
 # Note: requires jq
