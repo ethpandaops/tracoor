@@ -97,9 +97,6 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 
 	state := resp.BeaconStates[0]
 
-	// log if prefers urls
-	d.log.Infof("Prefer URLs: %v", d.store.PreferURLs())
-
 	if d.store.PreferURLs() {
 		var presignedURL string
 
@@ -110,9 +107,6 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 
 			return
 		}
-
-		// log url
-		d.log.Infof("Presigned URL: %s", presignedURL)
 
 		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
 
