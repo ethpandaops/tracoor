@@ -56,6 +56,8 @@ type Store interface {
 }
 
 func NewStore(namespace string, log logrus.FieldLogger, storeType Type, config yaml.RawMessage, opts *Options) (Store, error) {
+	namespace += "_store"
+
 	switch storeType {
 	case S3StoreType:
 		var s3Config *S3StoreConfig
