@@ -98,9 +98,9 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	state := resp.BeaconStates[0]
 
 	if d.store.PreferURLs() {
-		var presignedURL string
+		var itemURL string
 
-		presignedURL, err = d.store.GetBeaconStateURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetBeaconStateURL(ctx, state.Location.Value, 3600)
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for beacon state ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -108,7 +108,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, itemURL, http.StatusTemporaryRedirect)
 
 		return
 	}
@@ -175,9 +175,9 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 	state := resp.ExecutionBlockTraces[0]
 
 	if d.store.PreferURLs() {
-		var presignedURL string
+		var itemURL string
 
-		presignedURL, err = d.store.GetExecutionBlockTraceURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetExecutionBlockTraceURL(ctx, state.Location.Value, 3600)
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for block trace ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -185,7 +185,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 			return
 		}
 
-		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, itemURL, http.StatusTemporaryRedirect)
 
 		return
 	}
@@ -252,9 +252,9 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 	state := resp.ExecutionBadBlocks[0]
 
 	if d.store.PreferURLs() {
-		var presignedURL string
+		var itemURL string
 
-		presignedURL, err = d.store.GetExecutionBadBlockURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetExecutionBadBlockURL(ctx, state.Location.Value, 3600)
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for bad block ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -262,7 +262,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, itemURL, http.StatusTemporaryRedirect)
 
 		return
 	}
