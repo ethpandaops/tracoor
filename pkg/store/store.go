@@ -51,7 +51,7 @@ type Store interface {
 
 	// PathPrefix returns the path prefix for the store
 	PathPrefix() string
-	// PreferURLs returns if the store prefers URLs for files
+	// PreferURLs returns if the store prefers URLs for serving data
 	PreferURLs() bool
 }
 
