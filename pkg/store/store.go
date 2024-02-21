@@ -25,31 +25,37 @@ type Store interface {
 	// SaveBeaconState saves a beacon state to the store
 	SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error)
 	// GetBeaconState fetches a beacon state from the store
-	GetBeaconState(ctx context.Context, id string) (*[]byte, error)
+	GetBeaconState(ctx context.Context, location string) (*[]byte, error)
+	// GetBeaconStateURL returns a URL for the beacon state
+	GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error)
 	// DeleteBeaconState deletes a beacon state from the store
 	DeleteBeaconState(ctx context.Context, location string) error
 
 	// SaveExecutionBlockTrace saves an execution block trace to the store
 	SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error)
 	// GetExecutionBlockTrace fetches an execution block trace from the store
-	GetExecutionBlockTrace(ctx context.Context, id string) (*[]byte, error)
+	GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error)
+	// GetExecutionBlockTraceURL returns a URL for the execution block trace
+	GetExecutionBlockTraceURL(ctx context.Context, location string, expiry int) (string, error)
 	// DeleteExecutionBlockTrace deletes an execution block trace from the store
 	DeleteExecutionBlockTrace(ctx context.Context, location string) error
 
-	// SaveExecutionBlockTrace saves an execution block trace to the store
+	// SaveExecutionBadBlock saves an execution bad block to the store
 	SaveExecutionBadBlock(ctx context.Context, data *[]byte, location string) (string, error)
-	// GetExecutionBadBlock fetches an execution block trace from the store
-	GetExecutionBadBlock(ctx context.Context, id string) (*[]byte, error)
-	// DeleteExecutionBadBlock deletes an execution block trace from the store
+	// GetExecutionBadBlock fetches an execution bad block from the store
+	GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error)
+	// GetExecutionBadBlockURL returns a URL for the execution bad block
+	GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error)
+	// DeleteExecutionBadBlock deletes an execution bad block from the store
 	DeleteExecutionBadBlock(ctx context.Context, location string) error
 
 	// PathPrefix returns the path prefix for the store
 	PathPrefix() string
+	// PreferURLs returns if the store prefers URLs for files
+	PreferURLs() bool
 }
 
 func NewStore(namespace string, log logrus.FieldLogger, storeType Type, config yaml.RawMessage, opts *Options) (Store, error) {
-	namespace += "_store"
-
 	switch storeType {
 	case S3StoreType:
 		var s3Config *S3StoreConfig

@@ -5,11 +5,12 @@ import "github.com/prometheus/client_golang/prometheus"
 type BasicMetrics struct {
 	namespace string
 
-	info           *prometheus.GaugeVec
-	itemsAdded     *prometheus.CounterVec
-	itemsRemoved   *prometheus.CounterVec
-	itemsRetreived *prometheus.CounterVec
-	itemsStored    *prometheus.GaugeVec
+	info               *prometheus.GaugeVec
+	itemsAdded         *prometheus.CounterVec
+	itemsRemoved       *prometheus.CounterVec
+	itemsRetreived     *prometheus.CounterVec
+	itemsUrlsRetreived *prometheus.CounterVec
+	itemsStored        *prometheus.GaugeVec
 
 	cacheHit  *prometheus.CounterVec
 	cacheMiss *prometheus.CounterVec
@@ -45,6 +46,11 @@ func NewBasicMetrics(namespace, storeType string, enabled bool) *BasicMetrics {
 			Name:      "items_stored_total",
 			Help:      "Number of items stored in the store",
 		}, []string{"type"}),
+		itemsUrlsRetreived: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "items_urls_retrieved_count",
+			Help:      "Number of items URLs retreived",
+		}, []string{"type"}),
 		cacheHit: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "cache_hit_count",
@@ -62,6 +68,7 @@ func NewBasicMetrics(namespace, storeType string, enabled bool) *BasicMetrics {
 		prometheus.MustRegister(m.itemsAdded)
 		prometheus.MustRegister(m.itemsRemoved)
 		prometheus.MustRegister(m.itemsRetreived)
+		prometheus.MustRegister(m.itemsUrlsRetreived)
 		prometheus.MustRegister(m.itemsStored)
 		prometheus.MustRegister(m.cacheHit)
 		prometheus.MustRegister(m.cacheMiss)
@@ -82,6 +89,10 @@ func (m *BasicMetrics) ObserveItemRemoved(itemType string) {
 
 func (m *BasicMetrics) ObserveItemRetreived(itemType string) {
 	m.itemsRetreived.WithLabelValues(itemType).Inc()
+}
+
+func (m *BasicMetrics) ObserveItemURLRetreived(itemType string) {
+	m.itemsUrlsRetreived.WithLabelValues(itemType).Inc()
 }
 
 func (m *BasicMetrics) ObserveItemStored(itemType string, count int) {
