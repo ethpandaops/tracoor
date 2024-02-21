@@ -48,6 +48,8 @@ type agent struct {
 	executionBadBlockQueue   chan *BadBlockRequest
 }
 
+const namespace = "tracoor_agent"
+
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -64,7 +66,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		return nil, err
 	}
 
-	st, err := store.NewStore("store", log, config.Store.Type, config.Store.Config, store.DefaultOptions())
+	st, err := store.NewStore(namespace, log, config.Store.Type, config.Store.Config, store.DefaultOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		Config:                   config,
 		node:                     node,
 		log:                      log,
-		metrics:                  NewMetrics("tracoor_agent"),
+		metrics:                  NewMetrics(namespace),
 		scheduler:                gocron.NewScheduler(time.Local),
 		indexer:                  indexerClient,
 		store:                    st,

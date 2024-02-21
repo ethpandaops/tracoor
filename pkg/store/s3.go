@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -35,6 +36,7 @@ type S3StoreConfig struct {
 	AccessKey    string `yaml:"access_key"`
 	AccessSecret string `yaml:"access_secret"`
 	UsePathStyle bool   `yaml:"use_path_style"`
+	PreferURLs   bool   `yaml:"prefer_urls"`
 }
 
 // NewS3Store creates a new S3Store instance with the specified AWS configuration, bucket name, and key prefix.
@@ -212,6 +214,23 @@ func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (st
 	return buf.String(), nil
 }
 
+func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error) {
+	presignClient := s3.NewPresignClient(s.s3Client)
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconStateDataType))
+
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	if err != nil {
+		return "", err
+	}
+
+	return resp.URL, nil
+}
+
 func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte, error) {
 	s.basicMetrics.ObserveCacheMiss(string(BeaconStateDataType))
 
@@ -333,6 +352,23 @@ func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (
 	return &uncompressed, nil
 }
 
+func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, location string, expiry int) (string, error) {
+	presignClient := s3.NewPresignClient(s.s3Client)
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BlockTraceDataType))
+
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	if err != nil {
+		return "", err
+	}
+
+	return resp.URL, nil
+}
+
 func (s *S3Store) DeleteExecutionBlockTrace(ctx context.Context, location string) error {
 	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -411,6 +447,23 @@ func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[
 	return &uncompressed, nil
 }
 
+func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+	presignClient := s3.NewPresignClient(s.s3Client)
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BadBlockDataType))
+
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	if err != nil {
+		return "", err
+	}
+
+	return resp.URL, nil
+}
+
 func (s *S3Store) DeleteExecutionBadBlock(ctx context.Context, location string) error {
 	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -431,4 +484,8 @@ func (s *S3Store) DeleteExecutionBadBlock(ctx context.Context, location string) 
 	s.basicMetrics.ObserveItemRemoved(string(BadBlockDataType))
 
 	return err
+}
+
+func (s *S3Store) PreferURLs() bool {
+	return s.config.PreferURLs
 }
