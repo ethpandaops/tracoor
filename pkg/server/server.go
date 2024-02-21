@@ -61,7 +61,7 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 		return nil, err
 	}
 
-	db, err := persistence.NewIndexer("indexer", log, conf.Persistence)
+	db, err := persistence.NewIndexer("indexer", log, conf.Persistence, persistence.DefaultOptions())
 	if err != nil {
 		return nil, err
 	}
