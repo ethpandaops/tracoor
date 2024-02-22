@@ -39,6 +39,10 @@ type S3StoreConfig struct {
 	PreferURLs   bool   `yaml:"prefer_urls"`
 }
 
+var (
+	gzExtension = ".gz"
+)
+
 // NewS3Store creates a new S3Store instance with the specified AWS configuration, bucket name, and key prefix.
 func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig, opts *Options) (*S3Store, error) {
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
@@ -90,7 +94,7 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location st
 		return "", err
 	}
 
-	location = location + ".gz"
+	location += gzExtension
 
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -112,6 +116,8 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location st
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BeaconStateDataType), len(*data))
 
 	return location, err
 }
@@ -134,6 +140,7 @@ func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, e
 
 		return nil, err
 	}
+
 	defer data.Body.Close()
 
 	var buff bytes.Buffer
@@ -148,6 +155,7 @@ func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, e
 
 func (s *S3Store) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {
 	key := fmt.Sprintf("handshake/%s", node)
+
 	_, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(key),
@@ -186,6 +194,7 @@ func (s *S3Store) SaveStorageHandshakeToken(ctx context.Context, node, data stri
 
 func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (string, error) {
 	key := fmt.Sprintf("handshake/%s", node)
+
 	result, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(key),
@@ -206,6 +215,7 @@ func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (st
 	defer result.Body.Close()
 
 	buf := new(bytes.Buffer)
+
 	_, err = buf.ReadFrom(result.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read storage handshake for node %s: %w", node, err)
@@ -216,6 +226,7 @@ func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (st
 
 func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
+
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(location),
@@ -239,7 +250,7 @@ func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte,
 		return nil, err
 	}
 
-	if !strings.Contains(location, ".gz") {
+	if !strings.Contains(location, gzExtension) {
 		b := data.Bytes()
 
 		return &b, nil
@@ -302,7 +313,7 @@ func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, loc
 		return "", err
 	}
 
-	location = location + ".gz"
+	location += gzExtension
 
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -324,6 +335,8 @@ func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, loc
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BlockTraceDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BlockTraceDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BlockTraceDataType), len(*data))
 
 	return location, err
 }
@@ -336,7 +349,7 @@ func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (
 		return nil, err
 	}
 
-	if !strings.Contains(location, ".gz") {
+	if !strings.Contains(location, gzExtension) {
 		b := data.Bytes()
 
 		return &b, nil
@@ -397,7 +410,7 @@ func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, data *[]byte, locat
 		return "", err
 	}
 
-	location = location + ".gz"
+	location += gzExtension
 
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -419,6 +432,8 @@ func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, data *[]byte, locat
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BadBlockDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BadBlockDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BadBlockDataType), len(*data))
 
 	return location, err
 }
@@ -431,7 +446,7 @@ func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[
 		return nil, err
 	}
 
-	if !strings.Contains(location, ".gz") {
+	if !strings.Contains(location, gzExtension) {
 		b := data.Bytes()
 
 		return &b, nil
@@ -449,6 +464,7 @@ func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[
 
 func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
+
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(location),

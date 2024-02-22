@@ -47,6 +47,8 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 				WithError(err).
 				WithField("slot", stateRequest.Slot).
 				Error("Failed to fetch and index beacon state")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -68,6 +70,8 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 				WithField("block_hash", traceRequest.BlockHash).
 				WithField("block_number", traceRequest.BlockNumber).
 				Error("Failed to fetch and index execution block trace")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -87,6 +91,8 @@ func (s *agent) processBadBlockQueue(ctx context.Context) {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index execution bad blocks")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
