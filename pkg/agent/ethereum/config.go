@@ -26,5 +26,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid beacon configuration: %w", err)
 	}
 
+	if c.OverrideNetworkName == "" {
+		return fmt.Errorf("overrideNetworkName is required")
+	}
+
 	return nil
 }
