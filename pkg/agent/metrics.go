@@ -9,6 +9,7 @@ import (
 type Metrics struct {
 	queueSize               *prometheus.GaugeVec
 	queueItemProcessingTime *prometheus.HistogramVec
+	itemExported            *prometheus.CounterVec
 }
 
 type Queue string
@@ -32,6 +33,11 @@ func NewMetrics(namespace string) *Metrics {
 			Help:      "The time it takes to process an item from the queue",
 			Buckets:   prometheus.LinearBuckets(0, 3, 10),
 		}, []string{"queue"}),
+		itemExported: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "item_exported",
+			Help:      "The number of items exported",
+		}, []string{"queue"}),
 	}
 
 	prometheus.MustRegister(m.queueSize)
@@ -46,4 +52,8 @@ func (m *Metrics) SetQueueSize(queue Queue, count int) {
 
 func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration) {
 	m.queueItemProcessingTime.WithLabelValues(string(queue)).Observe(duration.Seconds())
+}
+
+func (m *Metrics) IncrementItemExported(queue Queue) {
+	m.itemExported.WithLabelValues(string(queue)).Inc()
 }

@@ -54,7 +54,6 @@ linters:
     - reassign
     - staticcheck
     - stylecheck
-    - tagliatelle
     - thelper
     - tparallel
     - typecheck

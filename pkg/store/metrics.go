@@ -5,12 +5,14 @@ import "github.com/prometheus/client_golang/prometheus"
 type BasicMetrics struct {
 	namespace string
 
-	info               *prometheus.GaugeVec
-	itemsAdded         *prometheus.CounterVec
-	itemsRemoved       *prometheus.CounterVec
-	itemsRetreived     *prometheus.CounterVec
-	itemsUrlsRetreived *prometheus.CounterVec
-	itemsStored        *prometheus.GaugeVec
+	info                        *prometheus.GaugeVec
+	itemsAdded                  *prometheus.CounterVec
+	itemsAddedBytes             *prometheus.HistogramVec
+	itemsAddedBytesUncompressed *prometheus.HistogramVec
+	itemsRemoved                *prometheus.CounterVec
+	itemsRetreived              *prometheus.CounterVec
+	itemsUrlsRetreived          *prometheus.CounterVec
+	itemsStored                 *prometheus.GaugeVec
 
 	cacheHit  *prometheus.CounterVec
 	cacheMiss *prometheus.CounterVec
@@ -61,11 +63,25 @@ func NewBasicMetrics(namespace, storeType string, enabled bool) *BasicMetrics {
 			Name:      "cache_miss_count",
 			Help:      "Number of cache misses",
 		}, []string{"type"}),
+		itemsAddedBytes: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "items_added_bytes",
+			Help:      "Size of items added to the store",
+			Buckets:   prometheus.ExponentialBuckets(1024000, 2, 13),
+		}, []string{"type"}),
+		itemsAddedBytesUncompressed: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "items_added_uncompressed_bytes",
+			Help:      "Size of items added to the store when uncompressed",
+			Buckets:   prometheus.ExponentialBuckets(1024000, 2, 13),
+		}, []string{"type"}),
 	}
 
 	if enabled {
 		prometheus.MustRegister(m.info)
 		prometheus.MustRegister(m.itemsAdded)
+		prometheus.MustRegister(m.itemsAddedBytes)
+		prometheus.MustRegister(m.itemsAddedBytesUncompressed)
 		prometheus.MustRegister(m.itemsRemoved)
 		prometheus.MustRegister(m.itemsRetreived)
 		prometheus.MustRegister(m.itemsUrlsRetreived)
@@ -81,6 +97,14 @@ func NewBasicMetrics(namespace, storeType string, enabled bool) *BasicMetrics {
 
 func (m *BasicMetrics) ObserveItemAdded(itemType string) {
 	m.itemsAdded.WithLabelValues(itemType).Inc()
+}
+
+func (m *BasicMetrics) ObserveItemAddedBytes(itemType string, size int) {
+	m.itemsAddedBytes.WithLabelValues(itemType).Observe(float64(size))
+}
+
+func (m *BasicMetrics) ObserveItemAddedBytesUncompressed(itemType string, size int) {
+	m.itemsAddedBytesUncompressed.WithLabelValues(itemType).Observe(float64(size))
 }
 
 func (m *BasicMetrics) ObserveItemRemoved(itemType string) {

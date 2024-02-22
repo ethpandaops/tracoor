@@ -109,6 +109,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
+	s.metrics.IncrementItemExported(BeaconStateQueue)
+
 	s.log.
 		WithField("state_root", rootAsString).
 		WithField("slot", slot).
