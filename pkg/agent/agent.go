@@ -15,7 +15,6 @@ import (
 
 	eth2v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/ethpandaops/ethwallclock"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
 	"github.com/ethpandaops/tracoor/pkg/networks"
@@ -164,17 +163,18 @@ func (s *agent) Start(ctx context.Context) error {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
 		}
 
-		s.node.Beacon().Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
-			// Sleep for a tiny amount to give the beacon node a chance to do any processing it needs to do.
-			time.Sleep(500 * time.Millisecond)
-
+		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			if !s.node.Beacon().Metadata().Synced() {
-				s.log.Debug("Skipping queueing beacon state as the beacon node is not yet synced")
+				s.log.Debug("Skipping queueing beacon state from block event as the beacon node is not yet synced")
 
-				return
+				return nil
 			}
 
-			s.enqueueBeaconState(ctx, phase0.Slot(slot.Number()))
+			time.Sleep(2000 * time.Millisecond)
+
+			s.enqueueBeaconState(ctx, event.Slot)
+
+			return nil
 		})
 
 		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {

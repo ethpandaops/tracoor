@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -17,7 +19,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to fetch beacon state root")
 	}
 
 	rootAsString := fmt.Sprintf("%#x", root)
@@ -56,8 +58,18 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	now := time.Now()
 
+	stateID := rootAsString
+
+	client := string(s.node.Beacon().Metadata().Client(ctx))
+
+	if client == string(services.ClientLodestar) ||
+		client == string(services.ClientPrysm) {
+		// Lodestar/prysm requires us to fetch the state id by slot
+		stateID = fmt.Sprintf("%d", slot)
+	}
+
 	// Fetch the state
-	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, rootAsString, "application/octet-stream")
+	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, "application/octet-stream")
 	if err != nil {
 		return err
 	}
