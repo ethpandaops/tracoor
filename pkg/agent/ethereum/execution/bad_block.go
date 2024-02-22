@@ -19,6 +19,7 @@ type BadBlocksResponse map[string]BadBlock
 
 func (b *BadBlock) ParseBlockHeader() (*types.Header, error) {
 	var header types.Header
+
 	err := json.Unmarshal(b.Block, &header)
 	if err != nil {
 		return nil, err
