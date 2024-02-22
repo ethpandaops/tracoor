@@ -24,6 +24,7 @@ type Node struct {
 }
 
 func NewNode(log logrus.FieldLogger, conf *Config) *Node {
+
 	return &Node{
 		config:   conf,
 		log:      log.WithField("module", "agent/ethereum/execution"),
@@ -119,9 +120,9 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash string) (*[]byte,
 		"debug_traceBlockByHash",
 		hash,
 		map[string]interface{}{
-			"disableMemory":  n.config.TraceDisableMemory,
-			"disableStorage": n.config.TraceDisableStorage,
-			"disableStack":   n.config.TraceDisableStack,
+			"disableMemory":  *n.config.TraceDisableMemory,
+			"disableStorage": *n.config.TraceDisableStorage,
+			"disableStack":   *n.config.TraceDisableStack,
 		},
 	))
 	if err != nil {
