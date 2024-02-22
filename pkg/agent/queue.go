@@ -19,21 +19,21 @@ type BeaconStateRequest struct {
 type BadBlockRequest struct {
 }
 
-func (n *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
-	n.beaconStateQueue <- &BeaconStateRequest{
+func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
+	s.beaconStateQueue <- &BeaconStateRequest{
 		Slot: slot,
 	}
 }
 
-func (n *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string, blockNumber uint64) {
-	n.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
+func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string, blockNumber uint64) {
+	s.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 	}
 }
 
-func (n *agent) enqueueBadBlock(ctx context.Context) {
-	n.executionBadBlockQueue <- &BadBlockRequest{}
+func (s *agent) enqueueBadBlock(ctx context.Context) {
+	s.executionBadBlockQueue <- &BadBlockRequest{}
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {

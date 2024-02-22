@@ -43,13 +43,13 @@ func (n *Node) Start(ctx context.Context) error {
 
 	metadata := services.NewMetadataService(n.log, rpc)
 
-	services := []services.Service{
+	svcs := []services.Service{
 		&metadata,
 	}
 
 	n.rpc = rpc
 
-	n.services = services
+	n.services = svcs
 
 	errs := make(chan error, 1)
 

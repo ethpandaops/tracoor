@@ -82,7 +82,6 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
-//nolint:gocyclo // Needs refactoring
 func (s *agent) Start(ctx context.Context) error {
 	if err := s.ServeMetrics(ctx); err != nil {
 		return err
@@ -247,8 +246,8 @@ func (s *agent) Start(ctx context.Context) error {
 				}).Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
 
 				s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
-
 			}
+
 			return nil
 		})
 
@@ -308,7 +307,7 @@ func (s *agent) performTokenHandshake(ctx context.Context) error {
 		s.log.WithField("token", token).Debug("Storage handshake token already exists")
 	} else {
 		// Save the token to the store
-		if err := s.store.SaveStorageHandshakeToken(ctx, s.Config.Name, token); err != nil {
+		if err = s.store.SaveStorageHandshakeToken(ctx, s.Config.Name, token); err != nil {
 			return fmt.Errorf("failed to save storage handshake token: %w", err)
 		}
 

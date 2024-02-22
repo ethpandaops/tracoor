@@ -60,7 +60,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	stateID := rootAsString
 
-	client := string(s.node.Beacon().Metadata().Client(ctx))
+	client := s.node.Beacon().Metadata().Client(ctx)
 
 	if client == string(services.ClientLodestar) ||
 		client == string(services.ClientPrysm) {
