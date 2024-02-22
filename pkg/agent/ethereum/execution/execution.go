@@ -119,9 +119,9 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash string) (*[]byte,
 		"debug_traceBlockByHash",
 		hash,
 		map[string]interface{}{
-			"disableMemory":  *n.config.TraceDisableMemory,
-			"disableStorage": *n.config.TraceDisableStorage,
-			"disableStack":   *n.config.TraceDisableStack,
+			"disableMemory":  n.config.GetTraceDisableMemory(),
+			"disableStorage": n.config.GetTraceDisableStorage(),
+			"disableStack":   n.config.GetTraceDisableStack(),
 		},
 	))
 	if err != nil {
