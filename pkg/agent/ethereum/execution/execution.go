@@ -24,7 +24,6 @@ type Node struct {
 }
 
 func NewNode(log logrus.FieldLogger, conf *Config) *Node {
-
 	return &Node{
 		config:   conf,
 		log:      log.WithField("module", "agent/ethereum/execution"),
