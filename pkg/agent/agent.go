@@ -74,7 +74,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		Config:                   config,
 		node:                     node,
 		log:                      log,
-		metrics:                  NewMetrics(namespace, config.Ethereum.OverrideNetworkName),
+		metrics:                  NewMetrics(namespace),
 		scheduler:                gocron.NewScheduler(time.Local),
 		indexer:                  indexerClient,
 		store:                    st,
