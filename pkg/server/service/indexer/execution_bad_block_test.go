@@ -33,6 +33,7 @@ func TestIndexerExecutionBadBlockCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -64,6 +65,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -285,6 +287,7 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 		}
 
 		// Download it via http
+		//nolint:gosec // This is a test
 		if resp, err := http.Get(url); err != nil {
 			t.Fatalf("failed to download execution bad block: %v", err)
 		} else {

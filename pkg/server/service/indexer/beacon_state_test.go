@@ -35,6 +35,7 @@ func TestIndexerBeaconStateCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -66,6 +67,7 @@ func TestIndexerBeaconStateDownloading(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -104,6 +106,7 @@ func TestIndexerBeaconStateDownloading(t *testing.T) {
 		}
 
 		// Download it via http
+		//nolint:gosec // This is a test
 		if resp, err := http.Get(url); err != nil {
 			t.Fatalf("failed to download beacon state: %v", err)
 		} else {
@@ -134,6 +137,7 @@ func TestIndexerBeaconState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)

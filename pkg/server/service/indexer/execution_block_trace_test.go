@@ -1,4 +1,4 @@
-// nolint:* // This is a test
+//nolint:gosec // This is a test
 package indexer
 
 import (
@@ -33,6 +33,7 @@ func TestIndexerExecutionBlockTraceCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -64,6 +65,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -246,6 +248,7 @@ func TestIndexerExecutionBlockTraceDownloading(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)

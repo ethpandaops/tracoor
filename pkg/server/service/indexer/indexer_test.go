@@ -44,6 +44,7 @@ func TestIndexerStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
@@ -63,6 +64,7 @@ func TestIndexerGetStorageHandshakeToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create indexer: %v", err)
 	}
+
 	defer func() {
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
