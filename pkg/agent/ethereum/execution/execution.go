@@ -119,8 +119,8 @@ func (n *Node) getDebugBlockTraceParms(ctx context.Context, client string) map[s
 		"disableStack":   n.config.GetTraceDisableStack(),
 	}
 
-	// geth inverts memory flag
-	if client == "geth" {
+	// geth/reth inverts memory flag
+	if client == "geth" || client == "reth" {
 		params["enableMemory"] = !n.config.GetTraceDisableMemory()
 		delete(params, "disableMemory")
 	}
