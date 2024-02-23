@@ -227,7 +227,11 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/execution_block_trace/${id}`}
-                download={`${id}.json.gz`}
+                download={
+                  trace
+                    ? `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}.json.gz`
+                    : `execution_block_trace-${id}.json.gz`
+                }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >
                 Download <ArrowDownTrayIcon className="w-6 h-6 ml-2" />

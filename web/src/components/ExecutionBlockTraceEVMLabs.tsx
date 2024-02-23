@@ -5,11 +5,6 @@ import { railscasts } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import { ExecutionBlockTrace } from '@app/types/api';
 
-type Selection = {
-  id: string;
-  execution_implementation: string;
-};
-
 export default function ExecutionBlockTraceEVMLabs({
   primaryTrace,
   relatedTraces,
@@ -18,9 +13,7 @@ export default function ExecutionBlockTraceEVMLabs({
   relatedTraces: ExecutionBlockTrace[];
 }) {
   const [step, setStep] = useState<number>(1);
-  const [selected, setSelected] = useState<Selection[]>([
-    { id: primaryTrace.id, execution_implementation: primaryTrace.execution_implementation },
-  ]);
+  const [selected, setSelected] = useState<ExecutionBlockTrace[]>([primaryTrace]);
   const [tx, setTx] = useState<string>('');
 
   function generateOption(trace: ExecutionBlockTrace) {
@@ -44,10 +37,7 @@ export default function ExecutionBlockTraceEVMLabs({
             disabled={selected.length >= 2 && !selected.some((s) => s.id === trace.id)}
             onChange={(e) => {
               if (e.target.checked) {
-                setSelected((prev) => [
-                  ...prev,
-                  { id: trace.id, execution_implementation: trace.execution_implementation },
-                ]);
+                setSelected((prev) => [...prev, trace]);
               } else {
                 setSelected((prev) => prev.filter((s) => s.id !== trace.id));
               }
@@ -120,9 +110,13 @@ export default function ExecutionBlockTraceEVMLabs({
     </div>
   );
 
-  function generateJQCommand(trace: Selection, tx: string) {
+  function generateJQCommand(trace: ExecutionBlockTrace, tx: string) {
     const nestedResult = !['nethermind', 'besu'].includes(trace.execution_implementation);
-    return `cat ${trace.id}.json | jq -c '.[${tx}]${nestedResult ? '.result' : ''}.structLogs.[]' > ${trace.id}-${tx}.trace`;
+    return `jq '${nestedResult ? `{results: .[${tx}]}` : `.[${tx}]`}' ${trace.id}.json > ${trace.id}-${tx}.json`;
+  }
+
+  function generateFileNamePrefix(trace: ExecutionBlockTrace) {
+    return `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}`;
   }
 
   const snippet = useMemo(() => {
@@ -130,12 +124,12 @@ export default function ExecutionBlockTraceEVMLabs({
     if (tx.length === 0) return '';
     return `# Download the traces
 # Note: requires wget
-wget -O ${selected[0].id}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[0].id}
-wget -O ${selected[1].id}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[1].id}
+wget -O ${generateFileNamePrefix(selected[0])}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[0].id}
+wget -O ${generateFileNamePrefix(selected[1])}.json.gz -q ${window.location.origin}/download/execution_block_trace/${selected[1].id}
 
 # Decompress the traces
-gzip -d ${selected[0].id}.json.gz
-gzip -d ${selected[1].id}.json.gz
+gzip -d ${generateFileNamePrefix(selected[0])}.json.gz
+gzip -d ${generateFileNamePrefix(selected[1])}.json.gz
 
 # Pull out the transaction
 # Note: requires jq
@@ -145,7 +139,7 @@ ${generateJQCommand(selected[1], tx)}
 # Compare the traces
 # Note: requires go and the tracediff tool
 #       go install github.com/holiman/goevmlab/cmd/tracediff@latest
-tracediff ${selected[0].id}-${tx}.trace ${selected[1].id}-${tx}.trace`;
+tracediff ${generateFileNamePrefix(selected[0])}-${tx}.json ${generateFileNamePrefix(selected[1])}-${tx}.json`;
   }, [selected, tx]);
 
   const step3 = (
