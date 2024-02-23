@@ -42,7 +42,7 @@ func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.Beaco
 func ProtoExecutionBlockTraceToDBExecutionBlockTrace(eb *indexer.ExecutionBlockTrace) *persistence.ExecutionBlockTrace {
 	return &persistence.ExecutionBlockTrace{
 		BlockHash:               eb.GetBlockHash().GetValue(),
-		BlockNumber:             int64(eb.GetBlockNumber().GetValue()),
+		BlockNumber:             eb.GetBlockNumber().GetValue(),
 		Node:                    eb.GetNode().GetValue(),
 		NodeVersion:             eb.GetNodeVersion().GetValue(),
 		FetchedAt:               eb.GetFetchedAt().AsTime(),

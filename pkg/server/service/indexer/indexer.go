@@ -32,52 +32,52 @@ type Indexer struct {
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store) (*Indexer, error) {
-	e := &Indexer{
+	i := &Indexer{
 		log:    log.WithField("server/module", ServiceType),
 		db:     db,
 		store:  st,
 		config: conf,
 	}
 
-	return e, nil
+	return i, nil
 }
 
-func (e *Indexer) Start(ctx context.Context, grpcServer *grpc.Server) error {
-	e.log.Info("Starting module")
+func (i *Indexer) Start(ctx context.Context, grpcServer *grpc.Server) error {
+	i.log.Info("Starting module")
 
-	if err := e.store.Healthy(ctx); err != nil {
+	if err := i.store.Healthy(ctx); err != nil {
 		return errors.Wrap(err, "failed to connect to store")
 	}
 
-	indexer.RegisterIndexerServer(grpcServer, e)
+	indexer.RegisterIndexerServer(grpcServer, i)
 
-	go e.startRetentionWatchers(ctx)
+	go i.startRetentionWatchers(ctx)
 
 	return nil
 }
 
-func (e *Indexer) Stop(ctx context.Context) error {
-	e.log.Info("Stopping module")
+func (i *Indexer) Stop(ctx context.Context) error {
+	i.log.Info("Stopping module")
 
 	// Wait for all requests to finish?
 
 	return nil
 }
 
-func (e *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
+func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	token, err := e.store.GetStorageHandshakeToken(ctx, req.Node)
+	token, err := i.store.GetStorageHandshakeToken(ctx, req.Node)
 	if err != nil {
-		e.log.WithError(err).WithField("node", req.GetNode()).Debug("Failed to get storage handshake")
+		i.log.WithError(err).WithField("node", req.GetNode()).Debug("Failed to get storage handshake")
 
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	if token != req.GetToken() {
-		e.log.
+		i.log.
 			WithField("agent", req.GetNode()).
 			Warn(`Storage handshake token mismatch.
 			It's highly likely that the node is not pointed at the same storage backend as the indexer. 
@@ -91,15 +91,15 @@ func (e *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.Get
 	}, nil
 }
 
-func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaconStateRequest) (*indexer.CreateBeaconStateResponse, error) {
+func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaconStateRequest) (*indexer.CreateBeaconStateResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	// Check the store for the state
-	exists, err := e.store.Exists(ctx, req.GetLocation().GetValue())
+	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
 	if err != nil {
-		e.log.
+		i.log.
 			WithError(err).
 			WithField("location", req.GetLocation().GetValue()).
 			WithField("node", req.GetNode().GetValue()).
@@ -117,7 +117,7 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		filter.AddStateRoot(req.GetStateRoot().GetValue())
 		filter.AddNode(req.GetNode().GetValue())
 
-		states, err := e.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
+		states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -157,13 +157,13 @@ func (e *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := e.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
-		e.log.WithError(err).WithFields(logFields).Error("Failed to index state")
+	if err := i.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index state")
 
 		return nil, status.Error(codes.Internal, "failed to index state")
 	}
 
-	e.log.WithFields(logFields).WithField("id", state.GetId().GetValue()).Debug("Indexed beacon state")
+	i.log.WithFields(logFields).WithField("id", state.GetId().GetValue()).Debug("Indexed beacon state")
 
 	return &indexer.CreateBeaconStateResponse{
 		Id: state.GetId(),
@@ -245,6 +245,10 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 func (i *Indexer) CountBeaconState(ctx context.Context, req *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
 	filter := &persistence.BeaconStateFilter{}
 
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
 	if req.Node != "" {
 		filter.AddNode(req.Node)
 	}
@@ -301,6 +305,7 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 	}
 
 	fields := make([]string, len(req.Fields))
+
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueBeaconStateValuesRequest_NODE:
@@ -505,6 +510,7 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 	}
 
 	fields := make([]string, len(req.Fields))
+
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE:
@@ -715,6 +721,7 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 	}
 
 	fields := make([]string, len(req.Fields))
+
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_NODE:
