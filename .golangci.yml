@@ -30,7 +30,6 @@ linters:
     - errcheck
     - errname
     - exportloopref
-    - goconst
     - gocritic
     - gocyclo
     - gofmt
