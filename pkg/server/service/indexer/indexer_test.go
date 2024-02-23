@@ -66,7 +66,7 @@ func TestIndexerGetStorageHandshakeToken(t *testing.T) {
 	}
 
 	defer func() {
-		if err := cleanup(); err != nil {
+		if err = cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
 		}
 	}()
