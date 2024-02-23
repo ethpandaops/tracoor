@@ -277,6 +277,7 @@ func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []
 	for rows.Next() {
 		values = make([]interface{}, len(fields))
 		valuePtrs := make([]interface{}, len(fields))
+
 		for i := range values {
 			valuePtrs[i] = &values[i]
 		}
@@ -308,6 +309,7 @@ func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []
 				case "block_extra_data":
 					results.BlockExtraData = append(results.BlockExtraData, values[i].(string))
 				}
+
 				valueSets[field][values[i]] = true
 			}
 		}

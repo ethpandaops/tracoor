@@ -64,6 +64,10 @@ func (i *Indexer) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (i *Indexer) Store() store.Store {
+	return i.store
+}
+
 func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

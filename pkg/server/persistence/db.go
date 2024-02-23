@@ -18,7 +18,7 @@ type Indexer struct {
 	metrics *BasicMetrics
 }
 
-func NewIndexer(namespace string, log logrus.FieldLogger, config Config) (*Indexer, error) {
+func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *Options) (*Indexer, error) {
 	namespace += "_indexer"
 
 	var db *gorm.DB
@@ -60,7 +60,7 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config) (*Index
 	return &Indexer{
 		db:      db,
 		log:     log.WithField("component", "indexer"),
-		metrics: NewBasicMetrics(namespace, config.DriverName, true),
+		metrics: NewBasicMetrics(namespace, config.DriverName, opts.MetricsEnabled),
 	}, nil
 }
 

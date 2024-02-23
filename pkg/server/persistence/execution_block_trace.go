@@ -263,6 +263,7 @@ func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields 
 	for rows.Next() {
 		values = make([]interface{}, len(fields))
 		valuePtrs := make([]interface{}, len(fields))
+
 		for i := range values {
 			valuePtrs[i] = &values[i]
 		}
@@ -292,6 +293,7 @@ func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields 
 				case "node_version":
 					results.NodeVersion = append(results.NodeVersion, values[i].(string))
 				}
+
 				valueSets[field][values[i]] = true
 			}
 		}
@@ -299,6 +301,7 @@ func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields 
 
 	if err := rows.Err(); err != nil {
 		i.metrics.ObserveOperationError(operation)
+
 		return nil, err
 	}
 
