@@ -6,3 +6,4 @@ store.db
 index.db
 server.yaml
 agent.yaml
+.vscode/launch.json

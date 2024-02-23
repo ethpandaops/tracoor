@@ -196,7 +196,6 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 	}
 
 	return response, nil
-
 }
 
 func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutionBlockTraceRequest) (*api.ListExecutionBlockTraceResponse, error) {

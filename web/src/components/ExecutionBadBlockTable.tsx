@@ -457,7 +457,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                           <div className="flex flex-row ">
                             <a
                               href={`/download/execution_bad_block/${row.id}`}
-                              download={`execution_bad_block_${row.id}.json`}
+                              download={`execution_bad_block-${row.block_number}-${row.block_hash}-${row.node}.json.gz`}
                               className="text-sky-500 hover:text-sky-600 px-2"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />

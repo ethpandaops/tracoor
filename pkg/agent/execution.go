@@ -29,16 +29,14 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 			WithField("block_number", blockNumber).
 			WithError(err).
 			Warn("Failed to check if execution block trace is already indexed. Will attempt to fetch and index anyway")
-	} else {
-		if rsp != nil && len(rsp.ExecutionBlockTraces) > 0 {
-			s.log.WithField("block_hash", blockHash).WithField("block_number", blockNumber).Debug("Execution block trace already indexed")
+	} else if rsp != nil && len(rsp.ExecutionBlockTraces) > 0 {
+		s.log.WithField("block_hash", blockHash).WithField("block_number", blockNumber).Debug("Execution block trace already indexed")
 
-			return nil
-		}
+		return nil
 	}
 
 	// Fetch the execution block trace from the execution node.
-	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash)
+	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash, s.node.Execution().Metadata().Client(ctx))
 	if err != nil {
 		return err
 	}
@@ -75,6 +73,8 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		return err
 	}
 
+	s.metrics.IncrementItemExported(ExecutionBlockTraceQueue)
+
 	s.log.
 		WithField("id", rrsp.GetId().GetValue()).
 		WithField("location", location).
@@ -91,7 +91,9 @@ func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
 	}
 
 	for _, block := range *blocks {
-		if err := s.indexBadBlock(ctx, &block); err != nil {
+		b := block
+
+		if err := s.indexBadBlock(ctx, &b); err != nil {
 			s.log.WithError(err).Error("Failed to index execution bad block")
 		}
 	}
@@ -104,7 +106,7 @@ func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) er
 	defer cancel()
 
 	// Check if we've already indexed this execution bad blocks.
-	// The bad blocks RPC returns the most recent bad blocks so theres a high likelyhood we've already indexed them.
+	// The bad blocks RPC returns the most recent bad blocks so theres a high likelihood we've already indexed them.
 	rsp, err := s.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
 		Node:      s.Config.Name,
 		BlockHash: block.Hash,
@@ -163,17 +165,15 @@ func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) er
 	header, err := block.ParseBlockHeader()
 	if err != nil {
 		s.log.WithError(err).Error("Failed to parse block data from bad block")
-	} else {
-		if header != nil {
-			if header.Number != nil {
-				req.BlockNumber = wrapperspb.Int64(int64(header.Number.Int64()))
-			}
+	} else if header != nil {
+		if header.Number != nil {
+			req.BlockNumber = wrapperspb.Int64(header.Number.Int64())
+		}
 
-			if header.Extra != nil {
-				sanitizedExtra := strings.ToValidUTF8(string(header.Extra), "")
+		if header.Extra != nil {
+			sanitizedExtra := strings.ToValidUTF8(string(header.Extra), "")
 
-				req.BlockExtraData = wrapperspb.String(sanitizedExtra)
-			}
+			req.BlockExtraData = wrapperspb.String(sanitizedExtra)
 		}
 	}
 
@@ -182,6 +182,8 @@ func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) er
 	if err != nil {
 		return errors.Wrapf(err, "failed to index execution bad block: %v", block.Hash)
 	}
+
+	s.metrics.IncrementItemExported(ExecutionBadBlockQueue)
 
 	s.log.
 		WithField("id", rrsp.GetId().GetValue()).

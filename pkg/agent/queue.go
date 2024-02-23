@@ -19,21 +19,21 @@ type BeaconStateRequest struct {
 type BadBlockRequest struct {
 }
 
-func (n *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
-	n.beaconStateQueue <- &BeaconStateRequest{
+func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
+	s.beaconStateQueue <- &BeaconStateRequest{
 		Slot: slot,
 	}
 }
 
-func (n *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string, blockNumber uint64) {
-	n.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
+func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string, blockNumber uint64) {
+	s.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 	}
 }
 
-func (n *agent) enqueueBadBlock(ctx context.Context) {
-	n.executionBadBlockQueue <- &BadBlockRequest{}
+func (s *agent) enqueueBadBlock(ctx context.Context) {
+	s.executionBadBlockQueue <- &BadBlockRequest{}
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
@@ -47,6 +47,8 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 				WithError(err).
 				WithField("slot", stateRequest.Slot).
 				Error("Failed to fetch and index beacon state")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -68,6 +70,8 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 				WithField("block_hash", traceRequest.BlockHash).
 				WithField("block_number", traceRequest.BlockNumber).
 				Error("Failed to fetch and index execution block trace")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -87,6 +91,8 @@ func (s *agent) processBadBlockQueue(ctx context.Context) {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index execution bad blocks")
+
+			continue
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(

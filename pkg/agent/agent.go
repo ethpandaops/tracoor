@@ -15,7 +15,6 @@ import (
 
 	eth2v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/ethpandaops/ethwallclock"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
 	"github.com/ethpandaops/tracoor/pkg/networks"
@@ -48,6 +47,8 @@ type agent struct {
 	executionBadBlockQueue   chan *BadBlockRequest
 }
 
+const namespace = "tracoor_agent"
+
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -64,7 +65,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		return nil, err
 	}
 
-	st, err := store.NewStore("store", log, config.Store.Type, config.Store.Config, store.DefaultOptions())
+	st, err := store.NewStore(namespace, log, config.Store.Type, config.Store.Config, store.DefaultOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		Config:                   config,
 		node:                     node,
 		log:                      log,
-		metrics:                  NewMetrics("tracoor_agent"),
+		metrics:                  NewMetrics(namespace),
 		scheduler:                gocron.NewScheduler(time.Local),
 		indexer:                  indexerClient,
 		store:                    st,
@@ -83,7 +84,6 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
-//nolint:gocyclo // Needs refactoring
 func (s *agent) Start(ctx context.Context) error {
 	if err := s.ServeMetrics(ctx); err != nil {
 		return err
@@ -164,17 +164,18 @@ func (s *agent) Start(ctx context.Context) error {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
 		}
 
-		s.node.Beacon().Metadata().Wallclock().OnSlotChanged(func(slot ethwallclock.Slot) {
-			// Sleep for a tiny amount to give the beacon node a chance to do any processing it needs to do.
-			time.Sleep(500 * time.Millisecond)
-
+		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			if !s.node.Beacon().Metadata().Synced() {
-				s.log.Debug("Skipping queueing beacon state as the beacon node is not yet synced")
+				s.log.Debug("Skipping queueing beacon state from block event as the beacon node is not yet synced")
 
-				return
+				return nil
 			}
 
-			s.enqueueBeaconState(ctx, phase0.Slot(slot.Number()))
+			time.Sleep(2000 * time.Millisecond)
+
+			s.enqueueBeaconState(ctx, event.Slot)
+
+			return nil
 		})
 
 		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
@@ -247,8 +248,8 @@ func (s *agent) Start(ctx context.Context) error {
 				}).Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
 
 				s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
-
 			}
+
 			return nil
 		})
 
@@ -308,7 +309,7 @@ func (s *agent) performTokenHandshake(ctx context.Context) error {
 		s.log.WithField("token", token).Debug("Storage handshake token already exists")
 	} else {
 		// Save the token to the store
-		if err := s.store.SaveStorageHandshakeToken(ctx, s.Config.Name, token); err != nil {
+		if err = s.store.SaveStorageHandshakeToken(ctx, s.Config.Name, token); err != nil {
 			return fmt.Errorf("failed to save storage handshake token: %w", err)
 		}
 

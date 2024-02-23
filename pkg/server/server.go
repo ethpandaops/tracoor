@@ -56,6 +56,8 @@ type Server struct {
 	frontendFS fs.FS
 }
 
+const namespace = "tracoor_server"
+
 func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Server, error) {
 	if err := conf.Validate(); err != nil {
 		return nil, err
@@ -66,7 +68,7 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 		return nil, err
 	}
 
-	st, err := store.NewStore("store", log, conf.Store.Type, conf.Store.Config, store.DefaultOptions())
+	st, err := store.NewStore(namespace, log, conf.Store.Type, conf.Store.Config, store.DefaultOptions())
 	if err != nil {
 		return nil, err
 	}

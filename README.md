@@ -50,8 +50,6 @@ TODO
 
 ### Storing
 
-* [x] Memory
-* [x] Filesystem
 * [x] S3
 
 ### Indexing

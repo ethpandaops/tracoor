@@ -14,15 +14,15 @@ import (
 func setupMinioContainer(ctx context.Context, bucketName string) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "minio/minio",
-		ExposedPorts: []string{"9001/tcp", "9000/tcp"},
+		ExposedPorts: []string{"9000/tcp"},
 		Env: map[string]string{
-			"MINIO_ACCESS_KEY":      "minioadmin",
-			"MINIO_SECRET_KEY":      "minioadmin",
-			"MINIO_CONSOLE_ADDRESS": ":9001",
+			"MINIO_ACCESS_KEY": "minioadmin",
+			"MINIO_SECRET_KEY": "minioadmin",
 		},
 		Cmd:        []string{"server", "/data"},
 		WaitingFor: wait.ForListeningPort("9000/tcp").WithStartupTimeout(2 * time.Minute),
 	}
+
 	minioContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
@@ -38,6 +38,7 @@ func setupMinioContainer(ctx context.Context, bucketName string) (testcontainers
 
 	// Exec into the container to create the bucket
 	execCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p /data/%s", bucketName)}
+
 	_, _, execErr := minioContainer.Exec(ctx, execCmd)
 	if execErr != nil {
 		return nil, "", execErr
@@ -50,6 +51,7 @@ func setupMinioContainer(ctx context.Context, bucketName string) (testcontainers
 func TestS3StoreOperations(t *testing.T) {
 	ctx := context.Background()
 	bucket := "mybucket"
+
 	minioContainer, endpoint, err := setupMinioContainer(ctx, bucket)
 	if err != nil {
 		t.Fatalf("Failed to setup Minio container: %v", err)

@@ -77,7 +77,6 @@ func (c *Client) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaco
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	return c.pb.CreateBeaconState(ctx, req, grpc.UseCompressor(gzip.Name))
-
 }
 
 func (c *Client) ListBeaconState(ctx context.Context, req *indexer.ListBeaconStateRequest) (*indexer.ListBeaconStateResponse, error) {

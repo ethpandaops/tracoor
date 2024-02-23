@@ -201,7 +201,11 @@ export default function ExecutionBadBlockId({ id }: { id: string }) {
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/execution_bad_block/${id}`}
-                download={`execution_bad_block_${id}.json`}
+                download={
+                  badBlock
+                    ? `execution_bad_block-${badBlock.block_number}-${badBlock.block_hash}-${badBlock.node}.json.gz`
+                    : `execution_bad_block-${id}.json.gz`
+                }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >
                 Download <ArrowDownTrayIcon className="w-6 h-6 ml-2" />

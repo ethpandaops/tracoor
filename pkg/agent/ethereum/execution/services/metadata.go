@@ -106,7 +106,9 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 
 func (m *MetadataService) Web3ClientVersion(ctx context.Context) (string, error) {
 	var version string
+
 	call := ethrpc.NewCallBuilder[string]("web3_clientVersion", nil)
+
 	_, err := m.rpc.Do(ctx, call.Into(&version))
 	if err != nil {
 		return "", err
@@ -121,7 +123,7 @@ func (m *MetadataService) RefreshAll(ctx context.Context) error {
 		return err
 	}
 
-	m.nodeVersion = string(version)
+	m.nodeVersion = version
 
 	return nil
 }
