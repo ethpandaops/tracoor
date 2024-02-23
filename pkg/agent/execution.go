@@ -36,7 +36,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	}
 
 	// Fetch the execution block trace from the execution node.
-	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash)
+	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash, s.node.Execution().Metadata().Client(ctx))
 	if err != nil {
 		return err
 	}
