@@ -112,17 +112,29 @@ func (n *Node) Metadata() *services.MetadataService {
 	return service.(*services.MetadataService)
 }
 
-func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash string) (*[]byte, error) {
+func (n *Node) getDebugBlockTraceParms(ctx context.Context, client string) map[string]interface{} {
+	params := map[string]interface{}{
+		"disableMemory":  n.config.GetTraceDisableMemory(),
+		"disableStorage": n.config.GetTraceDisableStorage(),
+		"disableStack":   n.config.GetTraceDisableStack(),
+	}
+
+	// geth inverts memory flag
+	if client == "geth" {
+		params["enableMemory"] = !n.config.GetTraceDisableMemory()
+		delete(params, "disableMemory")
+	}
+
+	return params
+}
+
+func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (*[]byte, error) {
 	data := jsonrpc.Message{}
 
 	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
 		"debug_traceBlockByHash",
 		hash,
-		map[string]interface{}{
-			"disableMemory":  n.config.GetTraceDisableMemory(),
-			"disableStorage": n.config.GetTraceDisableStorage(),
-			"disableStack":   n.config.GetTraceDisableStack(),
-		},
+		n.getDebugBlockTraceParms(ctx, client),
 	))
 	if err != nil {
 		return nil, err
