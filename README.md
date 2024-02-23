@@ -39,7 +39,7 @@ TODO
 
 ## Features
 
-* [x] Web interface for viewing beacon states, execution block traces and invalid gossiped blocks
+* [x] Web interface for viewing beacon states, execution block traces and invalid execution blocks
 * [x] Configurable retention period
 * [x] Prometheus metrics
 
