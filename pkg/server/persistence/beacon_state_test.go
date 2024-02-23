@@ -1,3 +1,4 @@
+//nolint:gosec // Only used in tests
 package persistence
 
 import (
@@ -29,19 +30,24 @@ func generateRandomBeaconState() *BeaconState {
 
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 	b := make([]byte, length)
+
 	for i := range b {
+		//nolint:gosec // Only used in tests
 		b[i] = charset[rand.Intn(len(charset))]
 	}
+
 	return string(b)
 }
 
 func generateRandomInt64() int64 {
+	//nolint:gosec // Only used in tests
 	return rand.Int63()
 }
 
 func TestInsertBeaconState(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -60,7 +66,7 @@ func TestInsertBeaconState(t *testing.T) {
 }
 
 func TestRemoveBeaconState(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -75,7 +81,7 @@ func TestRemoveBeaconState(t *testing.T) {
 }
 
 func TestCountBeaconState(t *testing.T) {
-	indexer, _, err := newMockIndexer()
+	indexer, _, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -95,7 +101,7 @@ func TestCountBeaconState(t *testing.T) {
 }
 
 func TestListBeaconState(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -119,7 +125,7 @@ func TestListBeaconState(t *testing.T) {
 }
 
 func TestUpdateBeaconState(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -139,9 +145,10 @@ func TestUpdateBeaconState(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+//nolint:gocyclo // Test is long but manageable
 func TestBeaconStateFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,7 +287,7 @@ func TestBeaconStateFilters(t *testing.T) {
 }
 func TestBeaconStateIndividualFilters(t *testing.T) {
 	t.Run("By individual attributes", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}

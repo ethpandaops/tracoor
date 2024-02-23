@@ -13,18 +13,14 @@ var (
 	testDBCounter = 0
 )
 
-func newMockIndexer() (*Indexer, sqlmock.Sqlmock, error) {
+func NewMockIndexer() (*Indexer, sqlmock.Sqlmock, error) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to open mock sql db, got error: %v", err)
+		return nil, nil, fmt.Errorf("failed to open mock sql db, got error: %v", err)
 	}
 
 	if db == nil {
 		return nil, nil, errors.New("sql db is nil")
-	}
-
-	if mock == nil {
-		return nil, nil, errors.New("mock sql is nil")
 	}
 
 	testDBCounter++
@@ -34,11 +30,11 @@ func newMockIndexer() (*Indexer, sqlmock.Sqlmock, error) {
 		DriverName: "sqlite",
 	}, DefaultOptions().SetMetricsEnabled(false))
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create indexer, got error: %v", err)
+		return nil, nil, fmt.Errorf("failed to create indexer, got error: %v", err)
 	}
 
 	if err := indexer.Start(context.Background()); err != nil {
-		return nil, nil, fmt.Errorf("Failed to start indexer, got error: %v", err)
+		return nil, nil, fmt.Errorf("failed to start indexer, got error: %v", err)
 	}
 
 	return indexer, mock, nil

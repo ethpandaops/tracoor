@@ -16,7 +16,6 @@ type Indexer struct {
 	db      *gorm.DB
 	log     logrus.FieldLogger
 	metrics *BasicMetrics
-	opts    *Options
 }
 
 func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *Options) (*Indexer, error) {

@@ -1,3 +1,4 @@
+//nolint:gosec // Only used in tests
 package persistence
 
 import (
@@ -29,7 +30,7 @@ func generateRandomExecutionBadBlock() *ExecutionBadBlock {
 }
 
 func TestInsertExecutionBadBlock(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -47,7 +48,7 @@ func TestInsertExecutionBadBlock(t *testing.T) {
 }
 
 func TestRemoveExecutionBadBlock(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -62,7 +63,7 @@ func TestRemoveExecutionBadBlock(t *testing.T) {
 }
 
 func TestCountExecutionBadBlock(t *testing.T) {
-	indexer, _, err := newMockIndexer()
+	indexer, _, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -82,7 +83,7 @@ func TestCountExecutionBadBlock(t *testing.T) {
 }
 
 func TestListExecutionBadBlock(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -105,9 +106,10 @@ func TestListExecutionBadBlock(t *testing.T) {
 	assert.Equal(t, block.Node, blocks[0].Node)
 }
 
+//nolint:gocyclo // Test is long but manageable
 func TestExecutionBadBlockFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -246,7 +248,7 @@ func TestExecutionBadBlockFilters(t *testing.T) {
 }
 func TestExecutionBadBlockIndividualFilters(t *testing.T) {
 	t.Run("By individual attributes", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,8 +277,10 @@ func TestExecutionBadBlockIndividualFilters(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
+			ttc := tc
+
 			t.Run(tc.name, func(t *testing.T) {
-				blocks, err := indexer.ListExecutionBadBlock(context.Background(), &tc.filter, &PaginationCursor{})
+				blocks, err := indexer.ListExecutionBadBlock(context.Background(), &ttc.filter, &PaginationCursor{})
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -80,8 +80,8 @@ func (f *BeaconStateFilter) AddNetwork(network string) {
 	f.Network = &network
 }
 
-func (f *BeaconStateFilter) AddBeaconImplementation(BeaconImplementation string) {
-	f.BeaconImplementation = &BeaconImplementation
+func (f *BeaconStateFilter) AddBeaconImplementation(beaconImplementation string) {
+	f.BeaconImplementation = &beaconImplementation
 }
 
 func (f *BeaconStateFilter) Validate() error {
@@ -279,6 +279,7 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 	for rows.Next() {
 		values = make([]interface{}, len(fields))
 		valuePtrs := make([]interface{}, len(fields))
+
 		for i := range values {
 			valuePtrs[i] = &values[i]
 		}
@@ -310,6 +311,7 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 				case "beacon_implementation":
 					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
 				}
+
 				valueSets[field][values[i]] = true
 			}
 		}
@@ -317,6 +319,7 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 
 	if err := rows.Err(); err != nil {
 		i.metrics.ObserveOperationError(operation)
+
 		return nil, err
 	}
 

@@ -1,3 +1,4 @@
+//nolint:gosec // Only used in tests
 package persistence
 
 import (
@@ -27,7 +28,7 @@ func generateRandomExecutionBlockTrace() *ExecutionBlockTrace {
 }
 
 func TestInsertExecutionBlockTrace(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -45,7 +46,7 @@ func TestInsertExecutionBlockTrace(t *testing.T) {
 }
 
 func TestRemoveExecutionBlockTrace(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -60,7 +61,7 @@ func TestRemoveExecutionBlockTrace(t *testing.T) {
 }
 
 func TestCountExecutionBlockTrace(t *testing.T) {
-	indexer, _, err := newMockIndexer()
+	indexer, _, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -80,7 +81,7 @@ func TestCountExecutionBlockTrace(t *testing.T) {
 }
 
 func TestListExecutionBlockTrace(t *testing.T) {
-	indexer, mock, err := newMockIndexer()
+	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -103,9 +104,10 @@ func TestListExecutionBlockTrace(t *testing.T) {
 	assert.Equal(t, trace.Node, traces[0].Node)
 }
 
+//nolint:gocyclo // Test is long but manageable
 func TestExecutionBlockTraceFilters(t *testing.T) {
 	t.Run("By individual attributes", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,8 +135,10 @@ func TestExecutionBlockTraceFilters(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
+			tcc := tc
+
 			t.Run(tc.name, func(t *testing.T) {
-				traces, err := indexer.ListExecutionBlockTrace(context.Background(), &tc.filter, &PaginationCursor{})
+				traces, err := indexer.ListExecutionBlockTrace(context.Background(), &tcc.filter, &PaginationCursor{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -150,7 +154,7 @@ func TestExecutionBlockTraceFilters(t *testing.T) {
 		}
 	})
 	t.Run("By random combinations", func(t *testing.T) {
-		indexer, _, err := newMockIndexer()
+		indexer, _, err := NewMockIndexer()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -276,5 +280,4 @@ func TestExecutionBlockTraceFilters(t *testing.T) {
 			}
 		}
 	})
-
 }
