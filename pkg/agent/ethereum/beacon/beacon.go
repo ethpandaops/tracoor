@@ -162,7 +162,7 @@ func (b *Node) Synced(ctx context.Context) error {
 
 	currentSlot := wallclock.Slots().Current()
 
-	if currentSlot.Number()-uint64(syncState.HeadSlot) > 32 {
+	if currentSlot.Number()-uint64(syncState.HeadSlot) > 64 {
 		return fmt.Errorf("beacon node is too far behind head, head slot is %d, current slot is %d", syncState.HeadSlot, currentSlot.Number())
 	}
 
