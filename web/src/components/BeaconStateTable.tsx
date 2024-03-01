@@ -105,19 +105,19 @@ export default function BeaconStateTable({ id }: { id?: string }) {
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-64 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
             <div className="h-5 w-96 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden md:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
             <div className="h-5 w-16 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
             <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
@@ -140,7 +140,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={7}
+          colSpan={8}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-red-600 text-center text-xl"
         >
           {message}
@@ -151,7 +151,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={7}
+          colSpan={8}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-gray-600 text-center text-xl"
         >
           No data available
@@ -236,7 +236,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                       sortConfig.key === 'beacon_implementation' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden lg:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 2xl:table-cell',
                     )}
                     onClick={() => handleSort('beacon_implementation')}
                   >
@@ -265,7 +265,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 4xl:table-cell',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -294,7 +294,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                       sortConfig.key === 'epoch' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden md:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 3xl:table-cell',
                     )}
                     onClick={() => handleSort('epoch')}
                   >
@@ -352,7 +352,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                       sortConfig.key === 'state_root' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden 2xl:table-cell',
                     )}
                     onClick={() => handleSort('state_root')}
                   >
@@ -398,7 +398,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -411,7 +411,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -422,7 +422,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden md:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -444,10 +444,10 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
                           <div className=" w-fit">
                             <span
-                              className="relative top-1 group transition cursor-pointer"
+                              className="relative top-1 group transition cursor-pointer font-mono"
                               onClick={() => setValue('beaconStateStateRoot', row.state_root)}
                             >
                               {row.state_root}

@@ -20,6 +20,32 @@ message BeaconState {
   google.protobuf.StringValue beacon_implementation = 10;
 }
 
+message BeaconBlock {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  google.protobuf.UInt64Value slot = 4;
+  google.protobuf.UInt64Value epoch = 5;
+  google.protobuf.StringValue block_root = 6;
+  google.protobuf.StringValue node_version = 7;
+  google.protobuf.StringValue location = 8;
+  google.protobuf.StringValue network = 9;
+  google.protobuf.StringValue beacon_implementation = 10;
+}
+
+message BeaconBadBlock {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  google.protobuf.UInt64Value slot = 4;
+  google.protobuf.UInt64Value epoch = 5;
+  google.protobuf.StringValue block_root = 6;
+  google.protobuf.StringValue node_version = 7;
+  google.protobuf.StringValue location = 8;
+  google.protobuf.StringValue network = 9;
+  google.protobuf.StringValue beacon_implementation = 10;
+}
+
 message ExecutionBlockTrace {
   google.protobuf.StringValue id = 1;
   google.protobuf.StringValue node = 2;
@@ -46,22 +72,55 @@ message ExecutionBadBlock {
 }
 
 service Indexer {
-  rpc GetStorageHandshakeToken(GetStorageHandshakeTokenRequest) returns (GetStorageHandshakeTokenResponse) {}
+  rpc GetStorageHandshakeToken(GetStorageHandshakeTokenRequest)
+      returns (GetStorageHandshakeTokenResponse) {}
   // BeaconState
-  rpc CreateBeaconState(CreateBeaconStateRequest) returns (CreateBeaconStateResponse) {}
-  rpc ListBeaconState(ListBeaconStateRequest) returns (ListBeaconStateResponse) {}
-  rpc CountBeaconState(CountBeaconStateRequest) returns (CountBeaconStateResponse) {}
-  rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest) returns (ListUniqueBeaconStateValuesResponse) {}
+  rpc CreateBeaconState(CreateBeaconStateRequest)
+      returns (CreateBeaconStateResponse) {}
+  rpc ListBeaconState(ListBeaconStateRequest)
+      returns (ListBeaconStateResponse) {}
+  rpc CountBeaconState(CountBeaconStateRequest)
+      returns (CountBeaconStateResponse) {}
+  rpc ListUniqueBeaconStateValues(ListUniqueBeaconStateValuesRequest)
+      returns (ListUniqueBeaconStateValuesResponse) {}
+  // BeaconBlock
+  rpc CreateBeaconBlock(CreateBeaconBlockRequest)
+      returns (CreateBeaconBlockResponse) {}
+  rpc ListBeaconBlock(ListBeaconBlockRequest)
+      returns (ListBeaconBlockResponse) {}
+  rpc CountBeaconBlock(CountBeaconBlockRequest)
+      returns (CountBeaconBlockResponse) {}
+  rpc ListUniqueBeaconBlockValues(ListUniqueBeaconBlockValuesRequest)
+      returns (ListUniqueBeaconBlockValuesResponse) {}
+  // BeaconBadBlock
+  rpc CreateBeaconBadBlock(CreateBeaconBadBlockRequest)
+      returns (CreateBeaconBadBlockResponse) {}
+  rpc ListBeaconBadBlock(ListBeaconBadBlockRequest)
+      returns (ListBeaconBadBlockResponse) {}
+  rpc CountBeaconBadBlock(CountBeaconBadBlockRequest)
+      returns (CountBeaconBadBlockResponse) {}
+  rpc ListUniqueBeaconBadBlockValues(ListUniqueBeaconBadBlockValuesRequest)
+      returns (ListUniqueBeaconBadBlockValuesResponse) {}
   // ExecutionBlockTrace
-  rpc CreateExecutionBlockTrace(CreateExecutionBlockTraceRequest) returns (CreateExecutionBlockTraceResponse) {}
-  rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest) returns (ListExecutionBlockTraceResponse) {}
-  rpc CountExecutionBlockTrace(CountExecutionBlockTraceRequest) returns (CountExecutionBlockTraceResponse) {}
-  rpc ListUniqueExecutionBlockTraceValues(ListUniqueExecutionBlockTraceValuesRequest) returns (ListUniqueExecutionBlockTraceValuesResponse) {}
+  rpc CreateExecutionBlockTrace(CreateExecutionBlockTraceRequest)
+      returns (CreateExecutionBlockTraceResponse) {}
+  rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest)
+      returns (ListExecutionBlockTraceResponse) {}
+  rpc CountExecutionBlockTrace(CountExecutionBlockTraceRequest)
+      returns (CountExecutionBlockTraceResponse) {}
+  rpc ListUniqueExecutionBlockTraceValues(
+      ListUniqueExecutionBlockTraceValuesRequest)
+      returns (ListUniqueExecutionBlockTraceValuesResponse) {}
   // ExecutionBadBlock
-  rpc CreateExecutionBadBlock(CreateExecutionBadBlockRequest) returns (CreateExecutionBadBlockResponse) {}
-  rpc ListExecutionBadBlock(ListExecutionBadBlockRequest) returns (ListExecutionBadBlockResponse) {}
-  rpc CountExecutionBadBlock(CountExecutionBadBlockRequest) returns (CountExecutionBadBlockResponse) {}
-  rpc ListUniqueExecutionBadBlockValues(ListUniqueExecutionBadBlockValuesRequest) returns (ListUniqueExecutionBadBlockValuesResponse) {}
+  rpc CreateExecutionBadBlock(CreateExecutionBadBlockRequest)
+      returns (CreateExecutionBadBlockResponse) {}
+  rpc ListExecutionBadBlock(ListExecutionBadBlockRequest)
+      returns (ListExecutionBadBlockResponse) {}
+  rpc CountExecutionBadBlock(CountExecutionBadBlockRequest)
+      returns (CountExecutionBadBlockResponse) {}
+  rpc ListUniqueExecutionBadBlockValues(
+      ListUniqueExecutionBadBlockValuesRequest)
+      returns (ListUniqueExecutionBadBlockValuesResponse) {}
 }
 
 message GetStorageHandshakeTokenRequest {
@@ -69,9 +128,7 @@ message GetStorageHandshakeTokenRequest {
   string token = 2;
 }
 
-message GetStorageHandshakeTokenResponse {
-  string token = 1;
-}
+message GetStorageHandshakeTokenResponse { string token = 1; }
 
 message CreateBeaconStateRequest {
   google.protobuf.StringValue node = 1;
@@ -85,9 +142,35 @@ message CreateBeaconStateRequest {
   google.protobuf.StringValue beacon_implementation = 9;
 }
 
-message CreateBeaconStateResponse {
-  google.protobuf.StringValue id = 1;
+message CreateBeaconStateResponse { google.protobuf.StringValue id = 1; }
+
+message CreateBeaconBlockRequest {
+  google.protobuf.StringValue node = 1;
+  google.protobuf.Timestamp fetched_at = 2;
+  google.protobuf.UInt64Value slot = 3;
+  google.protobuf.UInt64Value epoch = 4;
+  google.protobuf.StringValue block_root = 5;
+  google.protobuf.StringValue node_version = 6;
+  google.protobuf.StringValue location = 7;
+  google.protobuf.StringValue network = 8;
+  google.protobuf.StringValue beacon_implementation = 9;
 }
+
+message CreateBeaconBlockResponse { google.protobuf.StringValue id = 1; }
+
+message CreateBeaconBadBlockRequest {
+  google.protobuf.StringValue node = 1;
+  google.protobuf.Timestamp fetched_at = 2;
+  google.protobuf.UInt64Value slot = 3;
+  google.protobuf.UInt64Value epoch = 4;
+  google.protobuf.StringValue block_root = 5;
+  google.protobuf.StringValue node_version = 6;
+  google.protobuf.StringValue location = 7;
+  google.protobuf.StringValue network = 8;
+  google.protobuf.StringValue beacon_implementation = 9;
+}
+
+message CreateBeaconBadBlockResponse { google.protobuf.StringValue id = 1; }
 
 message CreateExecutionBlockTraceRequest {
   google.protobuf.StringValue node = 1;
@@ -194,7 +277,7 @@ message ListBeaconStateRequest {
   uint64 slot = 2;
   uint64 epoch = 3;
   string state_root = 4;
-  string node_version = 5 ;
+  string node_version = 5;
   string location = 6;
   string network = 7;
   google.protobuf.Timestamp before = 8;
@@ -205,9 +288,7 @@ message ListBeaconStateRequest {
   string beacon_implementation = 12;
 }
 
-message ListBeaconStateResponse {
-  repeated BeaconState beacon_states = 1;
-}
+message ListBeaconStateResponse { repeated BeaconState beacon_states = 1; }
 
 message CountBeaconStateRequest {
   string node = 1;
@@ -223,17 +304,133 @@ message CountBeaconStateRequest {
   string id = 11;
 }
 
-message CountBeaconStateResponse {
-  google.protobuf.UInt64Value count = 1;
+message CountBeaconStateResponse { google.protobuf.UInt64Value count = 1; }
+
+message ListUniqueBeaconBlockValuesRequest {
+  enum Field {
+    NODE = 0;
+    SLOT = 1;
+    EPOCH = 2;
+    BLOCK_ROOT = 3;
+    NODE_VERSION = 4;
+    LOCATION = 5;
+    NETWORK = 6;
+    BEACON_IMPLEMENTATION = 7;
+  }
+  repeated Field fields = 1;
 }
+
+message ListUniqueBeaconBlockValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string block_root = 4;
+  repeated string node_version = 5;
+  repeated string location = 6;
+  repeated string network = 7;
+  repeated string beacon_implementation = 8;
+}
+
+message ListBeaconBlockRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+
+  PaginationCursor pagination = 10;
+  string id = 11;
+  string beacon_implementation = 12;
+}
+
+message ListBeaconBlockResponse { repeated BeaconBlock beacon_blocks = 1; }
+
+message CountBeaconBlockRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+  string beacon_implementation = 10;
+  string id = 11;
+}
+
+message CountBeaconBlockResponse { google.protobuf.UInt64Value count = 1; }
+
+message ListUniqueBeaconBadBlockValuesRequest {
+  enum Field {
+    NODE = 0;
+    SLOT = 1;
+    EPOCH = 2;
+    BLOCK_ROOT = 3;
+    NODE_VERSION = 4;
+    LOCATION = 5;
+    NETWORK = 6;
+    BEACON_IMPLEMENTATION = 7;
+  }
+  repeated Field fields = 1;
+}
+
+message ListUniqueBeaconBadBlockValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string block_root = 4;
+  repeated string node_version = 5;
+  repeated string location = 6;
+  repeated string network = 7;
+  repeated string beacon_implementation = 8;
+}
+
+message ListBeaconBadBlockRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+
+  PaginationCursor pagination = 10;
+  string id = 11;
+  string beacon_implementation = 12;
+}
+
+message ListBeaconBadBlockResponse {
+  repeated BeaconBadBlock beacon_bad_blocks = 1;
+}
+
+message CountBeaconBadBlockRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+  string beacon_implementation = 10;
+  string id = 11;
+}
+
+message CountBeaconBadBlockResponse { google.protobuf.UInt64Value count = 1; }
 
 message PaginationCursor {
   int32 limit = 1;
   int32 offset = 2;
   string order_by = 3;
 }
-
-
 
 message CreateExecutionBadBlockRequest {
   google.protobuf.StringValue node = 1;
@@ -247,9 +444,7 @@ message CreateExecutionBadBlockRequest {
   google.protobuf.StringValue block_extra_data = 9;
 }
 
-message CreateExecutionBadBlockResponse {
-  google.protobuf.StringValue id = 1;
-}
+message CreateExecutionBadBlockResponse { google.protobuf.StringValue id = 1; }
 
 message ListExecutionBadBlockRequest {
   string node = 1;

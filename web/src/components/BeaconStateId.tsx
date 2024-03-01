@@ -1,10 +1,10 @@
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import TimeAgo from 'react-timeago';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 
+import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
-import ErrorAlert from '@components/ErrorAlert';
 import useNetwork from '@contexts/network';
 import { useBeaconStates } from '@hooks/useQuery';
 
@@ -30,12 +30,12 @@ export default function BeaconStateId({ id }: { id: string }) {
   let errorMessage = undefined;
 
   if (error) {
-    errorMessage = 'Error fetching bad block';
+    errorMessage = 'Error fetching beacon states';
     if (error instanceof Error) {
-      errorMessage = `Error fetching bad block: ${error.message}`;
+      errorMessage = `Error fetching beacon states: ${error.message}`;
     }
   } else if (!isLoading && !state) {
-    errorMessage = 'Bad block not found';
+    errorMessage = 'Beacon states not found';
   }
 
   if (errorMessage) {
@@ -47,7 +47,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
-            <ErrorAlert message={errorMessage} />
+            <Alert type="error" message={errorMessage} />
           </dl>
         </div>
       </div>
@@ -219,6 +219,46 @@ export default function BeaconStateId({ id }: { id: string }) {
               </a>
             </dt>
           </div>
+
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setValue('beaconBlockSelectorSlot', state?.slot);
+              setLocation(
+                `/lcli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
+              );
+            }}
+            href={`/lcli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`}
+            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> lcli state transition
+          </Link>
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setValue('beaconBlockSelectorSlot', state?.slot);
+              setLocation(
+                `/ncli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
+              );
+            }}
+            href={`/ncli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`}
+            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> ncli state transition
+          </Link>
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setLocation(`/zcli_state_diff?beaconStateSelectorId=${state?.id}`);
+            }}
+            href={`/zcli_state_diff?beaconStateSelectorId=${state?.id}`}
+            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> zcli state diff
+          </Link>
         </dl>
       </div>
     </div>

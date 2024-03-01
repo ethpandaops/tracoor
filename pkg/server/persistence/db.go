@@ -72,6 +72,16 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate beacon state")
 	}
 
+	err = i.db.AutoMigrate(&BeaconBlock{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate beacon block")
+	}
+
+	err = i.db.AutoMigrate(&BeaconBadBlock{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate beacon bad block")
+	}
+
 	err = i.db.AutoMigrate(&ExecutionBlockTrace{})
 	if err != nil {
 		return perrors.Wrap(err, "failed to auto migrate execution block trace")

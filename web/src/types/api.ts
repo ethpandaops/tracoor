@@ -10,6 +10,30 @@ export interface BeaconState {
   beacon_implementation: string;
 }
 
+export interface BeaconBlock {
+  id: string;
+  node: string;
+  fetched_at: string;
+  slot: number;
+  epoch: number;
+  block_root: string;
+  node_version: string;
+  network: string;
+  beacon_implementation: string;
+}
+
+export interface BeaconBadBlock {
+  id: string;
+  node: string;
+  fetched_at: string;
+  slot: number;
+  epoch: number;
+  block_root: string;
+  node_version: string;
+  network: string;
+  beacon_implementation: string;
+}
+
 export interface ExecutionBlockTrace {
   id: string;
   node: string;
@@ -38,6 +62,24 @@ export type BeaconStateField =
   | 'slot'
   | 'epoch'
   | 'state_root'
+  | 'node_version'
+  | 'network'
+  | 'beacon_implementation';
+
+export type BeaconBlockField =
+  | 'node'
+  | 'slot'
+  | 'epoch'
+  | 'block_root'
+  | 'node_version'
+  | 'network'
+  | 'beacon_implementation';
+
+export type BeaconBadBlockField =
+  | 'node'
+  | 'slot'
+  | 'epoch'
+  | 'block_root'
   | 'node_version'
   | 'network'
   | 'beacon_implementation';
@@ -96,6 +138,70 @@ export interface V1CountBeaconStateRequest {
 
 export interface V1ListUniqueBeaconStateValuesRequest {
   fields: BeaconStateField[];
+}
+
+export interface V1ListBeaconBlockRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1CountBeaconBlockRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1ListUniqueBeaconBlockValuesRequest {
+  fields: BeaconBlockField[];
+}
+
+export interface V1ListBeaconBadBlockRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1CountBeaconBadBlockRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1ListUniqueBeaconBadBlockValuesRequest {
+  fields: BeaconBadBlockField[];
 }
 
 export interface V1ListExecutionBlockTraceRequest {
@@ -174,6 +280,42 @@ export interface V1ListUniqueBeaconStateValuesResponse {
   slot?: number[];
   epoch?: number[];
   state_root?: string[];
+  node_version?: string[];
+  network?: string[];
+  beacon_implementation?: string[];
+}
+
+export interface V1ListBeaconBlockResponse {
+  beacon_blocks?: BeaconBlock[];
+}
+
+export interface V1CountBeaconBlockResponse {
+  count?: number;
+}
+
+export interface V1ListUniqueBeaconBlockValuesResponse {
+  node?: string[];
+  slot?: number[];
+  epoch?: number[];
+  block_root?: string[];
+  node_version?: string[];
+  network?: string[];
+  beacon_implementation?: string[];
+}
+
+export interface V1ListBeaconBadBlockResponse {
+  beacon_bad_blocks?: BeaconBadBlock[];
+}
+
+export interface V1CountBeaconBadBlockResponse {
+  count?: number;
+}
+
+export interface V1ListUniqueBeaconBadBlockValuesResponse {
+  node?: string[];
+  slot?: number[];
+  epoch?: number[];
+  block_root?: string[];
   node_version?: string[];
   network?: string[];
   beacon_implementation?: string[];

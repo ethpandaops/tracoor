@@ -1,7 +1,8 @@
 bin
 __debug_bin*
 dist/
-checkpointz
+tmp/
+tracoor
 store.db
 index.db
 server.yaml

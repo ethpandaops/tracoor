@@ -43,8 +43,10 @@ type agent struct {
 	store store.Store
 
 	beaconStateQueue         chan *BeaconStateRequest
+	beaconBlockQueue         chan *BeaconBlockRequest
+	beaconBadBlockQueue      chan *BeaconBadBlockRequest
 	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
-	executionBadBlockQueue   chan *BadBlockRequest
+	executionBadBlockQueue   chan *ExecutionBadBlockRequest
 }
 
 const namespace = "tracoor_agent"
@@ -79,8 +81,10 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		indexer:                  indexerClient,
 		store:                    st,
 		beaconStateQueue:         make(chan *BeaconStateRequest, 1000),
+		beaconBlockQueue:         make(chan *BeaconBlockRequest, 1000),
+		beaconBadBlockQueue:      make(chan *BeaconBadBlockRequest, 1000),
 		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
-		executionBadBlockQueue:   make(chan *BadBlockRequest, 1000),
+		executionBadBlockQueue:   make(chan *ExecutionBadBlockRequest, 1000),
 	}, nil
 }
 
@@ -103,7 +107,7 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
 		go s.processExecutionBlockTraceQueue(ctx)
-		go s.processBadBlockQueue(ctx)
+		go s.processExecutionBadBlockQueue(ctx)
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			logCtx := logrus.WithFields(logrus.Fields{
@@ -159,6 +163,8 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
 
 		go s.processBeaconStateQueue(ctx)
+		go s.processBeaconBlockQueue(ctx)
+		go s.processBeaconBadBlockQueue(ctx)
 
 		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
@@ -174,6 +180,7 @@ func (s *agent) Start(ctx context.Context) error {
 			time.Sleep(2000 * time.Millisecond)
 
 			s.enqueueBeaconState(ctx, event.Slot)
+			s.enqueueBeaconBlock(ctx, event.Slot)
 
 			return nil
 		})
@@ -206,6 +213,7 @@ func (s *agent) Start(ctx context.Context) error {
 				logCtx.WithField("target_slot", slot).Info("Queueing up a fresh beacon state index from reorg event")
 
 				s.enqueueBeaconState(ctx, slot)
+				s.enqueueBeaconBlock(ctx, slot)
 			}
 
 			// Go back and fetch all the new execution block traces
@@ -260,8 +268,20 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.WithField("network", s.Config.Ethereum.OverrideNetworkName).Info("Overriding network name")
 	}
 
+	if s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath != nil {
+		_, err := s.scheduler.Every(30).Seconds().Do(func() {
+			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath
+			if path != nil {
+				s.enqueueBeaconBadBlock(ctx, *path)
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err := s.scheduler.Every(90).Seconds().Do(func() {
-		s.enqueueBadBlock(ctx)
+		s.enqueueExecutionBadBlock(ctx)
 	})
 	if err != nil {
 		return err

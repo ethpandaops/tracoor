@@ -42,24 +42,24 @@ func NewAPI(ctx context.Context, log logrus.FieldLogger, conf *Config, st store.
 	return e, nil
 }
 
-func (e *API) Start(ctx context.Context, grpcServer *grpc.Server) error {
-	e.log.Info("Starting module")
+func (i *API) Start(ctx context.Context, grpcServer *grpc.Server) error {
+	i.log.Info("Starting module")
 
 	// Connect to the indexer
-	conn, err := grpc.Dial(e.grpcConn, e.grpcOpts...)
+	conn, err := grpc.Dial(i.grpcConn, i.grpcOpts...)
 	if err != nil {
 		return fmt.Errorf("fail to dial: %v", err)
 	}
 
-	e.indexer = indexer.NewIndexerClient(conn)
+	i.indexer = indexer.NewIndexerClient(conn)
 
-	api.RegisterAPIServer(grpcServer, e)
+	api.RegisterAPIServer(grpcServer, i)
 
 	return nil
 }
 
-func (e *API) Stop(ctx context.Context) error {
-	e.log.Info("Stopping module")
+func (i *API) Stop(ctx context.Context) error {
+	i.log.Info("Stopping module")
 
 	// Wait for all requests to finish?
 
@@ -82,6 +82,7 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	}
 
 	rq := &indexer.ListBeaconStateRequest{
+		Id:                   req.Id,
 		Node:                 req.Node,
 		Slot:                 req.Slot,
 		Epoch:                req.Epoch,
@@ -190,6 +191,272 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 		Slot:                 resp.Slot,
 		Epoch:                resp.Epoch,
 		StateRoot:            resp.StateRoot,
+		NodeVersion:          resp.NodeVersion,
+		Network:              resp.Network,
+		BeaconImplementation: resp.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
+func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockRequest) (*api.ListBeaconBlockResponse, error) {
+	pagination := &indexer.PaginationCursor{
+		Limit:   100,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = &indexer.PaginationCursor{
+			Limit:   req.Pagination.Limit,
+			Offset:  req.Pagination.Offset,
+			OrderBy: req.Pagination.OrderBy,
+		}
+	}
+
+	rq := &indexer.ListBeaconBlockRequest{
+		Id:                   req.Id,
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		Before:               req.Before,
+		After:                req.After,
+		BeaconImplementation: req.BeaconImplementation,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListBeaconBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list beacon blocks: %w", err).Error())
+	}
+
+	protoBeaconBlocks := make([]*api.BeaconBlock, len(resp.BeaconBlocks))
+	for i, block := range resp.BeaconBlocks {
+		protoBeaconBlocks[i] = &api.BeaconBlock{
+			Id:                   block.Id,
+			Node:                 block.Node,
+			Slot:                 block.Slot,
+			Epoch:                block.Epoch,
+			BlockRoot:            block.BlockRoot,
+			NodeVersion:          block.NodeVersion,
+			Network:              block.Network,
+			FetchedAt:            block.FetchedAt,
+			BeaconImplementation: block.BeaconImplementation,
+		}
+	}
+
+	return &api.ListBeaconBlockResponse{
+		BeaconBlocks: protoBeaconBlocks,
+	}, nil
+}
+
+func (i *API) CountBeaconBlock(ctx context.Context, req *api.CountBeaconBlockRequest) (*api.CountBeaconBlockResponse, error) {
+	rq := &indexer.CountBeaconBlockRequest{
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		BeaconImplementation: req.BeaconImplementation,
+		Before:               req.Before,
+		After:                req.After,
+	}
+
+	resp, err := i.indexer.CountBeaconBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count beacon blocks: %w", err).Error())
+	}
+
+	return &api.CountBeaconBlockResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
+func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniqueBeaconBlockValuesRequest) (*api.ListUniqueBeaconBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueBeaconBlockValuesRequest{
+		Fields: []indexer.ListUniqueBeaconBlockValuesRequest_Field{},
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueBeaconBlockValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueBeaconBlockValuesRequest_node:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_NODE
+		case api.ListUniqueBeaconBlockValuesRequest_node_version:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_NODE_VERSION
+		case api.ListUniqueBeaconBlockValuesRequest_network:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_NETWORK
+		case api.ListUniqueBeaconBlockValuesRequest_slot:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_SLOT
+		case api.ListUniqueBeaconBlockValuesRequest_epoch:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_EPOCH
+		case api.ListUniqueBeaconBlockValuesRequest_block_root:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_BLOCK_ROOT
+		case api.ListUniqueBeaconBlockValuesRequest_beacon_implementation:
+			f = indexer.ListUniqueBeaconBlockValuesRequest_BEACON_IMPLEMENTATION
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueBeaconBlockValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique beacon block values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueBeaconBlockValuesResponse{
+		Node:                 resp.Node,
+		Slot:                 resp.Slot,
+		Epoch:                resp.Epoch,
+		BlockRoot:            resp.BlockRoot,
+		NodeVersion:          resp.NodeVersion,
+		Network:              resp.Network,
+		BeaconImplementation: resp.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
+func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBlockRequest) (*api.ListBeaconBadBlockResponse, error) {
+	pagination := &indexer.PaginationCursor{
+		Limit:   100,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = &indexer.PaginationCursor{
+			Limit:   req.Pagination.Limit,
+			Offset:  req.Pagination.Offset,
+			OrderBy: req.Pagination.OrderBy,
+		}
+	}
+
+	rq := &indexer.ListBeaconBadBlockRequest{
+		Id:                   req.Id,
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		Before:               req.Before,
+		After:                req.After,
+		BeaconImplementation: req.BeaconImplementation,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListBeaconBadBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list beacon bad blocks: %w", err).Error())
+	}
+
+	protoBeaconBadBlocks := make([]*api.BeaconBadBlock, len(resp.BeaconBadBlocks))
+	for i, block := range resp.BeaconBadBlocks {
+		protoBeaconBadBlocks[i] = &api.BeaconBadBlock{
+			Id:                   block.Id,
+			Node:                 block.Node,
+			Slot:                 block.Slot,
+			Epoch:                block.Epoch,
+			BlockRoot:            block.BlockRoot,
+			NodeVersion:          block.NodeVersion,
+			Network:              block.Network,
+			FetchedAt:            block.FetchedAt,
+			BeaconImplementation: block.BeaconImplementation,
+		}
+	}
+
+	return &api.ListBeaconBadBlockResponse{
+		BeaconBadBlocks: protoBeaconBadBlocks,
+	}, nil
+}
+
+func (i *API) CountBeaconBadBlock(ctx context.Context, req *api.CountBeaconBadBlockRequest) (*api.CountBeaconBadBlockResponse, error) {
+	rq := &indexer.CountBeaconBadBlockRequest{
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		BeaconImplementation: req.BeaconImplementation,
+		Before:               req.Before,
+		After:                req.After,
+	}
+
+	resp, err := i.indexer.CountBeaconBadBlock(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count beacon bad blocks: %w", err).Error())
+	}
+
+	return &api.CountBeaconBadBlockResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
+func (i *API) ListUniqueBeaconBadBlockValues(ctx context.Context, req *api.ListUniqueBeaconBadBlockValuesRequest) (*api.ListUniqueBeaconBadBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueBeaconBadBlockValuesRequest{
+		Fields: []indexer.ListUniqueBeaconBadBlockValuesRequest_Field{},
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueBeaconBadBlockValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueBeaconBadBlockValuesRequest_node:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_NODE
+		case api.ListUniqueBeaconBadBlockValuesRequest_node_version:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_NODE_VERSION
+		case api.ListUniqueBeaconBadBlockValuesRequest_network:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_NETWORK
+		case api.ListUniqueBeaconBadBlockValuesRequest_slot:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_SLOT
+		case api.ListUniqueBeaconBadBlockValuesRequest_epoch:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_EPOCH
+		case api.ListUniqueBeaconBadBlockValuesRequest_block_root:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_BLOCK_ROOT
+		case api.ListUniqueBeaconBadBlockValuesRequest_beacon_implementation:
+			f = indexer.ListUniqueBeaconBadBlockValuesRequest_BEACON_IMPLEMENTATION
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueBeaconBadBlockValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique beacon bad block values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueBeaconBadBlockValuesResponse{
+		Node:                 resp.Node,
+		Slot:                 resp.Slot,
+		Epoch:                resp.Epoch,
+		BlockRoot:            resp.BlockRoot,
 		NodeVersion:          resp.NodeVersion,
 		Network:              resp.Network,
 		BeaconImplementation: resp.BeaconImplementation,

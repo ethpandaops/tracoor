@@ -14,6 +14,26 @@ http:
       post: /v1/api/count-beacon-state
       body: "*"
 
+    - selector: api.API.ListBeaconBlock
+      post: /v1/api/list-beacon-block
+      body: "*"
+    - selector: api.API.ListUniqueBeaconBlockValues
+      post: /v1/api/list-unique-beacon-block-values
+      body: "*"
+    - selector: api.API.CountBeaconBlock
+      post: /v1/api/count-beacon-block
+      body: "*"
+
+    - selector: api.API.ListBeaconBadBlock
+      post: /v1/api/list-beacon-bad-block
+      body: "*"
+    - selector: api.API.ListUniqueBeaconBadBlockValues
+      post: /v1/api/list-unique-beacon-bad-block-values
+      body: "*"
+    - selector: api.API.CountBeaconBadBlock
+      post: /v1/api/count-beacon-bad-block
+      body: "*"
+
     - selector: api.API.ListExecutionBlockTrace
       post: /v1/api/list-execution-block-trace
       body: "*"

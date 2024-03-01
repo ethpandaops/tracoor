@@ -164,6 +164,7 @@ func TestIndexerBeaconState(t *testing.T) {
 
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomBeaconStateRequest()
+
 		rsp, err := index.CreateBeaconState(ctx, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)

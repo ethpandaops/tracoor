@@ -3,13 +3,25 @@ package persistence
 type Operation string
 
 const (
+	OperationDistinctValues Operation = "distinct_values"
+
 	OperationInsertBeaconState Operation = "insert_beacon_state_metadata"
 	OperationDeleteBeaconState Operation = "delete_beacon_state_metadata"
 	OperationCountBeaconState  Operation = "count_beacon_state_metadata"
 	OperationListBeaconState   Operation = "list_beacon_state_metadata"
 	OperationUpdateBeaconState Operation = "update_beacon_state_metadata"
 
-	OperationDistinctValues Operation = "distinct_values"
+	OperationInsertBeaconBlock Operation = "insert_beacon_block_metadata"
+	OperationDeleteBeaconBlock Operation = "delete_beacon_block_metadata"
+	OperationCountBeaconBlock  Operation = "count_beacon_block_metadata"
+	OperationListBeaconBlock   Operation = "list_beacon_block_metadata"
+	OperationUpdateBeaconBlock Operation = "update_beacon_block_metadata"
+
+	OperationInsertBeaconBadBlock Operation = "insert_beacon_bad_block_metadata"
+	OperationDeleteBeaconBadBlock Operation = "delete_beacon_bad_block_metadata"
+	OperationCountBeaconBadBlock  Operation = "count_beacon_bad_block_metadata"
+	OperationListBeaconBadBlock   Operation = "list_beacon_bad_block_metadata"
+	OperationUpdateBeaconBadBlock Operation = "update_beacon_bad_block_metadata"
 
 	OperationInsertExecutionBlockTrace Operation = "insert_execution_block_trace"
 	OperationDeleteExecutionBlockTrace Operation = "delete_execution_block_trace"

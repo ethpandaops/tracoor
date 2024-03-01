@@ -105,16 +105,16 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-64 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
             <div className="h-5 w-96 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
             <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
@@ -236,7 +236,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden lg:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 2xl:table-cell',
                     )}
                     onClick={() => handleSort('execution_implementation')}
                   >
@@ -265,7 +265,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 4xl:table-cell',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -323,7 +323,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                       sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden 3xl:table-cell',
                     )}
                     onClick={() => handleSort('block_hash')}
                   >
@@ -369,7 +369,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -385,7 +385,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -414,10 +414,10 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
                           <div className=" w-fit">
                             <span
-                              className="relative top-1 group transition cursor-pointer"
+                              className="relative top-1 group transition cursor-pointer font-mono"
                               onClick={() =>
                                 setValue('executionBlockTraceBlockHash', row.block_hash)
                               }

@@ -3,8 +3,8 @@ import { useFormContext } from 'react-hook-form';
 import TimeAgo from 'react-timeago';
 import { useLocation } from 'wouter';
 
+import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
-import ErrorAlert from '@components/ErrorAlert';
 import useNetwork from '@contexts/network';
 import { useExecutionBadBlocks } from '@hooks/useQuery';
 
@@ -47,7 +47,7 @@ export default function ExecutionBadBlockId({ id }: { id: string }) {
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
-            <ErrorAlert message={errorMessage} />
+            <Alert type="error" message={errorMessage} />
           </dl>
         </div>
       </div>

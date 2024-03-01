@@ -92,6 +92,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomExecutionBlockTraceRequest()
+
 		rsp, err := index.CreateExecutionBlockTrace(ctx, req)
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)

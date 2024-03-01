@@ -83,7 +83,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	return nil
 }
 
-func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
+func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
 	// Fetch the bad blocks from the execution node.
 	blocks, err := s.node.Execution().GetBadBlocks(ctx)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
 	for _, block := range *blocks {
 		b := block
 
-		if err := s.indexBadBlock(ctx, &b); err != nil {
+		if err := s.indexExecutionBadBlock(ctx, &b); err != nil {
 			s.log.WithError(err).Error("Failed to index execution bad block")
 		}
 	}
@@ -101,7 +101,7 @@ func (s *agent) fetchAndIndexBadBlocks(ctx context.Context) error {
 	return nil
 }
 
-func (s *agent) indexBadBlock(ctx context.Context, block *execution.BadBlock) error {
+func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.BadBlock) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 

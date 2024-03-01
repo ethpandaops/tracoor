@@ -1,12 +1,10 @@
-import { ArrowDownTrayIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import TimeAgo from 'react-timeago';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 
+import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
-import ErrorAlert from '@components/ErrorAlert';
-import ExecutionBlockTraceEVMLabs from '@components/ExecutionBlockTraceEVMLabs';
-import Loading from '@components/Loading';
 import useNetwork from '@contexts/network';
 import { useExecutionBlockTraces } from '@hooks/useQuery';
 
@@ -24,20 +22,6 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
 
   const trace = data?.[0];
 
-  const {
-    data: relatedData,
-    isLoading: relatedIsLoading,
-    error: relatedError,
-  } = useExecutionBlockTraces(
-    {
-      network: network ? network : undefined,
-      block_hash: trace?.block_hash,
-    },
-    Boolean(trace?.block_hash),
-  );
-
-  const relatedTraces = relatedData?.filter((t) => t.id !== id);
-
   const handleSearch = (key: string, value: unknown) => {
     setValue(key, value);
     setLocation('/execution_block_trace');
@@ -54,26 +38,6 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
     errorMessage = 'Bad block not found';
   }
 
-  let evmLabsComp = undefined;
-  if (relatedError) {
-    let message = 'Error fetching related traces';
-    if (relatedError instanceof Error) {
-      message = `Error fetching related traces: ${relatedError.message}`;
-    }
-    evmLabsComp = <ErrorAlert message={message} />;
-  } else if (trace?.block_hash && !relatedIsLoading && !relatedTraces?.length) {
-    evmLabsComp = (
-      <div className="p-5 text-gray-600">
-        Need more than one block trace for block hash{' '}
-        <span className="text-sky-500">{trace?.block_hash}</span>
-      </div>
-    );
-  } else if (!relatedIsLoading && relatedTraces?.length && trace) {
-    evmLabsComp = <ExecutionBlockTraceEVMLabs primaryTrace={trace} relatedTraces={relatedTraces} />;
-  } else {
-    evmLabsComp = <Loading className="m-5" />;
-  }
-
   if (errorMessage) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
@@ -83,7 +47,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
-            <ErrorAlert message={errorMessage} />
+            <Alert type="error" message={errorMessage} />
           </dl>
         </div>
       </div>
@@ -238,19 +202,21 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               </a>
             </dt>
           </div>
-          <div className="py-4 sm:py-5 sm:px-6 flex justify-center sm:justify-start bg-amber-500/85">
-            <dt className="text-md text-white font-bold flex items-center">
-              EVM laboratory transaction tracediff{' '}
-              <a
-                target="_blank"
-                href="https://github.com/holiman/goevmlab/tree/master/cmd/tracediff"
-                rel="noreferrer"
-              >
-                <ArrowTopRightOnSquareIcon className="w-4 h-4 ml-2" />
-              </a>
-            </dt>
-          </div>
-          <div>{evmLabsComp}</div>
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('executionBlockTraceSelectorId1', trace?.id);
+              setValue('executionBlockTraceSelectorBlockHash2', trace?.block_hash);
+              setLocation(
+                `/go_evm_lab_diff?executionBlockTraceSelectorId1=${trace?.id}&executionBlockTraceSelectorBlockHash2=${trace?.block_hash}`,
+              );
+            }}
+            href={`/go_evm_lab_diff?executionBlockTraceSelectorId1=${trace?.id}&executionBlockTraceSelectorBlockHash2=${trace?.block_hash}`}
+            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> Go EVM lab transaction
+            tracediff
+          </Link>
         </dl>
       </div>
     </div>

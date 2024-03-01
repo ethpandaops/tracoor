@@ -14,6 +14,10 @@ import { Selection } from '@contexts/selection';
 const queryClient = new QueryClient();
 TimeAgo.addDefaultLocale(en);
 
+function isSelection(selection: string): selection is Selection {
+  return Object.values(Selection).includes(selection as Selection);
+}
+
 if (process.env.NODE_ENV === 'development' && import.meta.env.VITE_MOCK) {
   const { worker } = await import('@app/mocks/browser');
   worker.start({
@@ -26,14 +30,21 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <Switch>
-          <Route path="/beacon_state/:id">
-            {({ id }) => <App selection={Selection.beacon_state} id={id} />}
+          <Route path="/:selection">
+            {({ selection }) => {
+              if (!isSelection(selection)) {
+                return <App />;
+              }
+              return <App selection={selection} />;
+            }}
           </Route>
-          <Route path="/execution_block_trace/:id">
-            {({ id }) => <App selection={Selection.execution_block_trace} id={id} />}
-          </Route>
-          <Route path="/execution_bad_block/:id">
-            {({ id }) => <App selection={Selection.execution_bad_block} id={id} />}
+          <Route path="/:selection/:id">
+            {({ id, selection }) => {
+              if (!isSelection(selection)) {
+                return <App />;
+              }
+              return <App selection={selection} id={id} />;
+            }}
           </Route>
           <Route>
             <App />
