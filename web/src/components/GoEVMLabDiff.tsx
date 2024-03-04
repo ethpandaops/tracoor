@@ -54,37 +54,37 @@ export default function GoEVMLabDiff() {
     Boolean(executionBlockTraceSelectorId1),
   );
 
-  function generateFileNamePrefix(trace: ExecutionBlockTrace) {
-    return `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}`;
-  }
-
-  function generateJQCommand(trace: ExecutionBlockTrace, tx: string) {
-    const nestedResult = !['nethermind', 'besu'].includes(trace.execution_implementation);
-    return `jq '${nestedResult ? `{results: .[${tx}]}` : `.[${tx}]`}' ${trace.id}.json > ${trace.id}-${tx}.json`;
-  }
-
   const trace1 = trace1Data?.[0];
   const trace2 = trace2Data?.[0];
   let trace1FileName = '';
   let trace2FileName = '';
   if (trace1) trace1FileName = generateFileNamePrefix(trace1);
-  if (trace1) trace2FileName = generateFileNamePrefix(trace1);
+  if (trace2) trace2FileName = generateFileNamePrefix(trace2);
+
+  function generateFileNamePrefix(trace: ExecutionBlockTrace) {
+    return `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}`;
+  }
+
+  function generateJQCommand(trace: ExecutionBlockTrace, fileName: string, tx: string) {
+    const nestedResult = !['nethermind', 'besu'].includes(trace.execution_implementation);
+    return `jq '${nestedResult ? `{results: .[${tx}]}` : `.[${tx}]`}' ${fileName}.json > ${fileName}-${tx}.json`;
+  }
 
   const cmd = useMemo(() => {
     if (trace1 && trace2 && goEvmLabDiffTx !== '' && goEvmLabDiffTx !== undefined) {
       return `# Download the state and block
 # Note: requires wget
-wget -O ${trace1FileName}.ssz.gz -q ${window.location.origin}/download/execution_block_trace/${trace1.id}
-wget -O ${trace2FileName}.ssz.gz -q ${window.location.origin}/download/execution_block_trace/${trace2.id}
+wget -O ${trace1FileName}.json.gz -q ${window.location.origin}/download/execution_block_trace/${trace1.id}
+wget -O ${trace2FileName}.json.gz -q ${window.location.origin}/download/execution_block_trace/${trace2.id}
 
 # Decompress the state and block
-gzip -f -d ${trace1FileName}.ssz.gz
-gzip -f -d ${trace2FileName}.ssz.gz
+gzip -f -d ${trace1FileName}.json.gz
+gzip -f -d ${trace2FileName}.json.gz
 
 # Pull out the transaction
 # Note: requires jq
-${generateJQCommand(trace1, goEvmLabDiffTx)}
-${generateJQCommand(trace2, goEvmLabDiffTx)}
+${generateJQCommand(trace1, trace1FileName, goEvmLabDiffTx)}
+${generateJQCommand(trace2, trace2FileName, goEvmLabDiffTx)}
 
 # Compare the traces
 # Note: requires go and the tracediff tool
