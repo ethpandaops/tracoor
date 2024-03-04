@@ -201,6 +201,9 @@ export default function Selector() {
       <div className="hidden sm:block font-tracoor text-2xl absolute pt-2 pl-2 ">
         <ChevronDoubleRightIcon className="h-10 w-10 text-sky-600/15" aria-hidden="true" />
       </div>
+      <div className="sm:hidden font-tracoor text-2xl absolute pt-[8px] left-1">
+        <ChevronDoubleRightIcon className="h-6 w-6 text-sky-600/35" aria-hidden="true" />
+      </div>
       <div className="sm:hidden">
         <label htmlFor="tabs" className="sr-only">
           Select a tab
@@ -208,7 +211,7 @@ export default function Selector() {
         <select
           id="tabs"
           name="tabs"
-          className="block w-full py-2 pl-3 pr-10 focus:outline-none sm:text-sm bg-white/35"
+          className="block w-full py-2.5 pl-6 font-bold text-sky-600 pr-10 focus:outline-none sm:text-sm bg-white/35"
           value={currentSelection}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => {
             handleTabClick(e.target.value as Selection);

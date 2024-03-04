@@ -12,7 +12,8 @@ export default function BeaconBadBlockInfo() {
           Beacon blocks
         </a>{' '}
         captured from beacon nodes where the block succeeds gossip validation whilst failing full
-        validation.
+        validation. Sometimes there are false positives from reorgs, restarting or low peer count
+        nodes depending on client implementation.
       </h3>
     </div>
   );

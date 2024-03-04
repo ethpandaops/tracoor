@@ -66,6 +66,7 @@ export default function Provider({ children }: Props) {
       executionBadBlockNodeVersion: queryParams.get('executionBadBlockNodeVersion') || null,
       goEvmLabDiffBlockHash: queryParams.get('goEvmLabDiffBlockHash') || '',
       goEvmLabDiffBlockNumber: queryParams.get('goEvmLabDiffBlockNumber') || '',
+      goEvmLabDiffTx: queryParams.get('goEvmLabDiffTx') || '',
       executionBlockTraceSelectorId: queryParams.get('executionBlockTraceSelectorId') || '',
       executionBlockTraceSelectorBlockHash:
         queryParams.get('executionBlockTraceSelectorBlockHash') || '',

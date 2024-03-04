@@ -41,9 +41,9 @@ export default function BeaconBlockId({ id }: { id: string }) {
   if (errorMessage) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
           <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+            <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
@@ -56,13 +56,13 @@ export default function BeaconBlockId({ id }: { id: string }) {
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
         <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">ID</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Fetched at</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 underline decoration-dotted underline-offset-2 cursor-help">
               {isLoading ? (
@@ -72,7 +72,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Network</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               {isLoading ? (
@@ -82,7 +82,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -98,7 +98,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Execution Implementation</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -116,7 +116,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node version</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -132,7 +132,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Epoch</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -152,7 +152,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               />
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Slot</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -172,7 +172,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               />
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Block root</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               <span className="lg:hidden font-mono flex">
@@ -204,7 +204,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">
+          <div className="py-4 sm:py-5 px-4 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/beacon_block/${id}`}
@@ -229,7 +229,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               );
             }}
             href={`/lcli_state_transition?beaconBlockSelectorId=${block?.id}&beaconStateSelectorSlot=${block?.slot}`}
-            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
           >
             <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> lcli state transition
           </Link>
@@ -243,7 +243,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               );
             }}
             href={`/ncli_state_transition?beaconBlockSelectorId=${block?.id}&beaconStateSelectorSlot=${block?.slot}`}
-            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
           >
             <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> ncli state transition
           </Link>
@@ -254,7 +254,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
               setLocation(`/zcli_state_diff?beaconStateSelectorId=${block?.id}`);
             }}
             href={`/zcli_state_diff?beaconStateSelectorId=${block?.id}`}
-            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
           >
             <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> zcli state diff
           </Link>

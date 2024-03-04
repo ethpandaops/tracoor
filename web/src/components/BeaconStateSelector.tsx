@@ -53,7 +53,34 @@ export default function BeaconStateSelector() {
   let otherComp = undefined;
 
   if (selectedIsLoading) {
-    otherComp = <Loading />;
+    otherComp = (
+      <dl className="grid grid-cols-1 sm:grid-cols-3 mt-5">
+        <div className="px-4 sm:col-span-1 sm:px-0 pb-4 sm:pt-4">
+          <dt className="text-sm font-bold leading-6 text-gray-700">Node</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 h-5 w-64 sm:w-32 xl:w-64 bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+        <div className="border-t sm:border-none border-amber-500 px-4 py-4 sm:col-span-1 sm:px-0">
+          <dt className="text-sm font-bold leading-6 text-gray-700">Slot</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 h-5 w-20 sm:w-32 xl:w-24 bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+        <div className="border-t sm:border-none border-amber-500 px-4 py-4 sm:col-span-1 sm:px-0">
+          <dt className="text-sm font-bold leading-6 text-gray-700">Epoch</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 h-5 w-16 sm:w-32 xl:w-20 bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+        <div className="border-t border-amber-500 px-4 py-4 sm:col-span-1 sm:px-0">
+          <dt className="text-sm font-bold leading-6 text-gray-700">Beacon node Implementation</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 h-5 w-32 xl:w-28 bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+        <div className="border-t border-amber-500 px-4 py-4 sm:col-span-1 sm:px-0">
+          <dt className="text-sm font-bold leading-6 text-gray-700">Node version</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 h-5 w-64 sm:w-32 xl:w-64 bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+        <div className="border-t border-amber-500 px-4 py-4 sm:col-span-1 sm:px-0">
+          <dt className="text-sm font-bold leading-6 text-gray-700">State root</dt>
+          <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1 font-mono truncate h-5 w-64 sm:w-32 2xl:w-64 3xl:w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></dd>
+        </div>
+      </dl>
+    );
   } else if (selectedError) {
     let message = 'Something went wrong fetching data';
     if (typeof selectedError === 'string') {
@@ -136,12 +163,12 @@ export default function BeaconStateSelector() {
 
   return (
     <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-      <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
+      <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
         Beacon state
       </div>
       {hasFilters && (
         <button
-          className="absolute right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800"
+          className="absolute right-8 sm:right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
           onClick={() => {
             setValue('beaconStateSelectorId', '');
             setValue('beaconStateSelectorSlot', '');
@@ -155,7 +182,7 @@ export default function BeaconStateSelector() {
       {beaconStateSelectorId &&
         (otherComp ?? (
           <dl className="grid grid-cols-1 sm:grid-cols-3 mt-5">
-            <div className="px-4 sm:col-span-1 sm:px-0">
+            <div className="px-4 sm:col-span-1 sm:px-0 pb-4 sm:pt-4">
               <dt className="text-sm font-bold leading-6 text-gray-700">Node</dt>
               <dd className="mt-0.5 text-sm leading-6 text-gray-700 sm:mt-1">{state?.node}</dd>
             </div>
@@ -254,6 +281,10 @@ export default function BeaconStateSelector() {
                   <tr className="divide-x divide-orange-300">
                     <th
                       scope="col"
+                      className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50"
+                    ></th>
+                    <th
+                      scope="col"
                       className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden md:table-cell"
                     >
                       <div className="flex">
@@ -308,17 +339,33 @@ export default function BeaconStateSelector() {
                         <span className="whitespace-nowrap">State root</span>
                       </div>
                     </th>
-                    <th
-                      scope="col"
-                      className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50"
-                    ></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-orange-300">
                   {searchOtherComp
                     ? searchOtherComp
                     : searchData?.map((row) => (
-                        <tr key={row.id} className="divide-x divide-orange-300">
+                        <tr
+                          key={row.id}
+                          className="divide-x divide-orange-300 cursor-pointer"
+                          onClick={() => {
+                            setValue('beaconStateSelectorId', row.id);
+                            setValue('beaconStateSelectorSlot', '');
+                            setValue('beaconStateSelectorStateRoot', '');
+                          }}
+                        >
+                          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
+                            <button
+                              onClick={() => {
+                                setValue('beaconStateSelectorId', row.id);
+                                setValue('beaconStateSelectorSlot', '');
+                                setValue('beaconStateSelectorStateRoot', '');
+                              }}
+                              className="rounded-md bg-white/35 px-2.5 py-1.5 text-sm font-semibold text-gray-700  hover:bg-gray-50 border-2 border-sky-400 hover:border-sky-600"
+                            >
+                              Select
+                            </button>
+                          </td>
                           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-0 hidden md:table-cell">
                             <span className="underline decoration-dotted underline-offset-2 cursor-help">
                               <TimeAgo date={new Date(row.fetched_at)} />
@@ -371,18 +418,6 @@ export default function BeaconStateSelector() {
                                 <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
                               </span>
                             </div>
-                          </td>
-                          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
-                            <button
-                              onClick={() => {
-                                setValue('beaconStateSelectorId', row.id);
-                                setValue('beaconStateSelectorSlot', '');
-                                setValue('beaconStateSelectorStateRoot', '');
-                              }}
-                              className="rounded-md bg-white/35 px-2.5 py-1.5 text-sm font-semibold text-gray-700  hover:bg-gray-50"
-                            >
-                              Select
-                            </button>
                           </td>
                         </tr>
                       ))}

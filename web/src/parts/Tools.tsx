@@ -74,7 +74,8 @@ export default function Tools() {
           queryParams.append('beaconStateSelectorStateRoot', beaconStateSelectorStateRoot);
         break;
       case Selection.go_evm_lab_diff:
-        if (goEvmLabDiffTx) queryParams.append('goEvmLabDiffTx', goEvmLabDiffTx);
+        if (goEvmLabDiffTx !== undefined || goEvmLabDiffTx != '')
+          queryParams.append('goEvmLabDiffTx', goEvmLabDiffTx);
         if (executionBlockTraceSelectorId1)
           queryParams.append('executionBlockTraceSelectorId1', executionBlockTraceSelectorId1);
         if (executionBlockTraceSelectorBlockHash1)
@@ -144,5 +145,5 @@ export default function Tools() {
       return null;
   }
 
-  return <div className="px-4 sm:px-6 lg:px-8">{comp}</div>;
+  return <div className="px-4 sm:px-6 lg:px-8 mb-10">{comp}</div>;
 }

@@ -85,12 +85,12 @@ zcli \\
       <ZCLISetup />
       <BeaconStateSelector />
       <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-        <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
+        <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
           Local filename
         </div>
         {zcliFileName && (
           <button
-            className="absolute right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800"
+            className="absolute right-8 sm:right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
             onClick={() => setValue(`zcliFileName`, '')}
           >
             Clear
@@ -113,19 +113,23 @@ zcli \\
           </div>
         </div>
       </div>
-      {otherComp && <div className="sm:col-span-6">{otherComp}</div>}
-      {!otherComp && cmd && (
+      {(otherComp || cmd) && (
         <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
           <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
             State Diff Command
           </div>
           <div className="mt-2">
-            <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
-              <CopyToClipboard text={cmd} className="m-2" inverted />
-            </div>
-            <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
-              {cmd}
-            </SyntaxHighlighter>
+            {otherComp}
+            {!otherComp && (
+              <>
+                <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
+                  <CopyToClipboard text={cmd} className="m-2" inverted />
+                </div>
+                <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
+                  {cmd}
+                </SyntaxHighlighter>
+              </>
+            )}
           </div>
         </div>
       )}

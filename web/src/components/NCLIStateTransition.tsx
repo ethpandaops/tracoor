@@ -148,43 +148,49 @@ build/ncli transition \\
       <NCLISetup />
       <BeaconStateSelector />
       <BeaconBlockSelector />
-      {otherComp && <div className="sm:col-span-6">{otherComp}</div>}
-      {!otherComp && cmd && (
+      {(otherComp || cmd) && (
         <>
           <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-            <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
+            <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
               State Transition Command
             </div>
             <div className="mt-2">
-              <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
-                <CopyToClipboard text={cmd} className="m-2" inverted />
-              </div>
-              <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
-                {cmd}
-              </SyntaxHighlighter>
+              {otherComp}
+              {!otherComp && (
+                <>
+                  <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
+                    <CopyToClipboard text={cmd} className="m-2" inverted />
+                  </div>
+                  <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
+                    {cmd}
+                  </SyntaxHighlighter>
+                </>
+              )}
             </div>
           </div>
-          <div className="rounded-xl my-5 p-3 bg-sky-600 text-gray-100 font-bold border-4 border-gray-400/50 flex items-center justify-between">
-            <h3 className="text-base font-semibold leading-6">
-              You can use{' '}
-              <a
-                href="https://github.com/protolambda/zcli"
-                target="_blank"
-                className="text-amber-100 hover:text-amber-200 text-bold bg-white/35 rounded-lg font-mono px-2 py-1"
-                rel="noreferrer"
+          {!otherComp && (
+            <div className="rounded-xl my-5 p-3 bg-sky-600 text-gray-100 font-bold border-4 border-gray-400/50 flex items-center justify-between">
+              <h3 className="text-base font-semibold leading-6">
+                You can use{' '}
+                <a
+                  href="https://github.com/protolambda/zcli"
+                  target="_blank"
+                  className="text-amber-100 hover:text-amber-200 text-bold bg-white/35 rounded-lg font-mono px-2 py-1"
+                  rel="noreferrer"
+                >
+                  zcli
+                </a>{' '}
+                to get the state transition difference between this and an existing beacon state in
+                tracoor
+              </h3>
+              <Link
+                className="bg-white/15 rounded-xl px-2 py-2 border-2 border-amber-400 ml-4 hover:border-amber-300 flex items-center justify-center whitespace-nowrap"
+                href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz`}
               >
-                zcli
-              </a>{' '}
-              to get the state transition difference between this and an existing beacon state in
-              tracoor
-            </h3>
-            <Link
-              className="bg-white/15 rounded-xl px-2 py-2 border-2 border-amber-400 ml-4 hover:border-amber-300 flex items-center justify-center"
-              href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz`}
-            >
-              Lets go <ArrowRightIcon className="ml-2 h-5 w-5" />
-            </Link>
-          </div>
+                Lets go <ArrowRightIcon className="ml-2 h-5 w-5" />
+              </Link>
+            </div>
+          )}
         </>
       )}
     </div>

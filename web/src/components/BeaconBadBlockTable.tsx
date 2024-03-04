@@ -461,17 +461,22 @@ export default function BeaconBadBlockTable({ id }: { id?: string }) {
                           </div>
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
-                          <div className="flex flex-row ">
+                          <div className="flex flex-row">
                             <a
                               href={`/download/beacon_bad_block/${row.id}`}
                               download={`beacon_bad_block-${row.node}-${row.slot}-${row.block_root}.ssz.gz`}
-                              className="text-sky-500 hover:text-sky-600 px-2"
+                              className="text-sky-400 hover:text-sky-600 flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600"
                             >
-                              <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />
+                              <ArrowDownTrayIcon className="h-6 w-6 3xl:mr-1" aria-hidden="true" />
+                              <span className="hidden 3xl:block">Download</span>
                             </a>
                             <Link href={`/beacon_bad_block/${row.id}`}>
-                              <span className="text-sky-500 hover:text-sky-600 px-2 cursor-pointer">
-                                <MagnifyingGlassCircleIcon className="h-6 w-6" aria-hidden="true" />
+                              <span className="text-sky-400 hover:text-sky-600 cursor-pointer flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600">
+                                <MagnifyingGlassCircleIcon
+                                  className="h-6 w-6 3xl:mr-1"
+                                  aria-hidden="true"
+                                />
+                                <span className="hidden 3xl:block">View</span>
                               </span>
                             </Link>
                           </div>

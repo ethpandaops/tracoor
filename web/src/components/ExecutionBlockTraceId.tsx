@@ -41,9 +41,9 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
   if (errorMessage) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
           <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+            <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
@@ -56,13 +56,13 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
         <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">ID</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Fetched at</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 underline decoration-dotted underline-offset-2 cursor-help">
               {isLoading ? (
@@ -72,7 +72,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Network</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               {isLoading ? (
@@ -82,7 +82,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -98,7 +98,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Execution Implementation</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -119,7 +119,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node version</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -135,7 +135,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Block number</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -155,7 +155,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               />
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Block Hash</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               <span className="lg:hidden font-mono flex">
@@ -187,7 +187,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:px-6 flex justify-center sm:bg-gray-100 shadow-sm">
+          <div className="py-4 sm:py-5 px-4 sm:px-6 flex justify-center sm:bg-gray-100 shadow-sm">
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/execution_block_trace/${id}`}
@@ -212,7 +212,7 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
               );
             }}
             href={`/go_evm_lab_diff?executionBlockTraceSelectorId1=${trace?.id}&executionBlockTraceSelectorBlockHash2=${trace?.block_hash}`}
-            className="py-4 sm:py-5 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
           >
             <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> Go EVM lab transaction
             tracediff
