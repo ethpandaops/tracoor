@@ -4,7 +4,7 @@ import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { railscasts } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 
 import { BeaconBlock, BeaconState, BeaconBadBlock } from '@app/types/api';
 import Alert from '@components/Alert';
@@ -17,7 +17,8 @@ import useNetwork from '@contexts/network';
 import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates } from '@hooks/useQuery';
 
 export default function NCLIStateTransition() {
-  const { watch } = useFormContext();
+  const { watch, setValue } = useFormContext();
+  const [, setLocation] = useLocation();
   const { network } = useNetwork();
 
   const [beaconBlockSelectorId, beaconStateSelectorId] = watch([
@@ -150,21 +151,21 @@ build/ncli transition \\
       <BeaconBlockSelector />
       {(otherComp || cmd) && (
         <>
-          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-            <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
-              State Transition Command
+          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+            <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+              State transition command
             </div>
             <div className="mt-2">
               {otherComp}
               {!otherComp && (
-                <>
+                <div className="border-2 border-gray-200">
                   <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
                     <CopyToClipboard text={cmd} className="m-2" inverted />
                   </div>
                   <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
                     {cmd}
                   </SyntaxHighlighter>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -185,7 +186,16 @@ build/ncli transition \\
               </h3>
               <Link
                 className="bg-white/15 rounded-xl px-2 py-2 border-2 border-amber-400 ml-4 hover:border-amber-300 flex items-center justify-center whitespace-nowrap"
-                href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz`}
+                onClick={(a) => {
+                  a.preventDefault();
+                  setValue('zcliFileName', `${stateFileName}-post.ssz`);
+                  setValue('beaconStateSelectorId', '');
+                  setValue('beaconStateSelectorSlot', block?.slot);
+                  setLocation(
+                    `/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz&beaconStateSelectorSlot=${block?.slot}`,
+                  );
+                }}
+                href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz&beaconStateSelectorSlot=${block?.slot}`}
               >
                 Lets go <ArrowRightIcon className="ml-2 h-5 w-5" />
               </Link>

@@ -305,13 +305,13 @@ export default function FilterForm() {
   if (!form) return null;
 
   return (
-    <div className="bg-white/35 m-10 p-10 rounded-xl">
-      <div className="absolute -mt-12 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+    <div className="bg-white/35 mx-6 my-10 sm:m-10 p-10 rounded-xl border-2 border-amber-200">
+      <div className="absolute -mt-[52px] bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
         Filters
       </div>
       {hasFilters && (
         <button
-          className="absolute right-14 -mt-12 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
+          className="absolute right-14 -mt-12 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
           onClick={clearFilters}
         >
           Clear

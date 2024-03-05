@@ -150,21 +150,21 @@ cargo run --release -- transition-blocks \\
       <BeaconBlockSelector />
       {(otherComp || cmd) && (
         <>
-          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-            <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
-              State Transition Command
+          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+            <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+              State Transition command
             </div>
             <div className="mt-2">
               {otherComp}
               {!otherComp && (
-                <>
+                <div className="border-2 border-gray-200">
                   <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
                     <CopyToClipboard text={cmd} className="m-2" inverted />
                   </div>
                   <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
                     {cmd}
                   </SyntaxHighlighter>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -190,9 +190,11 @@ cargo run --release -- transition-blocks \\
                   setValue('zcliFileName', `${stateFileName}-post.ssz`);
                   setValue('beaconStateSelectorId', '');
                   setValue('beaconStateSelectorSlot', block?.slot);
-                  setLocation(`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz`);
+                  setLocation(
+                    `/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz&beaconStateSelectorSlot=${block?.slot}`,
+                  );
                 }}
-                href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz`}
+                href={`/zcli_state_diff?zcliFileName=${stateFileName}-post.ssz&beaconStateSelectorSlot=${block?.slot}`}
               >
                 Lets go <ArrowRightIcon className="ml-2 h-5 w-5" />
               </Link>

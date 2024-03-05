@@ -224,7 +224,7 @@ export default function BeaconStateId({ id }: { id: string }) {
             onClick={(a) => {
               a.preventDefault();
               setValue('beaconStateSelectorId', state?.id);
-              setValue('beaconBlockSelectorSlot', state?.slot);
+              setValue('beaconBlockSelectorSlot', '');
               setLocation(
                 `/lcli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
               );
@@ -238,7 +238,7 @@ export default function BeaconStateId({ id }: { id: string }) {
             onClick={(a) => {
               a.preventDefault();
               setValue('beaconStateSelectorId', state?.id);
-              setValue('beaconBlockSelectorSlot', state?.slot);
+              setValue('beaconBlockSelectorSlot', '');
               setLocation(
                 `/ncli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
               );

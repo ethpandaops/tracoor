@@ -161,8 +161,8 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
     <>
       <div className="mt-8 flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-            <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden">
+          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-10">
+            <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden border-y-2 sm:border-2 border-amber-100">
               <thead className="bg-sky-400">
                 <tr className="divide-x divide-orange-300">
                   <th

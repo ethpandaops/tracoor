@@ -211,7 +211,7 @@ export default function Selector() {
         <select
           id="tabs"
           name="tabs"
-          className="block w-full py-2.5 pl-6 font-bold text-sky-600 pr-10 focus:outline-none sm:text-sm bg-white/35"
+          className="block w-full py-2.5 pl-8 font-bold text-sky-600 pr-10 focus:outline-none sm:text-sm bg-white/35"
           value={currentSelection}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => {
             handleTabClick(e.target.value as Selection);

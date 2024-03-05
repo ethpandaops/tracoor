@@ -19,8 +19,8 @@ zcli --help`;
         <>
           <Disclosure.Button
             className={classNames(
-              open ? 'rounded-t-xl' : 'rounded-xl',
-              'bg-white/25 mt-1 px-4 p-5 sm:px-6 min-w-full',
+              open ? 'rounded-t-xl border-t-2 border-x-2' : 'rounded-xl border-2',
+              'bg-white/25 mt-1 px-4 p-5 sm:px-6 min-w-full border-amber-200',
             )}
           >
             <h3 className="text-base font-semibold leading-6 text-gray-700 flex justify-between items-center">
@@ -47,7 +47,7 @@ zcli --help`;
             </h3>
           </Disclosure.Button>
 
-          <Disclosure.Panel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl">
+          <Disclosure.Panel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl border-b-2 border-x-2 border-amber-200">
             <h3 className="text-base font-semibold leading-6 text-gray-600 pt-5">
               Install{' '}
               <a
@@ -60,12 +60,14 @@ zcli --help`;
               </a>
             </h3>
             <div className="mt-2">
-              <div className="absolute right-10 sm:right-14 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
+              <div className="absolute right-12 sm:right-16 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
                 <CopyToClipboard text={cmd} className="m-2" inverted />
               </div>
-              <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
-                {cmd}
-              </SyntaxHighlighter>
+              <div className="border-2 border-gray-200">
+                <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
+                  {cmd}
+                </SyntaxHighlighter>
+              </div>
             </div>
           </Disclosure.Panel>
         </>

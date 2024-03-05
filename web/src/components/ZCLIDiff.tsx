@@ -84,13 +84,13 @@ zcli \\
     <div className="mx-2 mt-8">
       <ZCLISetup />
       <BeaconStateSelector />
-      <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-        <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+      <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+        <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
           Local filename
         </div>
         {zcliFileName && (
           <button
-            className="absolute right-8 sm:right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
+            className="absolute right-8 sm:right-14 -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
             onClick={() => setValue(`zcliFileName`, '')}
           >
             Clear
@@ -100,7 +100,7 @@ zcli \\
         <h3 className="text-lg font-bold my-5 text-gray-700">
           Type the local filename of the state to diff
         </h3>
-        <div className="bg-white/35 border-lg rounded-lg p-4">
+        <div className="bg-white/35 border-lg rounded-lg p-4 border-2 border-amber-100">
           <label htmlFor="zcliFileName" className="block text-sm font-bold leading-6 text-gray-700">
             Filename
           </label>
@@ -114,21 +114,21 @@ zcli \\
         </div>
       </div>
       {(otherComp || cmd) && (
-        <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-          <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
-            State Diff Command
+        <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+          <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold">
+            State diff command
           </div>
           <div className="mt-2">
             {otherComp}
             {!otherComp && (
-              <>
+              <div className="border-2 border-gray-200">
                 <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
                   <CopyToClipboard text={cmd} className="m-2" inverted />
                 </div>
                 <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
                   {cmd}
                 </SyntaxHighlighter>
-              </>
+              </div>
             )}
           </div>
         </div>

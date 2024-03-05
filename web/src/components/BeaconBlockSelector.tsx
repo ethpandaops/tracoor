@@ -289,13 +289,13 @@ export default function BeaconBlockSelector() {
   }
 
   return (
-    <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-      <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+    <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+      <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
         Beacon block
       </div>
       {hasFilters && (
         <button
-          className="absolute right-8 sm:right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
+          className="absolute right-8 sm:right-14 -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
           onClick={() => {
             setValue('beaconBlockSelectorId', '');
             setValue('beaconBlockSelectorSlot', '');
@@ -348,7 +348,7 @@ export default function BeaconBlockSelector() {
           <h3 className="text-lg font-bold my-5 text-gray-700">
             Search for a slot or block root to select a beacon block
           </h3>
-          <div className="bg-white/35 border-lg rounded-lg p-4">
+          <div className="bg-white/35 border-lg rounded-lg p-4 border-2 border-amber-100">
             <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div className="sm:col-span-3 sm:col-start-1">
                 <label
@@ -403,7 +403,7 @@ export default function BeaconBlockSelector() {
         <div className="mt-8 flow-root">
           <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
             <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-              <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden">
+              <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden border-2 border-amber-100">
                 <thead className="bg-sky-400">
                   <tr className="divide-x divide-orange-300">
                     <th

@@ -31,12 +31,12 @@ export default function GoEVMLabDiff() {
   } = useExecutionBlockTraces(
     {
       network: network ? network : undefined,
-      id: executionBlockTraceSelectorId2,
+      id: executionBlockTraceSelectorId1,
       pagination: {
         limit: 1,
       },
     },
-    Boolean(executionBlockTraceSelectorId2),
+    Boolean(executionBlockTraceSelectorId1),
   );
 
   const {
@@ -46,12 +46,12 @@ export default function GoEVMLabDiff() {
   } = useExecutionBlockTraces(
     {
       network: network ? network : undefined,
-      id: executionBlockTraceSelectorId1,
+      id: executionBlockTraceSelectorId2,
       pagination: {
         limit: 1,
       },
     },
-    Boolean(executionBlockTraceSelectorId1),
+    Boolean(executionBlockTraceSelectorId2),
   );
 
   const trace1 = trace1Data?.[0];
@@ -67,7 +67,7 @@ export default function GoEVMLabDiff() {
 
   function generateJQCommand(trace: ExecutionBlockTrace, fileName: string, tx: string) {
     const nestedResult = !['nethermind', 'besu'].includes(trace.execution_implementation);
-    return `jq '${nestedResult ? `{results: .[${tx}]}` : `.[${tx}]`}' ${fileName}.json > ${fileName}-${tx}.json`;
+    return `jq '${nestedResult ? `.[${tx}].result` : `.[${tx}]`}' ${fileName}.json > ${fileName}-${tx}.json`;
   }
 
   const cmd = useMemo(() => {
@@ -118,13 +118,13 @@ tracediff ${trace1FileName}-${goEvmLabDiffTx}.json ${trace2FileName}-${goEvmLabD
       <GoEVMLabSetup />
       <ExecutionBlockTraceSelector num={1} excludeNum={2} />
       <ExecutionBlockTraceSelector num={2} excludeNum={1} />
-      <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-        <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+      <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+        <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
           Transaction index
         </div>
         {goEvmLabDiffTx && (
           <button
-            className="absolute right-8 sm:right-14 -mt-8 bg-white/85 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
+            className="absolute right-8 sm:right-14 -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
             onClick={() => setValue(`goEvmLabDiffTx`, '')}
           >
             Clear
@@ -134,7 +134,7 @@ tracediff ${trace1FileName}-${goEvmLabDiffTx}.json ${trace2FileName}-${goEvmLabD
         <h3 className="text-lg font-bold my-5 text-gray-700">
           Select the transaction index, starting from 0, to compare in each block trace
         </h3>
-        <div className="bg-white/35 border-lg rounded-lg p-4">
+        <div className="bg-white/35 border-lg rounded-lg p-4 border-2 border-amber-100">
           <label
             htmlFor="goEvmLabDiffTx"
             className="block text-sm font-bold leading-6 text-gray-700"
@@ -152,9 +152,9 @@ tracediff ${trace1FileName}-${goEvmLabDiffTx}.json ${trace2FileName}-${goEvmLabD
       </div>
       {(otherComp || cmd) && (
         <>
-          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl">
-            <div className="absolute -mt-8 bg-white/65 px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
-              Transaction tracediff Command
+          <div className="bg-white/35 my-10 px-8 py-5 rounded-xl border-2 border-amber-200">
+            <div className="absolute -mt-8 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-sky-600 font-bold border-2 border-sky-400">
+              Transaction tracediff command
             </div>
             <div className="mt-2">
               {otherComp}
@@ -163,9 +163,11 @@ tracediff ${trace1FileName}-${goEvmLabDiffTx}.json ${trace2FileName}-${goEvmLabD
                   <div className="absolute right-14 sm:right-20 m-2 bg-white/35 mix-blend-hard-light hover:bg-white/20 rounded-lg cursor-pointer">
                     <CopyToClipboard text={cmd} className="m-2" inverted />
                   </div>
-                  <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
-                    {cmd}
-                  </SyntaxHighlighter>
+                  <div className="border-2 border-gray-200">
+                    <SyntaxHighlighter language="bash" style={railscasts} showLineNumbers wrapLines>
+                      {cmd}
+                    </SyntaxHighlighter>
+                  </div>
                 </>
               )}
             </div>

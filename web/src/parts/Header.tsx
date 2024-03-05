@@ -93,9 +93,16 @@ export default function Header() {
                                 href="https://ethereum.github.io/beacon-APIs/#/Debug/getStateV2"
                                 className="underline text-orange-500 hover:text-orange-600 dark:text-blue-200 dark:hover:text-blue-300"
                               >
-                                beacon state
+                                beacon states
                               </a>
                               ,{' '}
+                              <a
+                                href="https://ethereum.github.io/beacon-APIs/?urls.primaryName=dev#/Beacon/getBlockV2"
+                                className="underline text-orange-500 hover:text-orange-600 dark:text-blue-200 dark:hover:text-blue-300"
+                              >
+                                beacon blocks
+                              </a>
+                              ,
                               <a
                                 href="https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debugtraceblock"
                                 className="underline text-orange-500 hover:text-orange-600 dark:text-blue-200 dark:hover:text-blue-300"
