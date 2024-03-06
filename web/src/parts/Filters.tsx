@@ -311,7 +311,7 @@ export default function FilterForm() {
       </div>
       {hasFilters && (
         <button
-          className="absolute right-14 -mt-12 bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
+          className="absolute right-11 sm:right-14 -mt-[52px] bg-white px-3 py-1 -ml-6 shadow-xl text-xs rounded-lg text-gray-600 font-bold flex cursor-pointer transition hover:text-gray-800 border-2 border-gray-500 hover:border-gray-700"
           onClick={clearFilters}
         >
           Clear
