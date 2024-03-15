@@ -20,8 +20,34 @@ func TestS3StoreOperations(t *testing.T) {
 		}
 	}()
 
+	t.Run("BeaconState", func(t *testing.T) {
+		testBeaconState(ctx, t, store)
+	})
+
+	t.Run("BeaconBlock", func(t *testing.T) {
+		testBeaconBlock(ctx, t, store)
+	})
+
+	t.Run("BeaconBadBlock", func(t *testing.T) {
+		testBeaconBadBlock(ctx, t, store)
+	})
+
+	t.Run("ExecutionBlockTrace", func(t *testing.T) {
+		testExecutionBlockTrace(ctx, t, store)
+	})
+
+	t.Run("ExecutionBadBlock", func(t *testing.T) {
+		testExecutionBadBlock(ctx, t, store)
+	})
+}
+
+func testBeaconState(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
 	location := "beacon_state/location.json"
 	data := []byte(`"abc": "def"`)
+
+	var err error
 
 	t.Run("BeaconState", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
@@ -33,7 +59,6 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatalf("Failed to save beacon state: %v", err)
 		}
 
-		//nolint:govet // This is a test
 		retrievedData, err := store.GetBeaconState(ctx, location)
 		if err != nil {
 			t.Fatalf("Failed to get beacon state: %v", err)
@@ -65,6 +90,15 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatal("Expected file to not exist after deletion")
 		}
 	})
+}
+
+func testBeaconBlock(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	location := "beacon_block/location.json"
+	data := []byte(`"abc": "def"`)
+
+	var err error
 
 	t.Run("BeaconBlock", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
@@ -76,7 +110,6 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatalf("Failed to save beacon block: %v", err)
 		}
 
-		//nolint:govet // This is a test
 		retrievedData, err := store.GetBeaconBlock(ctx, location)
 		if err != nil {
 			t.Fatalf("Failed to get beacon block: %v", err)
@@ -108,6 +141,15 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatal("Expected file to not exist after deletion")
 		}
 	})
+}
+
+func testBeaconBadBlock(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	location := "beacon_bad_block/location.json"
+	data := []byte(`"abc": "def"`)
+
+	var err error
 
 	t.Run("BeaconBadBlock", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
@@ -119,7 +161,6 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatalf("Failed to save beacon bad block: %v", err)
 		}
 
-		//nolint:govet // This is a test
 		retrievedData, err := store.GetBeaconBadBlock(ctx, location)
 		if err != nil {
 			t.Fatalf("Failed to get beacon bad block: %v", err)
@@ -151,6 +192,15 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatal("Expected file to not exist after deletion")
 		}
 	})
+}
+
+func testExecutionBlockTrace(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	location := "execution_block_trace/location.json"
+	data := []byte(`"abc": "def"`)
+
+	var err error
 
 	t.Run("ExecutionBlockTrace", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
@@ -162,7 +212,6 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatalf("Failed to save execution block trace: %v", err)
 		}
 
-		//nolint:govet // This is a test
 		retrievedData, err := store.GetExecutionBlockTrace(ctx, location)
 		if err != nil {
 			t.Fatalf("Failed to get execution block trace: %v", err)
@@ -194,6 +243,15 @@ func TestS3StoreOperations(t *testing.T) {
 			t.Fatal("Expected file to not exist after deletion")
 		}
 	})
+}
+
+func testExecutionBadBlock(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	location := "execution_bad_block/location.json"
+	data := []byte(`"abc": "def"`)
+
+	var err error
 
 	t.Run("ExecutionBadBlock", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
