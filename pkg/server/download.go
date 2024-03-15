@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
-	"github.com/ethpandaops/tracoor/pkg/store"
+	tStore "github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/snappy"
@@ -18,14 +18,14 @@ import (
 
 type ObjectDownloader struct {
 	log      logrus.FieldLogger
-	store    store.Store
+	store    tStore.Store
 	mux      *runtime.ServeMux
 	indexer  indexer.IndexerClient
 	grpcConn string
 	grpcOpts []grpc.DialOption
 }
 
-func NewObjectDownloader(log logrus.FieldLogger, store store.Store, mux *runtime.ServeMux, grpcConn string, grpcOpts []grpc.DialOption) *ObjectDownloader {
+func NewObjectDownloader(log logrus.FieldLogger, store tStore.Store, mux *runtime.ServeMux, grpcConn string, grpcOpts []grpc.DialOption) *ObjectDownloader {
 	return &ObjectDownloader{
 		log:      log,
 		store:    store,
@@ -130,7 +130,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := setResponseCompression(w, r, data); err != nil {
+	if err = setResponseCompression(w, r, data); err != nil {
 		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -207,7 +207,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := setResponseCompression(w, r, data); err != nil {
+	if err = setResponseCompression(w, r, data); err != nil {
 		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -284,7 +284,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := setResponseCompression(w, r, data); err != nil {
+	if err = setResponseCompression(w, r, data); err != nil {
 		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -361,7 +361,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := setResponseCompression(w, r, data); err != nil {
+	if err = setResponseCompression(w, r, data); err != nil {
 		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -438,7 +438,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := setResponseCompression(w, r, data); err != nil {
+	if err = setResponseCompression(w, r, data); err != nil {
 		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -484,7 +484,7 @@ func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte
 
 		var b bytes.Buffer
 
-		df := snappy.NewWriter(&b)
+		df := snappy.NewBufferedWriter(&b)
 
 		if _, err := df.Write(*data); err != nil {
 			return err

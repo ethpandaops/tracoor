@@ -43,8 +43,8 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 	services = append(services, ind)
 
 	// API
-	if err := defaults.Set(&cfg.API); err != nil {
-		return nil, err
+	if defaultErr := defaults.Set(&cfg.API); defaultErr != nil {
+		return nil, defaultErr
 	}
 
 	ap, err := api.NewAPI(ctx, log, &cfg.API, c, grpcConn, grpcOpts)

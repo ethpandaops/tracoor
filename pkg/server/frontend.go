@@ -44,6 +44,7 @@ func (f *Frontend) customRoutingErrorHandler(ctx context.Context, mux *runtime.S
 			req.URL.Path = "/"
 			f.handler.ServeHTTP(w, req)
 		}
+
 		return
 	}
 
@@ -52,5 +53,6 @@ func (f *Frontend) customRoutingErrorHandler(ctx context.Context, mux *runtime.S
 
 func (f *Frontend) fileExists(path string) bool {
 	_, err := fs.Stat(f.filesystem, path)
+
 	return err == nil
 }

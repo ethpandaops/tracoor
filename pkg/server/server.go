@@ -145,6 +145,7 @@ func (x *Server) Start(ctx context.Context) error {
 	})
 	g.Go(func() error {
 		<-gCtx.Done()
+
 		if err := x.stop(ctx); err != nil {
 			return err
 		}
@@ -260,6 +261,7 @@ func (x *Server) startGrpcGateway(ctx context.Context) error {
 	}
 
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+
 	err := gw.RegisterAPIHandlerFromEndpoint(ctx, mux, x.config.Addr, opts)
 	if err != nil {
 		return err
