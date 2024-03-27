@@ -27,6 +27,7 @@ func generateRandomBeaconBadBlock() *BeaconBadBlock {
 		Network:              generateRandomString(5),
 	}
 }
+
 func TestInsertBeaconBadBlock(t *testing.T) {
 	indexer, mock, err := NewMockIndexer()
 	assert.NoError(t, err)

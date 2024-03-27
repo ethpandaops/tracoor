@@ -16,7 +16,7 @@ type BeaconBlock struct {
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_slot,where:deleted_at IS NULL"`
+	Slot                 int64 `gorm:"where:deleted_at IS NULL"`
 	Epoch                int64
 	BlockRoot            string
 	FetchedAt            time.Time `gorm:"index"`
