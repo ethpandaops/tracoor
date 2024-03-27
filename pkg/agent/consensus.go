@@ -243,6 +243,8 @@ func getBadBlocksFilePattern(client string) (*string, error) {
 		pattern = `^(\d+)_([^.]+)\.ssz$`
 	case string(services.ClientNimbus):
 		pattern = `^block-(\d+)-([^.]+)\.ssz$`
+	case string(services.ClientPrysm):
+		pattern = `^beacon_block_(\d+)\.ssz$`
 	default:
 		return nil, errors.New("client does not have bad blocks available")
 	}
@@ -277,9 +279,8 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 
 	for _, file := range files {
 		matches := matcher.FindStringSubmatch(file.Name())
-		if len(matches) == 3 {
+		if len(matches) == 2 {
 			filePath := filepath.Join(path, file.Name())
-
 			// Parse 'slot' and 'blockRoot' from the file name
 			slotI, err := strconv.ParseUint(matches[1], 10, 64)
 			if err != nil {
@@ -293,7 +294,11 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 
 			slot := phase0.Slot(slotI)
 
-			blockRoot := matches[2]
+			blockRoot := "unknown"
+
+			if len(matches) == 3 {
+				blockRoot = matches[2]
+			}
 
 			// Read the file into the `block` variable
 			blockRaw, err := os.ReadFile(filePath)
