@@ -13,6 +13,8 @@ import (
 func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 	i.log.WithFields(logrus.Fields{
 		"beacon_state":          i.config.Retention.BeaconStates.Duration,
+		"beacon_block":          i.config.Retention.BeaconBlocks.Duration,
+		"beacon_bad_block":      i.config.Retention.BeaconBadBlocks.Duration,
 		"execution_block_trace": i.config.Retention.ExecutionBlockTraces.Duration,
 		"execution_bad_block":   i.config.Retention.ExecutionBadBlocks.Duration,
 	}).Info("Starting retention watcher")
@@ -20,6 +22,14 @@ func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 	for {
 		if err := i.purgeOldBeaconStates(ctx); err != nil {
 			i.log.WithError(err).Error("Failed to delete old beacon states")
+		}
+
+		if err := i.purgeOldBeaconBlocks(ctx); err != nil {
+			i.log.WithError(err).Error("Failed to delete old beacon blocks")
+		}
+
+		if err := i.purgeOldBeaconBadBlocks(ctx); err != nil {
+			i.log.WithError(err).Error("Failed to delete old beacon bad blocks")
 		}
 
 		if err := i.purgeOldExecutionTraces(ctx); err != nil {
@@ -45,7 +55,7 @@ func (i *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 		Before: &before,
 	}
 
-	states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 1, OrderBy: "fetched_at ASC"})
+	states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
 	if err != nil {
 		return err
 	}
@@ -84,6 +94,98 @@ func (i *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 	return nil
 }
 
+func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
+	before := time.Now().Add(-i.config.Retention.BeaconBlocks.Duration)
+
+	filter := &persistence.BeaconBlockFilter{
+		Before: &before,
+	}
+
+	blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	i.log.WithField("before", before).Debugf("Purging %d old beacon blocks", len(blocks))
+
+	for _, block := range blocks {
+		// Delete from the store first
+		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				i.log.WithField("block_id", block.ID).Warn("Beacon block not found in store")
+			} else {
+				i.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete beacon block from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := i.db.DeleteBeaconBlock(ctx, block.ID)
+		if err != nil {
+			i.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete beacon block")
+
+			continue
+		}
+
+		i.log.WithFields(
+			logrus.Fields{
+				"node":    block.Node,
+				"network": block.Network,
+				"slot":    block.Slot,
+				"id":      block.ID,
+			},
+		).Debug("Deleted beacon block")
+	}
+
+	return nil
+}
+
+func (i *Indexer) purgeOldBeaconBadBlocks(ctx context.Context) error {
+	before := time.Now().Add(-i.config.Retention.BeaconBadBlocks.Duration)
+
+	filter := &persistence.BeaconBadBlockFilter{
+		Before: &before,
+	}
+
+	blocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	i.log.WithField("before", before).Debugf("Purging %d old beacon bad blocks", len(blocks))
+
+	for _, block := range blocks {
+		// Delete from the store first
+		if err := i.store.DeleteBeaconBadBlock(ctx, block.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				i.log.WithField("block_id", block.ID).Warn("Beacon bad block not found in store")
+			} else {
+				i.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete beacon bad block from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := i.db.DeleteBeaconBadBlock(ctx, block.ID)
+		if err != nil {
+			i.log.WithError(err).WithField("block_id", block.ID).Error("Failed to delete beacon bad block")
+
+			continue
+		}
+
+		i.log.WithFields(
+			logrus.Fields{
+				"node":    block.Node,
+				"network": block.Network,
+				"slot":    block.Slot,
+				"id":      block.ID,
+			},
+		).Debug("Deleted beacon bad block")
+	}
+
+	return nil
+}
+
 func (i *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 	before := time.Now().Add(-i.config.Retention.ExecutionBlockTraces.Duration)
 
@@ -91,7 +193,7 @@ func (i *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 		Before: &before,
 	}
 
-	traces, err := i.db.ListExecutionBlockTrace(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 1, OrderBy: "fetched_at ASC"})
+	traces, err := i.db.ListExecutionBlockTrace(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
 	if err != nil {
 		return err
 	}
@@ -137,7 +239,7 @@ func (i *Indexer) purgeOldExecutionBadBlocks(ctx context.Context) error {
 		Before: &before,
 	}
 
-	blocks, err := i.db.ListExecutionBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 1, OrderBy: "fetched_at ASC"})
+	blocks, err := i.db.ListExecutionBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
 	if err != nil {
 		return err
 	}

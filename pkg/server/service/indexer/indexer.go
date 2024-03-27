@@ -350,6 +350,516 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 	return response, nil
 }
 
+func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeaconBlockRequest) (*indexer.CreateBeaconBlockResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Check the store for the block
+	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField("location", req.GetLocation().GetValue()).
+			WithField("node", req.GetNode().GetValue()).
+			Error("Failed to index a beacon block because the block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if exists {
+		// Check if the block is already indexed
+		filter := &persistence.BeaconBlockFilter{}
+
+		filter.AddNetwork(req.GetNetwork().GetValue())
+		filter.AddSlot(req.GetSlot().GetValue())
+		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
+		filter.AddNode(req.GetNode().GetValue())
+
+		blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		if len(blocks) > 0 {
+			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
+		}
+	}
+
+	// Create the block
+	block := &indexer.BeaconBlock{
+		Id:                   wrapperspb.String(uuid.New().String()),
+		Node:                 req.GetNode(),
+		Network:              req.GetNetwork(),
+		Slot:                 req.GetSlot(),
+		Epoch:                req.GetEpoch(),
+		BlockRoot:            req.GetBlockRoot(),
+		NodeVersion:          req.GetNodeVersion(),
+		Location:             req.GetLocation(),
+		FetchedAt:            req.GetFetchedAt(),
+		BeaconImplementation: req.GetBeaconImplementation(),
+	}
+
+	if err := block.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	logFields := logrus.Fields{
+		"node":                  req.GetNode().GetValue(),
+		"network":               req.GetNetwork().GetValue(),
+		"slot":                  req.GetSlot().GetValue(),
+		"epoch":                 req.GetEpoch().GetValue(),
+		"block_root":            req.GetBlockRoot().GetValue(),
+		"node_version":          req.GetNodeVersion().GetValue(),
+		"location":              req.GetLocation().GetValue(),
+		"fetched_at":            req.GetFetchedAt().AsTime(),
+		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+	}
+
+	if err := i.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index block")
+
+		return nil, status.Error(codes.Internal, "failed to index block")
+	}
+
+	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed beacon block")
+
+	return &indexer.CreateBeaconBlockResponse{
+		Id: block.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBlockRequest) (*indexer.ListBeaconBlockResponse, error) {
+	filter := &persistence.BeaconBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	beaconBlocks, err := i.db.ListBeaconBlock(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoBeaconBlocks := make([]*indexer.BeaconBlock, len(beaconBlocks))
+	for i, block := range beaconBlocks {
+		protoBeaconBlocks[i] = DBBeaconBlockToProtoBeaconBlock(block)
+	}
+
+	return &indexer.ListBeaconBlockResponse{
+		BeaconBlocks: protoBeaconBlocks,
+	}, nil
+}
+
+func (i *Indexer) CountBeaconBlock(ctx context.Context, req *indexer.CountBeaconBlockRequest) (*indexer.CountBeaconBlockResponse, error) {
+	filter := &persistence.BeaconBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	beaconBlocks, err := i.db.CountBeaconBlock(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountBeaconBlockResponse{
+		Count: wrapperspb.UInt64(uint64(beaconBlocks)),
+	}, nil
+}
+
+func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBlockValuesRequest) (*indexer.ListUniqueBeaconBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueBeaconBlockValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueBeaconBlockValuesRequest_SLOT:
+			fields[idx] = "slot"
+		case indexer.ListUniqueBeaconBlockValuesRequest_EPOCH:
+			fields[idx] = "epoch"
+		case indexer.ListUniqueBeaconBlockValuesRequest_BLOCK_ROOT:
+			fields[idx] = "block_root"
+		case indexer.ListUniqueBeaconBlockValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		case indexer.ListUniqueBeaconBlockValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueBeaconBlockValuesRequest_NETWORK:
+			fields[idx] = "network"
+		case indexer.ListUniqueBeaconBlockValuesRequest_BEACON_IMPLEMENTATION:
+			fields[idx] = "beacon_implementation"
+		}
+	}
+
+	distinctValues, err := i.db.DistinctBeaconBlockValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueBeaconBlockValuesResponse{
+		Node:                 distinctValues.Node,
+		Slot:                 distinctValues.Slot,
+		Epoch:                distinctValues.Epoch,
+		BlockRoot:            distinctValues.BlockRoot,
+		NodeVersion:          distinctValues.NodeVersion,
+		Location:             distinctValues.Location,
+		Network:              distinctValues.Network,
+		BeaconImplementation: distinctValues.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
+func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateBeaconBadBlockRequest) (*indexer.CreateBeaconBadBlockResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Check the store for the bad block
+	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField("location", req.GetLocation().GetValue()).
+			WithField("node", req.GetNode().GetValue()).
+			Error("Failed to index a beacon block because the bad block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if exists {
+		// Check if the bad block is already indexed
+		filter := &persistence.BeaconBadBlockFilter{}
+
+		filter.AddNetwork(req.GetNetwork().GetValue())
+		filter.AddSlot(req.GetSlot().GetValue())
+		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
+		filter.AddNode(req.GetNode().GetValue())
+
+		badBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		if len(badBlocks) > 0 {
+			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
+		}
+	}
+
+	// Create the bad block
+	badBlock := &indexer.BeaconBadBlock{
+		Id:                   wrapperspb.String(uuid.New().String()),
+		Node:                 req.GetNode(),
+		Network:              req.GetNetwork(),
+		Slot:                 req.GetSlot(),
+		Epoch:                req.GetEpoch(),
+		BlockRoot:            req.GetBlockRoot(),
+		NodeVersion:          req.GetNodeVersion(),
+		Location:             req.GetLocation(),
+		FetchedAt:            req.GetFetchedAt(),
+		BeaconImplementation: req.GetBeaconImplementation(),
+	}
+
+	if err := badBlock.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	logFields := logrus.Fields{
+		"node":                  req.GetNode().GetValue(),
+		"network":               req.GetNetwork().GetValue(),
+		"slot":                  req.GetSlot().GetValue(),
+		"epoch":                 req.GetEpoch().GetValue(),
+		"block_root":            req.GetBlockRoot().GetValue(),
+		"node_version":          req.GetNodeVersion().GetValue(),
+		"location":              req.GetLocation().GetValue(),
+		"fetched_at":            req.GetFetchedAt().AsTime(),
+		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+	}
+
+	if err := i.db.InsertBeaconBadBlock(ctx, ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock)); err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad block")
+
+		return nil, status.Error(codes.Internal, "failed to index bad block")
+	}
+
+	i.log.WithFields(logFields).WithField("id", badBlock.GetId().GetValue()).Debug("Indexed beacon block")
+
+	return &indexer.CreateBeaconBadBlockResponse{
+		Id: badBlock.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeaconBadBlockRequest) (*indexer.ListBeaconBadBlockResponse, error) {
+	filter := &persistence.BeaconBadBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	beaconBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoBeaconBadBlocks := make([]*indexer.BeaconBadBlock, len(beaconBlocks))
+	for i, badBlock := range beaconBlocks {
+		protoBeaconBadBlocks[i] = DBBeaconBadBlockToProtoBeaconBadBlock(badBlock)
+	}
+
+	return &indexer.ListBeaconBadBlockResponse{
+		BeaconBadBlocks: protoBeaconBadBlocks,
+	}, nil
+}
+
+func (i *Indexer) CountBeaconBadBlock(ctx context.Context, req *indexer.CountBeaconBadBlockRequest) (*indexer.CountBeaconBadBlockResponse, error) {
+	filter := &persistence.BeaconBadBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	beaconBlocks, err := i.db.CountBeaconBadBlock(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountBeaconBadBlockResponse{
+		Count: wrapperspb.UInt64(uint64(beaconBlocks)),
+	}, nil
+}
+
+func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlockValuesRequest) (*indexer.ListUniqueBeaconBadBlockValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_SLOT:
+			fields[idx] = "slot"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_EPOCH:
+			fields[idx] = "epoch"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_BLOCK_ROOT:
+			fields[idx] = "block_root"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_NETWORK:
+			fields[idx] = "network"
+		case indexer.ListUniqueBeaconBadBlockValuesRequest_BEACON_IMPLEMENTATION:
+			fields[idx] = "beacon_implementation"
+		}
+	}
+
+	distinctValues, err := i.db.DistinctBeaconBadBlockValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueBeaconBadBlockValuesResponse{
+		Node:                 distinctValues.Node,
+		Slot:                 distinctValues.Slot,
+		Epoch:                distinctValues.Epoch,
+		BlockRoot:            distinctValues.BlockRoot,
+		NodeVersion:          distinctValues.NodeVersion,
+		Location:             distinctValues.Location,
+		Network:              distinctValues.Network,
+		BeaconImplementation: distinctValues.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
 func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.CreateExecutionBlockTraceRequest) (*indexer.CreateExecutionBlockTraceResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

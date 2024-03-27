@@ -1,10 +1,10 @@
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import TimeAgo from 'react-timeago';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 
+import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
-import ErrorAlert from '@components/ErrorAlert';
 import useNetwork from '@contexts/network';
 import { useBeaconStates } from '@hooks/useQuery';
 
@@ -30,24 +30,24 @@ export default function BeaconStateId({ id }: { id: string }) {
   let errorMessage = undefined;
 
   if (error) {
-    errorMessage = 'Error fetching bad block';
+    errorMessage = 'Error fetching beacon states';
     if (error instanceof Error) {
-      errorMessage = `Error fetching bad block: ${error.message}`;
+      errorMessage = `Error fetching beacon states: ${error.message}`;
     }
   } else if (!isLoading && !state) {
-    errorMessage = 'Bad block not found';
+    errorMessage = 'Beacon states not found';
   }
 
   if (errorMessage) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+        <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
           <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+            <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">ID</dt>
               <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
             </div>
-            <ErrorAlert message={errorMessage} />
+            <Alert type="error" message={errorMessage} />
           </dl>
         </div>
       </div>
@@ -56,13 +56,13 @@ export default function BeaconStateId({ id }: { id: string }) {
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800 shadow dark:shadow-inner">
-      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800 px-4 py-5 sm:p-0">
+      <div className="border-t border-gray-200 dark:border-b dark:border-gray-800">
         <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-900">
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">ID</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">{id}</dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Fetched at</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 underline decoration-dotted underline-offset-2 cursor-help">
               {isLoading ? (
@@ -72,7 +72,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Network</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               {isLoading ? (
@@ -82,7 +82,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -98,7 +98,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Execution Implementation</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -116,7 +116,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Node version</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -132,7 +132,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Epoch</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -152,7 +152,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               />
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Slot</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4 flex">
               <span
@@ -172,7 +172,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               />
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">State root</dt>
             <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
               <span className="lg:hidden font-mono flex">
@@ -204,7 +204,7 @@ export default function BeaconStateId({ id }: { id: string }) {
               </span>
             </dd>
           </div>
-          <div className="py-4 sm:py-5 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">
+          <div className="py-4 sm:py-5 px-4 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/beacon_state/${id}`}
@@ -219,6 +219,46 @@ export default function BeaconStateId({ id }: { id: string }) {
               </a>
             </dt>
           </div>
+
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setValue('beaconBlockSelectorSlot', '');
+              setLocation(
+                `/lcli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
+              );
+            }}
+            href={`/lcli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`}
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> lcli state transition
+          </Link>
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setValue('beaconBlockSelectorSlot', '');
+              setLocation(
+                `/ncli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`,
+              );
+            }}
+            href={`/ncli_state_transition?beaconStateSelectorId=${state?.id}&beaconBlockSelectorSlot=${state?.slot}`}
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> ncli state transition
+          </Link>
+          <Link
+            onClick={(a) => {
+              a.preventDefault();
+              setValue('beaconStateSelectorId', state?.id);
+              setLocation(`/zcli_state_diff?beaconStateSelectorId=${state?.id}`);
+            }}
+            href={`/zcli_state_diff?beaconStateSelectorId=${state?.id}`}
+            className="py-4 sm:py-5 px-4 sm:px-6 flex text-gray-100 font-bold justify-center sm:justify-start bg-amber-500/85"
+          >
+            <ArrowLeftStartOnRectangleIcon className="w-6 h-6 mr-2" /> zcli state diff
+          </Link>
         </dl>
       </div>
     </div>

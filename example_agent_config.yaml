@@ -1,0 +1,27 @@
+logging: "info"
+metricsAddr: ":9092"
+pprofAddr: ":6065"
+
+name: example-agent
+
+ethereum:
+  beacon:
+    nodeAddress: http://localhost:5052
+    # invalidGossipVerifiedBlocksPath: /some/path/to/dump/invalid
+  execution:
+    nodeAddress: http://localhost:8545
+    traceDisableMemory: true
+    traceDisableStack: true
+    traceDisableStorage: true
+
+indexer:
+  address: localhost:8081
+
+store:
+  type: s3
+  config:
+    region: "us-east-1"
+    endpoint: http://localhost:9000
+    bucket_name: tracoor
+    access_key: minioadmin
+    access_secret: minioadmin

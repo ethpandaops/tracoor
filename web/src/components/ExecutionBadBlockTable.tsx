@@ -101,20 +101,20 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-64 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
             <div className="h-5 w-96 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
             <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
-          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
-            <div className="h-5 w-96 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
+            <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
           <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-20 bg-gray-600/35 rounded-xl animate-pulse"></div>
@@ -161,8 +161,8 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
     <>
       <div className="mt-8 flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-            <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden">
+          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-10">
+            <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden border-y-2 sm:border-2 border-amber-100">
               <thead className="bg-sky-400">
                 <tr className="divide-x divide-orange-300">
                   <th
@@ -235,7 +235,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                         sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden lg:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 2xl:table-cell',
                     )}
                     onClick={() => handleSort('execution_implementation')}
                   >
@@ -264,7 +264,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                       sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 4xl:table-cell',
                     )}
                     onClick={() => handleSort('node_version')}
                   >
@@ -322,7 +322,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                       sortConfig.key === 'block_hash' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden 3xl:table-cell',
                     )}
                     onClick={() => handleSort('block_hash')}
                   >
@@ -351,7 +351,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                       sortConfig.key === 'block_extra_data' && sortConfig.direction === 'ASC'
                         ? 'cursor-s-resize'
                         : '',
-                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-10 hidden xl:table-cell',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-10 hidden 3xl:table-cell',
                     )}
                     onClick={() => handleSort('block_extra_data')}
                   >
@@ -397,7 +397,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden lg:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -413,7 +413,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
                           <div className=" w-fit">
                             <span
                               className="relative top-1 group transition cursor-pointer"
@@ -439,10 +439,10 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
                           <div className=" w-fit">
                             <span
-                              className="relative top-1 group transition cursor-pointer"
+                              className="relative top-1 group transition cursor-pointer font-mono"
                               onClick={() => setValue('executionBadBlockBlockHash', row.block_hash)}
                             >
                               {row.block_hash}
@@ -450,21 +450,26 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                             </span>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden xl:table-cell">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
                           {row.block_extra_data}
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
-                          <div className="flex flex-row ">
+                          <div className="flex flex-row">
                             <a
                               href={`/download/execution_bad_block/${row.id}`}
                               download={`execution_bad_block-${row.block_number}-${row.block_hash}-${row.node}.json.gz`}
-                              className="text-sky-500 hover:text-sky-600 px-2"
+                              className="text-sky-400 hover:text-sky-600 flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600"
                             >
-                              <ArrowDownTrayIcon className="h-6 w-6" aria-hidden="true" />
+                              <ArrowDownTrayIcon className="h-6 w-6 3xl:mr-1" aria-hidden="true" />
+                              <span className="hidden 3xl:block">Download</span>
                             </a>
                             <Link href={`/execution_bad_block/${row.id}`}>
-                              <span className="text-sky-500 hover:text-sky-600 px-2 cursor-pointer">
-                                <MagnifyingGlassCircleIcon className="h-6 w-6" aria-hidden="true" />
+                              <span className="text-sky-400 hover:text-sky-600 cursor-pointer flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600">
+                                <MagnifyingGlassCircleIcon
+                                  className="h-6 w-6 3xl:mr-1"
+                                  aria-hidden="true"
+                                />
+                                <span className="hidden 3xl:block">View</span>
                               </span>
                             </Link>
                           </div>

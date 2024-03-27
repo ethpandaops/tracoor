@@ -88,40 +88,6 @@ func (s *S3Store) Healthy(ctx context.Context) error {
 	return nil
 }
 
-func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
-	compressed, err := GzipCompress(*data)
-	if err != nil {
-		return "", err
-	}
-
-	location += gzExtension
-
-	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(compressed),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(compressed))
-	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BeaconStateDataType), len(*data))
-
-	return location, err
-}
-
 func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, error) {
 	data, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.config.BucketName),
@@ -224,6 +190,59 @@ func (s *S3Store) GetStorageHandshakeToken(ctx context.Context, node string) (st
 	return buf.String(), nil
 }
 
+func (s *S3Store) Exists(ctx context.Context, location string) (bool, error) {
+	_, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.ErrorCode() == "NotFound" {
+				return false, nil
+			}
+		}
+
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
+	compressed, err := GzipCompress(*data)
+	if err != nil {
+		return "", err
+	}
+
+	location += gzExtension
+
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+		Body:   bytes.NewBuffer(compressed),
+	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to save frame: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BeaconStateDataType), len(*data))
+
+	return location, err
+}
+
 func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
 
@@ -288,23 +307,200 @@ func (s *S3Store) DeleteBeaconState(ctx context.Context, location string) error 
 	return err
 }
 
-func (s *S3Store) Exists(ctx context.Context, location string) (bool, error) {
-	_, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+func (s *S3Store) SaveBeaconBlock(ctx context.Context, data *[]byte, location string) (string, error) {
+	compressed, err := GzipCompress(*data)
+	if err != nil {
+		return "", err
+	}
+
+	location += gzExtension
+
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+		Body:   bytes.NewBuffer(compressed),
+	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to save frame: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(BeaconBlockDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBlockDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BeaconBlockDataType), len(*data))
+
+	return location, err
+}
+
+func (s *S3Store) GetBeaconBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+	presignClient := s3.NewPresignClient(s.s3Client)
+
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBlockDataType))
+
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	if err != nil {
+		return "", err
+	}
+
+	return resp.URL, nil
+}
+
+func (s *S3Store) GetBeaconBlock(ctx context.Context, location string) (*[]byte, error) {
+	s.basicMetrics.ObserveCacheMiss(string(BeaconBlockDataType))
+
+	data, err := s.GetRaw(ctx, location)
+	if err != nil {
+		return nil, err
+	}
+
+	if !strings.Contains(location, gzExtension) {
+		b := data.Bytes()
+
+		return &b, nil
+	}
+
+	s.basicMetrics.ObserveItemRetreived(string(BeaconBlockDataType))
+
+	uncompressed, err := GzipDecompress(data.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return &uncompressed, nil
+}
+
+func (s *S3Store) DeleteBeaconBlock(ctx context.Context, location string) error {
+	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(location),
 	})
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
-			if apiErr.ErrorCode() == "NotFound" {
-				return false, nil
+			switch apiErr.(type) {
+			case *s3types.NotFound:
+				return ErrNotFound
+			default:
+				return errors.New("failed to delete: " + apiErr.Error())
 			}
 		}
-
-		return false, err
 	}
 
-	return true, nil
+	s.basicMetrics.ObserveItemRemoved(string(BeaconBlockDataType))
+
+	return err
+}
+
+func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, data *[]byte, location string) (string, error) {
+	compressed, err := GzipCompress(*data)
+	if err != nil {
+		return "", err
+	}
+
+	location += gzExtension
+
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+		Body:   bytes.NewBuffer(compressed),
+	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to save frame: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(BeaconBadBlockDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlockDataType), len(compressed))
+	s.basicMetrics.ObserveItemAddedBytesUncompressed(string(BeaconBadBlockDataType), len(*data))
+
+	return location, err
+}
+
+func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+	presignClient := s3.NewPresignClient(s.s3Client)
+
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlockDataType))
+
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	if err != nil {
+		return "", err
+	}
+
+	return resp.URL, nil
+}
+
+func (s *S3Store) GetBeaconBadBlock(ctx context.Context, location string) (*[]byte, error) {
+	s.basicMetrics.ObserveCacheMiss(string(BeaconBadBlockDataType))
+
+	data, err := s.GetRaw(ctx, location)
+	if err != nil {
+		return nil, err
+	}
+
+	if !strings.Contains(location, gzExtension) {
+		b := data.Bytes()
+
+		return &b, nil
+	}
+
+	s.basicMetrics.ObserveItemRetreived(string(BeaconBadBlockDataType))
+
+	uncompressed, err := GzipDecompress(data.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return &uncompressed, nil
+}
+
+func (s *S3Store) DeleteBeaconBadBlock(ctx context.Context, location string) error {
+	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NotFound:
+				return ErrNotFound
+			default:
+				return errors.New("failed to delete: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemRemoved(string(BeaconBadBlockDataType))
+
+	return err
 }
 
 func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error) {

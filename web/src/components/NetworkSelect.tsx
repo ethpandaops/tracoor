@@ -28,6 +28,8 @@ export default function NetworkSelect({ networks: origNetworks }: { networks?: s
     }
   }, [networks, currentNetwork, setNetwork]);
 
+  if (!currentNetwork) return null;
+
   return (
     <Listbox value={currentNetwork} onChange={setNetwork}>
       {({ open }) => (

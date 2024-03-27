@@ -9,6 +9,8 @@ type Config struct {
 	NodeHeaders map[string]string `yaml:"nodeHeaders"`
 	// BeaconSubscriptions is a list of beacon subscriptions to subscribe to.
 	BeaconSubscriptions *[]string `yaml:"beaconSubscriptions"`
+	// InvalidGossipVerifiedBlocksPath is the path to watch for invalid gossip verified blocks from the beacon node.
+	InvalidGossipVerifiedBlocksPath *string `yaml:"invalidGossipVerifiedBlocksPath"`
 }
 
 func (c *Config) Validate() error {

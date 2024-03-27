@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, SyntheticEvent, ChangeEvent } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
 
 import {
   ControllerRenderProps,
@@ -29,7 +29,7 @@ function DebouncedTextField<TName extends string>({
   wait = 500,
   ...props
 }: Props<TName>) {
-  const { field, formState } = controllerProps;
+  const { field } = controllerProps;
   const [innerValue, setInnerValue] = useState('');
 
   useEffect(() => {

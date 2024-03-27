@@ -23,6 +23,38 @@ func CreateBeaconStateFileName(
 	)
 }
 
+func CreateBeaconBlockFileName(
+	node string,
+	network string,
+	slot phase0.Slot,
+	blockRoot string,
+) string {
+	return path.Join(
+		"beacon_blocks",
+		network,
+		"slots",
+		fmt.Sprintf("%d", slot),
+		node,
+		blockRoot,
+	)
+}
+
+func CreateBeaconBadBlockFileName(
+	node string,
+	network string,
+	slot phase0.Slot,
+	blockRoot string,
+) string {
+	return path.Join(
+		"beacon_bad_blocks",
+		network,
+		"slots",
+		fmt.Sprintf("%d", slot),
+		node,
+		blockRoot,
+	)
+}
+
 func CreateExecutionBlockTraceFileName(
 	node string,
 	network string,

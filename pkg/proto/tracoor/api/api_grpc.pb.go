@@ -22,6 +22,12 @@ const (
 	API_ListBeaconState_FullMethodName                     = "/api.API/ListBeaconState"
 	API_CountBeaconState_FullMethodName                    = "/api.API/CountBeaconState"
 	API_ListUniqueBeaconStateValues_FullMethodName         = "/api.API/ListUniqueBeaconStateValues"
+	API_ListBeaconBlock_FullMethodName                     = "/api.API/ListBeaconBlock"
+	API_CountBeaconBlock_FullMethodName                    = "/api.API/CountBeaconBlock"
+	API_ListUniqueBeaconBlockValues_FullMethodName         = "/api.API/ListUniqueBeaconBlockValues"
+	API_ListBeaconBadBlock_FullMethodName                  = "/api.API/ListBeaconBadBlock"
+	API_CountBeaconBadBlock_FullMethodName                 = "/api.API/CountBeaconBadBlock"
+	API_ListUniqueBeaconBadBlockValues_FullMethodName      = "/api.API/ListUniqueBeaconBadBlockValues"
 	API_ListExecutionBlockTrace_FullMethodName             = "/api.API/ListExecutionBlockTrace"
 	API_CountExecutionBlockTrace_FullMethodName            = "/api.API/CountExecutionBlockTrace"
 	API_ListUniqueExecutionBlockTraceValues_FullMethodName = "/api.API/ListUniqueExecutionBlockTraceValues"
@@ -37,6 +43,12 @@ type APIClient interface {
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
 	CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
+	ListBeaconBlock(ctx context.Context, in *ListBeaconBlockRequest, opts ...grpc.CallOption) (*ListBeaconBlockResponse, error)
+	CountBeaconBlock(ctx context.Context, in *CountBeaconBlockRequest, opts ...grpc.CallOption) (*CountBeaconBlockResponse, error)
+	ListUniqueBeaconBlockValues(ctx context.Context, in *ListUniqueBeaconBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconBlockValuesResponse, error)
+	ListBeaconBadBlock(ctx context.Context, in *ListBeaconBadBlockRequest, opts ...grpc.CallOption) (*ListBeaconBadBlockResponse, error)
+	CountBeaconBadBlock(ctx context.Context, in *CountBeaconBadBlockRequest, opts ...grpc.CallOption) (*CountBeaconBadBlockResponse, error)
+	ListUniqueBeaconBadBlockValues(ctx context.Context, in *ListUniqueBeaconBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconBadBlockValuesResponse, error)
 	ListExecutionBlockTrace(ctx context.Context, in *ListExecutionBlockTraceRequest, opts ...grpc.CallOption) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(ctx context.Context, in *CountExecutionBlockTraceRequest, opts ...grpc.CallOption) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(ctx context.Context, in *ListUniqueExecutionBlockTraceValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBlockTraceValuesResponse, error)
@@ -74,6 +86,60 @@ func (c *aPIClient) CountBeaconState(ctx context.Context, in *CountBeaconStateRe
 func (c *aPIClient) ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error) {
 	out := new(ListUniqueBeaconStateValuesResponse)
 	err := c.cc.Invoke(ctx, API_ListUniqueBeaconStateValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListBeaconBlock(ctx context.Context, in *ListBeaconBlockRequest, opts ...grpc.CallOption) (*ListBeaconBlockResponse, error) {
+	out := new(ListBeaconBlockResponse)
+	err := c.cc.Invoke(ctx, API_ListBeaconBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) CountBeaconBlock(ctx context.Context, in *CountBeaconBlockRequest, opts ...grpc.CallOption) (*CountBeaconBlockResponse, error) {
+	out := new(CountBeaconBlockResponse)
+	err := c.cc.Invoke(ctx, API_CountBeaconBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListUniqueBeaconBlockValues(ctx context.Context, in *ListUniqueBeaconBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconBlockValuesResponse, error) {
+	out := new(ListUniqueBeaconBlockValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueBeaconBlockValues_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListBeaconBadBlock(ctx context.Context, in *ListBeaconBadBlockRequest, opts ...grpc.CallOption) (*ListBeaconBadBlockResponse, error) {
+	out := new(ListBeaconBadBlockResponse)
+	err := c.cc.Invoke(ctx, API_ListBeaconBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) CountBeaconBadBlock(ctx context.Context, in *CountBeaconBadBlockRequest, opts ...grpc.CallOption) (*CountBeaconBadBlockResponse, error) {
+	out := new(CountBeaconBadBlockResponse)
+	err := c.cc.Invoke(ctx, API_CountBeaconBadBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aPIClient) ListUniqueBeaconBadBlockValues(ctx context.Context, in *ListUniqueBeaconBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconBadBlockValuesResponse, error) {
+	out := new(ListUniqueBeaconBadBlockValuesResponse)
+	err := c.cc.Invoke(ctx, API_ListUniqueBeaconBadBlockValues_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +207,12 @@ type APIServer interface {
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
 	CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
+	ListBeaconBlock(context.Context, *ListBeaconBlockRequest) (*ListBeaconBlockResponse, error)
+	CountBeaconBlock(context.Context, *CountBeaconBlockRequest) (*CountBeaconBlockResponse, error)
+	ListUniqueBeaconBlockValues(context.Context, *ListUniqueBeaconBlockValuesRequest) (*ListUniqueBeaconBlockValuesResponse, error)
+	ListBeaconBadBlock(context.Context, *ListBeaconBadBlockRequest) (*ListBeaconBadBlockResponse, error)
+	CountBeaconBadBlock(context.Context, *CountBeaconBadBlockRequest) (*CountBeaconBadBlockResponse, error)
+	ListUniqueBeaconBadBlockValues(context.Context, *ListUniqueBeaconBadBlockValuesRequest) (*ListUniqueBeaconBadBlockValuesResponse, error)
 	ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error)
 	CountExecutionBlockTrace(context.Context, *CountExecutionBlockTraceRequest) (*CountExecutionBlockTraceResponse, error)
 	ListUniqueExecutionBlockTraceValues(context.Context, *ListUniqueExecutionBlockTraceValuesRequest) (*ListUniqueExecutionBlockTraceValuesResponse, error)
@@ -162,6 +234,24 @@ func (UnimplementedAPIServer) CountBeaconState(context.Context, *CountBeaconStat
 }
 func (UnimplementedAPIServer) ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconStateValues not implemented")
+}
+func (UnimplementedAPIServer) ListBeaconBlock(context.Context, *ListBeaconBlockRequest) (*ListBeaconBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconBlock not implemented")
+}
+func (UnimplementedAPIServer) CountBeaconBlock(context.Context, *CountBeaconBlockRequest) (*CountBeaconBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountBeaconBlock not implemented")
+}
+func (UnimplementedAPIServer) ListUniqueBeaconBlockValues(context.Context, *ListUniqueBeaconBlockValuesRequest) (*ListUniqueBeaconBlockValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconBlockValues not implemented")
+}
+func (UnimplementedAPIServer) ListBeaconBadBlock(context.Context, *ListBeaconBadBlockRequest) (*ListBeaconBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconBadBlock not implemented")
+}
+func (UnimplementedAPIServer) CountBeaconBadBlock(context.Context, *CountBeaconBadBlockRequest) (*CountBeaconBadBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountBeaconBadBlock not implemented")
+}
+func (UnimplementedAPIServer) ListUniqueBeaconBadBlockValues(context.Context, *ListUniqueBeaconBadBlockValuesRequest) (*ListUniqueBeaconBadBlockValuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUniqueBeaconBadBlockValues not implemented")
 }
 func (UnimplementedAPIServer) ListExecutionBlockTrace(context.Context, *ListExecutionBlockTraceRequest) (*ListExecutionBlockTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListExecutionBlockTrace not implemented")
@@ -244,6 +334,114 @@ func _API_ListUniqueBeaconStateValues_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(APIServer).ListUniqueBeaconStateValues(ctx, req.(*ListUniqueBeaconStateValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListBeaconBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBeaconBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListBeaconBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListBeaconBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListBeaconBlock(ctx, req.(*ListBeaconBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_CountBeaconBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountBeaconBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).CountBeaconBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_CountBeaconBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).CountBeaconBlock(ctx, req.(*CountBeaconBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListUniqueBeaconBlockValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueBeaconBlockValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListUniqueBeaconBlockValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListUniqueBeaconBlockValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListUniqueBeaconBlockValues(ctx, req.(*ListUniqueBeaconBlockValuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListBeaconBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBeaconBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListBeaconBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListBeaconBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListBeaconBadBlock(ctx, req.(*ListBeaconBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_CountBeaconBadBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountBeaconBadBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).CountBeaconBadBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_CountBeaconBadBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).CountBeaconBadBlock(ctx, req.(*CountBeaconBadBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _API_ListUniqueBeaconBadBlockValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUniqueBeaconBadBlockValuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).ListUniqueBeaconBadBlockValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_ListUniqueBeaconBadBlockValues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).ListUniqueBeaconBadBlockValues(ctx, req.(*ListUniqueBeaconBadBlockValuesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -374,6 +572,30 @@ var API_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUniqueBeaconStateValues",
 			Handler:    _API_ListUniqueBeaconStateValues_Handler,
+		},
+		{
+			MethodName: "ListBeaconBlock",
+			Handler:    _API_ListBeaconBlock_Handler,
+		},
+		{
+			MethodName: "CountBeaconBlock",
+			Handler:    _API_CountBeaconBlock_Handler,
+		},
+		{
+			MethodName: "ListUniqueBeaconBlockValues",
+			Handler:    _API_ListUniqueBeaconBlockValues_Handler,
+		},
+		{
+			MethodName: "ListBeaconBadBlock",
+			Handler:    _API_ListBeaconBadBlock_Handler,
+		},
+		{
+			MethodName: "CountBeaconBadBlock",
+			Handler:    _API_CountBeaconBadBlock_Handler,
+		},
+		{
+			MethodName: "ListUniqueBeaconBadBlockValues",
+			Handler:    _API_ListUniqueBeaconBadBlockValues_Handler,
 		},
 		{
 			MethodName: "ListExecutionBlockTrace",

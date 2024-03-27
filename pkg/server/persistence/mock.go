@@ -26,7 +26,7 @@ func NewMockIndexer() (*Indexer, sqlmock.Sqlmock, error) {
 	testDBCounter++
 
 	indexer, err := NewIndexer("indexer_test", logrus.New(), Config{
-		DSN:        fmt.Sprintf("file:%v?mode=memory&cache=shared", testDBCounter),
+		DSN:        fmt.Sprintf("file:%v?mode=memory&cache=private", testDBCounter),
 		DriverName: "sqlite",
 	}, DefaultOptions().SetMetricsEnabled(false))
 	if err != nil {

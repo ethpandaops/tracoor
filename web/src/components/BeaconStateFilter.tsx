@@ -1,8 +1,8 @@
 import { useFormContext, Controller } from 'react-hook-form';
 
+import Alert from '@components/Alert';
 import { CustomCombobox } from '@components/Combobox';
 import DebouncedInput from '@components/DebouncedInput';
-import ErrorAlert from '@components/ErrorAlert';
 import { useUniqueBeaconStateValues } from '@hooks/useQuery';
 
 export default function FilterForm() {
@@ -21,7 +21,7 @@ export default function FilterForm() {
     if (typeof error === 'string') {
       message = error;
     }
-    errorComp = <ErrorAlert message={message} />;
+    errorComp = <Alert type="error" message={message} />;
   }
 
   return (

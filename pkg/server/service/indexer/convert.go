@@ -39,6 +39,66 @@ func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.Beaco
 	}
 }
 
+func ProtoBeaconBlockToDBBeaconBlock(bs *indexer.BeaconBlock) *persistence.BeaconBlock {
+	return &persistence.BeaconBlock{
+		ID:                   bs.GetId().GetValue(),
+		Node:                 bs.GetNode().GetValue(),
+		Slot:                 int64(bs.GetSlot().GetValue()),
+		Epoch:                int64(bs.GetEpoch().GetValue()),
+		BlockRoot:            bs.GetBlockRoot().GetValue(),
+		FetchedAt:            bs.GetFetchedAt().AsTime(),
+		NodeVersion:          bs.GetNodeVersion().GetValue(),
+		Location:             bs.GetLocation().GetValue(),
+		Network:              bs.GetNetwork().GetValue(),
+		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
+	}
+}
+
+func DBBeaconBlockToProtoBeaconBlock(bs *persistence.BeaconBlock) *indexer.BeaconBlock {
+	return &indexer.BeaconBlock{
+		Id:                   &wrapperspb.StringValue{Value: bs.ID},
+		Node:                 &wrapperspb.StringValue{Value: bs.Node},
+		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
+		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
+		FetchedAt:            timestamppb.New(bs.FetchedAt),
+		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
+		Location:             &wrapperspb.StringValue{Value: bs.Location},
+		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
+	}
+}
+
+func ProtoBeaconBadBlockToDBBeaconBadBlock(bs *indexer.BeaconBadBlock) *persistence.BeaconBadBlock {
+	return &persistence.BeaconBadBlock{
+		ID:                   bs.GetId().GetValue(),
+		Node:                 bs.GetNode().GetValue(),
+		Slot:                 int64(bs.GetSlot().GetValue()),
+		Epoch:                int64(bs.GetEpoch().GetValue()),
+		BlockRoot:            bs.GetBlockRoot().GetValue(),
+		FetchedAt:            bs.GetFetchedAt().AsTime(),
+		NodeVersion:          bs.GetNodeVersion().GetValue(),
+		Location:             bs.GetLocation().GetValue(),
+		Network:              bs.GetNetwork().GetValue(),
+		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
+	}
+}
+
+func DBBeaconBadBlockToProtoBeaconBadBlock(bs *persistence.BeaconBadBlock) *indexer.BeaconBadBlock {
+	return &indexer.BeaconBadBlock{
+		Id:                   &wrapperspb.StringValue{Value: bs.ID},
+		Node:                 &wrapperspb.StringValue{Value: bs.Node},
+		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
+		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
+		FetchedAt:            timestamppb.New(bs.FetchedAt),
+		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
+		Location:             &wrapperspb.StringValue{Value: bs.Location},
+		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
+	}
+}
+
 func ProtoExecutionBlockTraceToDBExecutionBlockTrace(eb *indexer.ExecutionBlockTrace) *persistence.ExecutionBlockTrace {
 	return &persistence.ExecutionBlockTrace{
 		BlockHash:               eb.GetBlockHash().GetValue(),

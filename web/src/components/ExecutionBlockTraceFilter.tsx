@@ -1,8 +1,8 @@
 import { useFormContext, Controller } from 'react-hook-form';
 
+import Alert from '@components/Alert';
 import { CustomCombobox } from '@components/Combobox';
 import DebouncedInput from '@components/DebouncedInput';
-import ErrorAlert from '@components/ErrorAlert';
 import { useUniqueExecutionBlockTraceValues } from '@hooks/useQuery';
 
 export default function FilterForm() {
@@ -21,7 +21,7 @@ export default function FilterForm() {
     if (typeof error === 'string') {
       message = error;
     }
-    errorComp = <ErrorAlert message={message} />;
+    errorComp = <Alert type="error" message={message} />;
   }
 
   return (
@@ -86,7 +86,7 @@ export default function FilterForm() {
         <CustomCombobox
           name="executionBlockTraceNodeImplementation"
           disabled={isLoading || Boolean(error) || !data}
-          label="Beacon Node Implementation"
+          label="Execution Implementation"
           items={data?.execution_implementation ?? []}
           itemToString={(item) => item}
         />
@@ -95,7 +95,7 @@ export default function FilterForm() {
         <CustomCombobox
           name="executionBlockTraceNodeVersion"
           disabled={isLoading || Boolean(error) || !data}
-          label="Beacon Node Version"
+          label="Execution Node Version"
           items={data?.node_version ?? []}
           itemToString={(item) => item}
         />

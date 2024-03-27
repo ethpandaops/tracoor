@@ -1,8 +1,7 @@
 <img align="left" src="./web/src/assets//logo.png" width="88">
 <h1>Tracoor</h1>
 
-
-TODO
+Tracoor captures, stores and makes available beacon states, beacon blocks, execution debug traces, execution bad blocks and invalid gossiped verified blocks.
 
 ----------
 
@@ -13,7 +12,10 @@ TODO
   <a href="https://tracoor.mainnet.ethpandaops.io" target="_blank">Mainnet</a>
 </p>
 <p align="center">
-  <a href="https://tracoor.goerli.ethpandaops.io" target="_blank">Goerli</a>
+  <a href="https://tracoor.holesky.ethpandaops.io" target="_blank">Holesky</a>
+</p>
+<p align="center">
+  <a href="https://tracoor.sepolia.ethpandaops.io" target="_blank">Sepolia</a>
 </p>
 
 ----------
@@ -21,13 +23,14 @@ TODO
 
 * [Features](#features)
 - [Usage](#usage) 
-  * [Configuration](#configuration)
-  * [Getting Started](#getting-started)
-    + [Download a release](#download-a-release)
-    + [Docker](#docker)
-      - [Images](#images)
-    + [Kubernetes via Helm](#kubernetes-via-helm)
-    + [Building yourself](#building-yourself)
+  * [Server](#server)
+  * [Agent](#agent)
+- [Getting Started](#getting-started)
+  * [Download a release](#download-a-release)
+  * [Docker](#docker)
+    + [Images](#images)
+  * [Kubernetes via Helm](#kubernetes-via-helm)
+  * [Building yourself](#building-yourself)
 * [Contributing](#contributing)
   + [Running locally](#running-locally)
     - [Backend](#backend)
@@ -54,22 +57,42 @@ TODO
 
 ### Indexing
 
-* [x] Sqlite
 * [x] Postgres
 
 ## Usage
 
-Tracoor requires a config file. An example file can be found [here](https://github.com/ethpandaops/tracoor/blob/master/example_config.yaml).
+Tracoor has two components, a server and an agent. The server has a web interface and serves the data captured by the agent. The agent captures data from the Ethereum Beacon Node and Ethereum Execution Node.
+
+### Server
+
+Tracoor server requires a config file. An example file can be found [here](https://github.com/ethpandaops/tracoor/blob/master/example_server_config.yaml).
 
 ```bash
-tracoor - fetches and serves Ethereum fork choice data
+Runs tracoor in Server mode, which means it will listen to gRPC requests from
+	tracoor agent nodes and forward the data on to the configured sinks.
 
 Usage:
-  tracoor [flags]
+  tracoor server [flags]
 
 Flags:
-      --config string   config file (default is config.yaml) (default "config.yaml")
-  -h, --help            help for tracoor
+      --config string   config file (default is server.yaml) (default "server.yaml")
+  -h, --help            help for server
+```
+
+### Agent
+
+Tracoor agent requires a config file. An example file can be found [here](https://github.com/ethpandaops/tracoor/blob/master/example_agent_config.yaml).
+
+```bash
+Runs tracoor in agent mode, which means it will listen for events from
+	an Ethereum beacon node and forward the data on to 	the configured sinks.
+
+Usage:
+  tracoor agent [flags]
+
+Flags:
+      --config string   config file (default is agent.yaml) (default "agent.yaml")
+  -h, --help            help for agent
 ```
 
 ## Getting Started

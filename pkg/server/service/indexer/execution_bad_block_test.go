@@ -92,6 +92,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomExecutionBadBlockRequest()
+
 		rsp, err := index.CreateExecutionBadBlock(ctx, req)
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)

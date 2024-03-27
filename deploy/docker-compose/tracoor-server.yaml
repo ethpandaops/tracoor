@@ -12,7 +12,9 @@ persistence:
 services:
   indexer:
     retention:
-      beaconStates: 1m
+      beaconStates: 30m
+      beaconBlocks: 30m
+      executionBlockTrace: 30m
 
 store:
   type: s3

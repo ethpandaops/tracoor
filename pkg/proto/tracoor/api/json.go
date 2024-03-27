@@ -14,11 +14,12 @@ func (f ListUniqueBeaconStateValuesRequest_Field) MarshalJSON() ([]byte, error) 
 func (f *ListUniqueBeaconStateValuesRequest_Field) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("Field should be a string, got %s", data)
+		return fmt.Errorf("field should be a string, got %s", data)
 	}
 
 	if val, ok := ListUniqueBeaconStateValuesRequest_Field_value[s]; ok {
 		*f = ListUniqueBeaconStateValuesRequest_Field(val)
+
 		return nil
 	}
 
@@ -28,11 +29,12 @@ func (f *ListUniqueBeaconStateValuesRequest_Field) UnmarshalJSON(data []byte) er
 func (f *ListUniqueExecutionBlockTraceValuesRequest_Field) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("Field should be a string, got %s", data)
+		return fmt.Errorf("field should be a string, got %s", data)
 	}
 
 	if val, ok := ListUniqueExecutionBlockTraceValuesRequest_Field_value[s]; ok {
 		*f = ListUniqueExecutionBlockTraceValuesRequest_Field(val)
+
 		return nil
 	}
 
@@ -46,11 +48,12 @@ func (f ListUniqueExecutionBlockTraceValuesRequest_Field) MarshalJSON() ([]byte,
 func (f *ListUniqueExecutionBadBlockValuesRequest_Field) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("Field should be a string, got %s", data)
+		return fmt.Errorf("field should be a string, got %s", data)
 	}
 
 	if val, ok := ListUniqueExecutionBadBlockValuesRequest_Field_value[s]; ok {
 		*f = ListUniqueExecutionBadBlockValuesRequest_Field(val)
+
 		return nil
 	}
 
