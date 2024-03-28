@@ -209,6 +209,82 @@ func (r *ListUniqueBeaconBadBlockValuesRequest) Validate() error {
 	return nil
 }
 
+func (s *BeaconBadBlob) Validate() error {
+	if s == nil {
+		return errors.New("beacon bad block is nil")
+	}
+
+	if s.GetEpoch() == nil {
+		return errors.New("epoch is required")
+	}
+
+	if s.GetSlot() == nil {
+		return errors.New("slot is required")
+	}
+
+	if s.GetBlockRoot().Value == "" {
+		return errors.New("block root is required")
+	}
+
+	if s.GetId() == nil {
+		return errors.New("id is required")
+	}
+
+	if s.GetBeaconImplementation().GetValue() == "" {
+		return errors.New("beacon implementation is required")
+	}
+
+	if s.GetIndex() == nil {
+		return errors.New("index is required")
+	}
+
+	return nil
+}
+
+func (req *CreateBeaconBadBlobRequest) Validate() error {
+	if req.GetLocation().GetValue() == "" {
+		return fmt.Errorf("location is required")
+	}
+
+	if req.GetNode().GetValue() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if req.Epoch == nil {
+		return fmt.Errorf("epoch is required")
+	}
+
+	if req.Slot == nil {
+		return fmt.Errorf("slot is required")
+	}
+
+	if req.GetBlockRoot().Value == "" {
+		return fmt.Errorf("block root is required")
+	}
+
+	if req.GetBeaconImplementation().Value == "" {
+		return fmt.Errorf("beacon implementation is required")
+	}
+
+	if req.Index == nil {
+		return fmt.Errorf("index is required")
+	}
+
+	return nil
+}
+
+func (r *ListUniqueBeaconBadBlobValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}
+
 func (req *GetStorageHandshakeTokenRequest) Validate() error {
 	if req.GetNode() == "" {
 		return fmt.Errorf("node is required")

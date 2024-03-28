@@ -34,6 +34,16 @@ http:
       post: /v1/api/count-beacon-bad-block
       body: "*"
 
+    - selector: api.API.ListBeaconBadBlob
+      post: /v1/api/list-beacon-bad-blob
+      body: "*"
+    - selector: api.API.ListUniqueBeaconBadBlobValues
+      post: /v1/api/list-unique-beacon-bad-blob-values
+      body: "*"
+    - selector: api.API.CountBeaconBadBlob
+      post: /v1/api/count-beacon-bad-blob
+      body: "*"
+
     - selector: api.API.ListExecutionBlockTrace
       post: /v1/api/list-execution-block-trace
       body: "*"

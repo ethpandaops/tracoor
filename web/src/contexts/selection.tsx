@@ -14,6 +14,7 @@ export enum Selection {
   beacon_state = 'beacon_state',
   beacon_block = 'beacon_block',
   beacon_bad_block = 'beacon_bad_block',
+  beacon_bad_blob = 'beacon_bad_blob',
   execution_block_trace = 'execution_block_trace',
   execution_bad_block = 'execution_bad_block',
   go_evm_lab_diff = 'go_evm_lab_diff',

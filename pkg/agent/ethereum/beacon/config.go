@@ -11,6 +11,8 @@ type Config struct {
 	BeaconSubscriptions *[]string `yaml:"beaconSubscriptions"`
 	// InvalidGossipVerifiedBlocksPath is the path to watch for invalid gossip verified blocks from the beacon node.
 	InvalidGossipVerifiedBlocksPath *string `yaml:"invalidGossipVerifiedBlocksPath"`
+	// InvalidGossipVerifiedBlobsPath is the path to watch for invalid gossip verified blobs from the beacon node.
+	InvalidGossipVerifiedBlobsPath *string `yaml:"invalidGossipVerifiedBlobsPath"`
 }
 
 func (c *Config) Validate() error {

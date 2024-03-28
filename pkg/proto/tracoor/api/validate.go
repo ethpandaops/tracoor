@@ -35,6 +35,16 @@ func (r *ListBeaconBadBlockRequest) Validate() error {
 	return nil
 }
 
+func (r *ListBeaconBadBlobRequest) Validate() error {
+	if r.Pagination != nil {
+		if err := r.Pagination.Validate(); err != nil {
+			return fmt.Errorf("invalid pagination: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (r *ListExecutionBlockTraceRequest) Validate() error {
 	if r.Pagination != nil {
 		if err := r.Pagination.Validate(); err != nil {
@@ -88,6 +98,18 @@ func (r *ListUniqueBeaconBlockValuesRequest) Validate() error {
 }
 
 func (r *ListUniqueBeaconBadBlockValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}
+
+func (r *ListUniqueBeaconBadBlobValuesRequest) Validate() error {
 	if r == nil {
 		return errors.New("request is nil")
 	}

@@ -12,6 +12,7 @@ import {
   useUniqueBeaconStateValues,
   useUniqueBeaconBlockValues,
   useUniqueBeaconBadBlockValues,
+  useUniqueBeaconBadBlobValues,
   useUniqueExecutionBlockTraceValues,
   useUniqueExecutionBadBlockValues,
 } from '@hooks/useQuery';
@@ -19,7 +20,12 @@ import {
 const categories: { name: string; tabs: Selection[] }[] = [
   {
     name: 'Consensus Layer',
-    tabs: [Selection.beacon_state, Selection.beacon_block, Selection.beacon_bad_block],
+    tabs: [
+      Selection.beacon_state,
+      Selection.beacon_block,
+      Selection.beacon_bad_block,
+      Selection.beacon_bad_blob,
+    ],
   },
   {
     name: 'Execution Layer',
@@ -40,6 +46,7 @@ const tabs: { id: Selection; name: string }[] = [
   { id: Selection.beacon_state, name: 'Beacon states' },
   { id: Selection.beacon_block, name: 'Beacon blocks' },
   { id: Selection.beacon_bad_block, name: 'Beacon bad blocks' },
+  { id: Selection.beacon_bad_blob, name: 'Beacon bad blobs' },
   { id: Selection.execution_block_trace, name: 'Execution block traces' },
   { id: Selection.execution_bad_block, name: 'Execution bad blocks' },
   { id: Selection.go_evm_lab_diff, name: 'Go EVM lab diff' },
@@ -89,6 +96,12 @@ export default function Selector() {
   } = useUniqueBeaconBadBlockValues(['network'], currentSelection === Selection.beacon_bad_block);
 
   const {
+    data: beaconBadBlobData,
+    isLoading: beaconBadBlobIsLoading,
+    error: beaconBadBlobError,
+  } = useUniqueBeaconBadBlobValues(['network'], currentSelection === Selection.beacon_bad_blob);
+
+  const {
     data: executionBlockTraceData,
     isLoading: executionBlockTraceIsLoading,
     error: executionBlockTraceError,
@@ -123,6 +136,9 @@ export default function Selector() {
       case Selection.beacon_bad_block:
         if (currentSelection !== Selection.beacon_bad_block)
           setSelection(Selection.beacon_bad_block);
+        break;
+      case Selection.beacon_bad_blob:
+        if (currentSelection !== Selection.beacon_bad_blob) setSelection(Selection.beacon_bad_blob);
         break;
       case Selection.execution_block_trace:
         if (currentSelection !== Selection.execution_block_trace)
@@ -174,6 +190,11 @@ export default function Selector() {
       data = beaconBadBlockData?.network;
       error = beaconBadBlockError;
       isLoading = beaconBadBlockIsLoading;
+      break;
+    case Selection.beacon_bad_blob:
+      data = beaconBadBlobData?.network;
+      error = beaconBadBlobError;
+      isLoading = beaconBadBlobIsLoading;
       break;
     case Selection.execution_block_trace:
     case Selection.go_evm_lab_diff:

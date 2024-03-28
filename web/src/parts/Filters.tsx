@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import { useLocation } from 'wouter';
 
+import BeaconBadBlobFilter from '@components/BeaconBadBlobFilter';
 import BeaconBadBlockFilter from '@components/BeaconBadBlockFilter';
 import BeaconBlockFilter from '@components/BeaconBlockFilter';
 import BeaconStateFilter from '@components/BeaconStateFilter';
@@ -45,6 +46,13 @@ export default function FilterForm() {
     beaconBadBlockNode,
     beaconBadBlockNodeImplementation,
     beaconBadBlockNodeVersion,
+    beaconBadBlobSlot,
+    beaconBadBlobEpoch,
+    beaconBadBlobBlockRoot,
+    beaconBadBlobIndex,
+    beaconBadBlobNode,
+    beaconBadBlobNodeImplementation,
+    beaconBadBlobNodeVersion,
     executionBlockTraceBlockHash,
     executionBlockTraceBlockNumber,
     executionBlockTraceNode,
@@ -74,6 +82,13 @@ export default function FilterForm() {
     'beaconBadBlockNode',
     'beaconBadBlockNodeImplementation',
     'beaconBadBlockNodeVersion',
+    'beaconBadBlobSlot',
+    'beaconBadBlobEpoch',
+    'beaconBadBlobBlockRoot',
+    'beaconBadBlobIndex',
+    'beaconBadBlobNode',
+    'beaconBadBlobNodeImplementation',
+    'beaconBadBlobNodeVersion',
     'executionBlockTraceBlockHash',
     'executionBlockTraceBlockNumber',
     'executionBlockTraceNode',
@@ -124,6 +139,20 @@ export default function FilterForm() {
         beaconBadBlockNode ||
         beaconBadBlockNodeImplementation ||
         beaconBadBlockNodeVersion
+      ) {
+        hasFilters = true;
+      }
+      break;
+    case Selection.beacon_bad_blob:
+      form = <BeaconBadBlobFilter />;
+      if (
+        beaconBadBlobSlot ||
+        beaconBadBlobEpoch ||
+        beaconBadBlobBlockRoot ||
+        beaconBadBlobIndex ||
+        beaconBadBlobNode ||
+        beaconBadBlobNodeImplementation ||
+        beaconBadBlobNodeVersion
       ) {
         hasFilters = true;
       }
@@ -188,6 +217,18 @@ export default function FilterForm() {
         if (beaconBadBlockNodeVersion)
           queryParams.append('beaconBadBlockNodeVersion', beaconBadBlockNodeVersion);
         break;
+      case Selection.beacon_bad_blob:
+        if (beaconBadBlobSlot) queryParams.append('beaconBadBlobSlot', beaconBadBlobSlot);
+        if (beaconBadBlobEpoch) queryParams.append('beaconBadBlobEpoch', beaconBadBlobEpoch);
+        if (beaconBadBlobBlockRoot)
+          queryParams.append('beaconBadBlobBlockRoot', beaconBadBlobBlockRoot);
+        if (beaconBadBlobIndex) queryParams.append('beaconBadBlobIndex', beaconBadBlobIndex);
+        if (beaconBadBlobNode) queryParams.append('beaconBadBlobNode', beaconBadBlobNode);
+        if (beaconBadBlobNodeImplementation)
+          queryParams.append('beaconBadBlobNodeImplementation', beaconBadBlobNodeImplementation);
+        if (beaconBadBlobNodeVersion)
+          queryParams.append('beaconBadBlobNodeVersion', beaconBadBlobNodeVersion);
+        break;
       case Selection.execution_block_trace:
         if (executionBlockTraceBlockHash)
           queryParams.append('executionBlockTraceBlockHash', executionBlockTraceBlockHash);
@@ -245,6 +286,13 @@ export default function FilterForm() {
     beaconBadBlockNode,
     beaconBadBlockNodeImplementation,
     beaconBadBlockNodeVersion,
+    beaconBadBlobSlot,
+    beaconBadBlobEpoch,
+    beaconBadBlobBlockRoot,
+    beaconBadBlobIndex,
+    beaconBadBlobNode,
+    beaconBadBlobNodeImplementation,
+    beaconBadBlobNodeVersion,
     executionBlockTraceBlockHash,
     executionBlockTraceBlockNumber,
     executionBlockTraceNode,
@@ -284,6 +332,15 @@ export default function FilterForm() {
         setValue('beaconBadBlockNode', null);
         setValue('beaconBadBlockNodeImplementation', null);
         setValue('beaconBadBlockNodeVersion', null);
+        break;
+      case Selection.beacon_bad_blob:
+        setValue('beaconBadBlobSlot', '');
+        setValue('beaconBadBlobEpoch', '');
+        setValue('beaconBadBlobBlockRoot', '');
+        setValue('beaconBadBlobIndex', '');
+        setValue('beaconBadBlobNode', null);
+        setValue('beaconBadBlobNodeImplementation', null);
+        setValue('beaconBadBlobNodeVersion', null);
         break;
       case Selection.execution_block_trace:
         setValue('executionBlockTraceBlockHash', '');

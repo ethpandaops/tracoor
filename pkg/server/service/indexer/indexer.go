@@ -860,6 +860,275 @@ func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *index
 	return response, nil
 }
 
+func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBeaconBadBlobRequest) (*indexer.CreateBeaconBadBlobResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Check the store for the bad blob
+	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField("location", req.GetLocation().GetValue()).
+			WithField("node", req.GetNode().GetValue()).
+			Error("Failed to index a beacon blob because the bad blob could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if exists {
+		// Check if the bad blob is already indexed
+		filter := &persistence.BeaconBadBlobFilter{}
+
+		filter.AddNetwork(req.GetNetwork().GetValue())
+		filter.AddSlot(req.GetSlot().GetValue())
+		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
+		filter.AddIndex(req.GetIndex().GetValue())
+		filter.AddNode(req.GetNode().GetValue())
+
+		badBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		if len(badBlobs) > 0 {
+			return nil, status.Error(codes.AlreadyExists, "beacon blob already indexed")
+		}
+	}
+
+	// Create the bad blob
+	badBlob := &indexer.BeaconBadBlob{
+		Id:                   wrapperspb.String(uuid.New().String()),
+		Node:                 req.GetNode(),
+		Network:              req.GetNetwork(),
+		Slot:                 req.GetSlot(),
+		Epoch:                req.GetEpoch(),
+		BlockRoot:            req.GetBlockRoot(),
+		NodeVersion:          req.GetNodeVersion(),
+		Location:             req.GetLocation(),
+		FetchedAt:            req.GetFetchedAt(),
+		BeaconImplementation: req.GetBeaconImplementation(),
+		Index:                req.GetIndex(),
+	}
+
+	if err := badBlob.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	logFields := logrus.Fields{
+		"node":                  req.GetNode().GetValue(),
+		"network":               req.GetNetwork().GetValue(),
+		"slot":                  req.GetSlot().GetValue(),
+		"epoch":                 req.GetEpoch().GetValue(),
+		"block_root":            req.GetBlockRoot().GetValue(),
+		"node_version":          req.GetNodeVersion().GetValue(),
+		"location":              req.GetLocation().GetValue(),
+		"fetched_at":            req.GetFetchedAt().AsTime(),
+		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+		"index":                 req.GetIndex().GetValue(),
+	}
+
+	if err := i.db.InsertBeaconBadBlob(ctx, ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob)); err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad blob")
+
+		return nil, status.Error(codes.Internal, "failed to index bad blob")
+	}
+
+	i.log.WithFields(logFields).WithField("id", badBlob.GetId().GetValue()).Debug("Indexed beacon blob")
+
+	return &indexer.CreateBeaconBadBlobResponse{
+		Id: badBlob.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeaconBadBlobRequest) (*indexer.ListBeaconBadBlobResponse, error) {
+	filter := &persistence.BeaconBadBlobFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	if req.Index != nil {
+		filter.AddIndex(req.Index.GetValue())
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	beaconBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoBeaconBadBlobs := make([]*indexer.BeaconBadBlob, len(beaconBlobs))
+	for i, badBlob := range beaconBlobs {
+		protoBeaconBadBlobs[i] = DBBeaconBadBlobToProtoBeaconBadBlob(badBlob)
+	}
+
+	return &indexer.ListBeaconBadBlobResponse{
+		BeaconBadBlobs: protoBeaconBadBlobs,
+	}, nil
+}
+
+func (i *Indexer) CountBeaconBadBlob(ctx context.Context, req *indexer.CountBeaconBadBlobRequest) (*indexer.CountBeaconBadBlobResponse, error) {
+	filter := &persistence.BeaconBadBlobFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	if req.Index != nil {
+		filter.AddIndex(req.Index.GetValue())
+	}
+
+	beaconBlobs, err := i.db.CountBeaconBadBlob(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountBeaconBadBlobResponse{
+		Count: wrapperspb.UInt64(uint64(beaconBlobs)),
+	}, nil
+}
+
+func (i *Indexer) ListUniqueBeaconBadBlobValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlobValuesRequest) (*indexer.ListUniqueBeaconBadBlobValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_NODE:
+			fields[idx] = "node"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_SLOT:
+			fields[idx] = "slot"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_EPOCH:
+			fields[idx] = "epoch"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_BLOCK_ROOT:
+			fields[idx] = "block_root"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_NODE_VERSION:
+			fields[idx] = "node_version"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_LOCATION:
+			fields[idx] = "location"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_NETWORK:
+			fields[idx] = "network"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_BEACON_IMPLEMENTATION:
+			fields[idx] = "beacon_implementation"
+		case indexer.ListUniqueBeaconBadBlobValuesRequest_INDEX:
+			fields[idx] = "index"
+		}
+	}
+
+	distinctValues, err := i.db.DistinctBeaconBadBlobValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueBeaconBadBlobValuesResponse{
+		Node:                 distinctValues.Node,
+		Slot:                 distinctValues.Slot,
+		Epoch:                distinctValues.Epoch,
+		BlockRoot:            distinctValues.BlockRoot,
+		NodeVersion:          distinctValues.NodeVersion,
+		Location:             distinctValues.Location,
+		Network:              distinctValues.Network,
+		BeaconImplementation: distinctValues.BeaconImplementation,
+		Index:                distinctValues.Index,
+	}
+
+	return response, nil
+}
+
 func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.CreateExecutionBlockTraceRequest) (*indexer.CreateExecutionBlockTraceResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

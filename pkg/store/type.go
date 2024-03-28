@@ -23,6 +23,7 @@ const (
 	BeaconStateDataType    DataType = "beacon_state"
 	BeaconBlockDataType    DataType = "beacon_block"
 	BeaconBadBlockDataType DataType = "beacon_bad_block"
+	BeaconBadBlobDataType  DataType = "beacon_bad_blob"
 	BlockTraceDataType     DataType = "execution_block_trace"
 	BadBlockDataType       DataType = "execution_bad_block"
 )

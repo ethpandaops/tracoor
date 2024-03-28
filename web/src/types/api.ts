@@ -34,6 +34,19 @@ export interface BeaconBadBlock {
   beacon_implementation: string;
 }
 
+export interface BeaconBadBlob {
+  id: string;
+  node: string;
+  fetched_at: string;
+  slot: number;
+  epoch: number;
+  block_root: string;
+  node_version: string;
+  network: string;
+  beacon_implementation: string;
+  index: number;
+}
+
 export interface ExecutionBlockTrace {
   id: string;
   node: string;
@@ -83,6 +96,16 @@ export type BeaconBadBlockField =
   | 'node_version'
   | 'network'
   | 'beacon_implementation';
+
+export type BeaconBadBlobField =
+  | 'node'
+  | 'slot'
+  | 'epoch'
+  | 'block_root'
+  | 'node_version'
+  | 'network'
+  | 'beacon_implementation'
+  | 'index';
 
 export type ExecutionBlockTraceField =
   | 'node'
@@ -204,6 +227,40 @@ export interface V1ListUniqueBeaconBadBlockValuesRequest {
   fields: BeaconBadBlockField[];
 }
 
+export interface V1ListBeaconBadBlobRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  index?: number;
+  pagination?: PaginationCursor;
+}
+
+export interface V1CountBeaconBadBlobRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  index?: number;
+  pagination?: PaginationCursor;
+}
+
+export interface V1ListUniqueBeaconBadBlobValuesRequest {
+  fields: BeaconBadBlobField[];
+}
+
 export interface V1ListExecutionBlockTraceRequest {
   node?: string;
   block_number?: number;
@@ -319,6 +376,25 @@ export interface V1ListUniqueBeaconBadBlockValuesResponse {
   node_version?: string[];
   network?: string[];
   beacon_implementation?: string[];
+}
+
+export interface V1ListBeaconBadBlobResponse {
+  beacon_bad_blobs?: BeaconBadBlob[];
+}
+
+export interface V1CountBeaconBadBlobResponse {
+  count?: number;
+}
+
+export interface V1ListUniqueBeaconBadBlobValuesResponse {
+  node?: string[];
+  slot?: number[];
+  epoch?: number[];
+  block_root?: string[];
+  node_version?: string[];
+  network?: string[];
+  beacon_implementation?: string[];
+  index?: number[];
 }
 
 export interface V1ListExecutionBlockTraceResponse {

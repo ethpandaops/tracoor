@@ -10,6 +10,19 @@ export interface Props {
   beaconStateNode?: string | null;
   beaconStateNodeImplementation?: string | null;
   beaconStateNodeVersion?: string | null;
+  beaconBadBlockSlot?: string;
+  beaconBadBlockEpoch?: string;
+  beaconBadBlockBlockRoot?: string;
+  beaconBadBlockNode?: string | null;
+  beaconBadBlockNodeImplementation?: string | null;
+  beaconBadBlockNodeVersion?: string | null;
+  beaconBadBlobSlot?: string;
+  beaconBadBlobEpoch?: string;
+  beaconBadBlobBlockRoot?: string;
+  beaconBadBlobIndex?: string;
+  beaconBadBlobNode?: string | null;
+  beaconBadBlobNodeImplementation?: string | null;
+  beaconBadBlobNodeVersion?: string | null;
   executionBlockTraceBlockHash?: string;
   executionBlockTraceBlockNumber?: string;
   executionBlockTraceNode?: string | null;
@@ -52,6 +65,19 @@ export default function Provider({ children }: Props) {
       beaconStateNode: queryParams.get('beaconStateNode') || null,
       beaconStateNodeImplementation: queryParams.get('beaconStateNodeImplementation') || null,
       beaconStateNodeVersion: queryParams.get('beaconStateNodeVersion') || null,
+      beaconBadBlockSlot: queryParams.get('beaconBadBlockSlot') || '',
+      beaconBadBlockEpoch: queryParams.get('beaconBadBlockEpoch') || '',
+      beaconBadBlockBlockRoot: queryParams.get('beaconBadBlockBlockRoot') || '',
+      beaconBadBlockNode: queryParams.get('beaconBadBlockNode') || '',
+      beaconBadBlockNodeImplementation: queryParams.get('beaconBadBlockNodeImplementation') || '',
+      beaconBadBlockNodeVersion: queryParams.get('beaconBadBlockNodeVersion') || '',
+      beaconBadBlobSlot: queryParams.get('beaconBadBlobSlot') || '',
+      beaconBadBlobEpoch: queryParams.get('beaconBadBlobEpoch') || '',
+      beaconBadBlobBlockRoot: queryParams.get('beaconBadBlobBlockRoot') || '',
+      beaconBadBlobIndex: queryParams.get('beaconBadBlobIndex') || '',
+      beaconBadBlobNode: queryParams.get('beaconBadBlobNode') || '',
+      beaconBadBlobNodeImplementation: queryParams.get('beaconBadBlobNodeImplementation') || '',
+      beaconBadBlobNodeVersion: queryParams.get('beaconBadBlobNodeVersion') || '',
       executionBlockTraceBlockHash: queryParams.get('executionBlockTraceBlockHash') || '',
       executionBlockTraceBlockNumber: queryParams.get('executionBlockTraceBlockNumber') || '',
       executionBlockTraceNode: queryParams.get('executionBlockTraceNode') || null,

@@ -338,7 +338,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 			})
 			if err != nil {
 				s.log.
-					WithField("block_root", blockRoot).
+					WithField("blockRoot", blockRoot).
 					WithField("slot", slot).
 					WithError(err).
 					Error("Failed to check if beacon bad block is already indexed")
@@ -346,7 +346,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 
 			if rsp != nil && len(rsp.BeaconBadBlocks) > 0 {
 				s.log.
-					WithField("block_root", blockRoot).
+					WithField("blockRoot", blockRoot).
 					WithField("slot", slot).
 					Debug("Beacon bad block already indexed")
 
@@ -400,7 +400,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				// Index the block
 				if _, err := s.indexer.CreateBeaconBadBlock(ctx, req); err != nil {
 					s.log.
-						WithField("block_root", blockRoot).
+						WithField("blockRoot", blockRoot).
 						WithField("slot", slot).
 						WithError(err).
 						Error("Failed to index beacon bad block")
@@ -427,6 +427,217 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 			}
 
 			s.log.WithField("filePath", filePath).Debug("Deleted beacon bad block")
+		}
+	}
+
+	return nil
+}
+
+func getBadBlobsFilePattern(client string) (*string, error) {
+	var pattern string
+
+	switch client {
+	case string(services.ClientPrysm):
+		pattern = `^blob_sidecar_([^.]+)_(\d+)_(\d+)\.ssz$`
+	default:
+		return nil, errors.New("client does not have bad blobs available")
+	}
+
+	return &pattern, nil
+}
+
+func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) error {
+	client := s.node.Beacon().Metadata().Client(ctx)
+
+	// Verify the path is a directory
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("path %s is not a directory", path)
+	}
+
+	pattern, err := getBadBlobsFilePattern(client)
+	if err != nil {
+		return err
+	}
+
+	matcher := regexp.MustCompile(*pattern)
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		matches := matcher.FindStringSubmatch(file.Name())
+		if len(matches) == 4 {
+			filePath := filepath.Join(path, file.Name())
+			// Parse 'slot', 'blockRoot' and 'index' from the file name
+			blockRoot := matches[1]
+
+			slotI, err := strconv.ParseUint(matches[2], 10, 64)
+			if err != nil {
+				s.log.
+					WithField("fileName", file.Name()).
+					WithField("filePath", filePath).
+					WithError(err).Error("Failed to parse slot from beacon bad blob file name")
+
+				continue
+			}
+
+			slot := phase0.Slot(slotI)
+
+			index, err := strconv.ParseUint(matches[3], 10, 64)
+			if err != nil {
+				s.log.
+					WithField("fileName", file.Name()).
+					WithField("filePath", filePath).
+					WithError(err).Error("Failed to parse index from beacon bad blob file name")
+
+				continue
+			}
+
+			// Read the file into the `blob` variable
+			blobRaw, err := os.ReadFile(filePath)
+			if err != nil {
+				s.log.
+					WithField("slot", slot).
+					WithField("blockRoot", blockRoot).
+					WithField("index", index).
+					WithField("filePath", filePath).
+					WithError(err).
+					Error("Failed to read beacon bad blob file")
+
+				continue
+			}
+
+			s.log.
+				WithField("slot", slot).
+				WithField("blockRoot", blockRoot).
+				WithField("index", index).
+				WithField("filePath", filePath).
+				Debug("Processing beacon bad block")
+
+			location := CreateBeaconBadBlobFileName(
+				s.Config.Name,
+				string(s.node.Beacon().Metadata().Network.Name),
+				slot,
+				blockRoot,
+				index,
+			)
+
+			location = fmt.Sprintf("%s.ssz", location)
+
+			exists := false
+
+			// Check if we've somehow already indexed this beacon bad blob
+			rsp, err := s.indexer.ListBeaconBadBlob(ctx, &indexer.ListBeaconBadBlobRequest{
+				Node:      s.Config.Name,
+				BlockRoot: blockRoot,
+				Slot:      slotI,
+				Index:     wrapperspb.UInt64(index),
+			})
+			if err != nil {
+				s.log.
+					WithField("index", index).
+					WithField("blockRoot", blockRoot).
+					WithField("slot", slot).
+					WithError(err).
+					Error("Failed to check if beacon bad blob is already indexed")
+			}
+
+			if rsp != nil && len(rsp.BeaconBadBlobs) > 0 {
+				s.log.
+					WithField("index", index).
+					WithField("blockRoot", blockRoot).
+					WithField("slot", slot).
+					Debug("Beacon bad blob already indexed")
+
+				exists = true
+			}
+
+			if !exists {
+				now := time.Now()
+
+				s.log.WithField("location", location).Debug("Saving beacon bad blob")
+
+				location, err = s.store.SaveBeaconBadBlob(ctx, &blobRaw, location)
+				if err != nil {
+					s.log.WithFields(logrus.Fields{
+						"slot":      slot,
+						"blockRoot": blockRoot,
+						"index":     index,
+						"filePath":  filePath,
+					}).WithError(err).Error("Failed to save beacon bad blob to store")
+
+					continue
+				}
+
+				// Sleep for 1s to give the store time to update
+				time.Sleep(1 * time.Second)
+
+				spec, err := s.node.Beacon().Node().Spec()
+				if err != nil {
+					s.log.
+						WithField("slot", slot).
+						WithField("blockRoot", blockRoot).
+						WithField("index", index).
+						WithField("filePath", filePath).
+						WithError(err).Error("Failed to fetch spec")
+
+					continue
+				}
+
+				req := &indexer.CreateBeaconBadBlobRequest{
+					Node:        wrapperspb.String(s.Config.Name),
+					Network:     wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
+					Slot:        wrapperspb.UInt64(uint64(slot)),
+					Epoch:       wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
+					BlockRoot:   wrapperspb.String(blockRoot),
+					Index:       wrapperspb.UInt64(index),
+					Location:    wrapperspb.String(location),
+					NodeVersion: wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
+					BeaconImplementation: wrapperspb.String(
+						s.node.Beacon().Metadata().Client(ctx),
+					),
+					FetchedAt: timestamppb.New(now),
+				}
+
+				// Index the blob
+				if _, err := s.indexer.CreateBeaconBadBlob(ctx, req); err != nil {
+					s.log.
+						WithField("blockRoot", blockRoot).
+						WithField("index", index).
+						WithField("slot", slot).
+						WithError(err).
+						Error("Failed to index beacon bad blob")
+
+					continue
+				}
+
+				s.metrics.IncrementItemExported(BeaconBadBlobQueue)
+
+				s.log.
+					WithField("blockRoot", blockRoot).
+					WithField("index", index).
+					WithField("slot", slot).
+					Debug("Indexed beacon bad block")
+			}
+
+			// Delete the file
+			if err := os.Remove(filePath); err != nil {
+				s.log.
+					WithField("filePath", filePath).
+					WithError(err).
+					Error("Failed to delete beacon bad blob")
+
+				continue
+			}
+
+			s.log.WithField("filePath", filePath).Debug("Deleted beacon bad blob")
 		}
 	}
 

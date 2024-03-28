@@ -23,6 +23,12 @@ const (
 	OperationListBeaconBadBlock   Operation = "list_beacon_bad_block_metadata"
 	OperationUpdateBeaconBadBlock Operation = "update_beacon_bad_block_metadata"
 
+	OperationInsertBeaconBadBlob Operation = "insert_beacon_bad_blob_metadata"
+	OperationDeleteBeaconBadBlob Operation = "delete_beacon_bad_blob_metadata"
+	OperationCountBeaconBadBlob  Operation = "count_beacon_bad_blob_metadata"
+	OperationListBeaconBadBlob   Operation = "list_beacon_bad_blob_metadata"
+	OperationUpdateBeaconBadBlob Operation = "update_beacon_bad_blob_metadata"
+
 	OperationInsertExecutionBlockTrace Operation = "insert_execution_block_trace"
 	OperationDeleteExecutionBlockTrace Operation = "delete_execution_block_trace"
 	OperationCountExecutionBlockTrace  Operation = "count_execution_block_trace"

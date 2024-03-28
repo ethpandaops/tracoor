@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 
 import {
+  fetchListUniqueBeaconBadBlobValues,
+  fetchListBeaconBadBlob,
+  fetchCountBeaconBadBlob,
+} from '@api/beaconBadBlob';
+import {
   fetchListUniqueBeaconBadBlockValues,
   fetchListBeaconBadBlock,
   fetchCountBeaconBadBlock,
@@ -27,7 +32,9 @@ import {
 } from '@api/executionBlockTrace';
 import {
   BeaconBadBlock,
+  BeaconBadBlob,
   BeaconBadBlockField,
+  BeaconBadBlobField,
   BeaconBlock,
   BeaconBlockField,
   BeaconState,
@@ -37,16 +44,19 @@ import {
   ExecutionBlockTrace,
   ExecutionBlockTraceField,
   V1CountBeaconBadBlockRequest,
+  V1CountBeaconBadBlobRequest,
   V1CountBeaconBlockRequest,
   V1CountBeaconStateRequest,
   V1CountExecutionBadBlockRequest,
   V1CountExecutionBlockTraceRequest,
   V1ListBeaconBadBlockRequest,
+  V1ListBeaconBadBlobRequest,
   V1ListBeaconBlockRequest,
   V1ListBeaconStateRequest,
   V1ListExecutionBadBlockRequest,
   V1ListExecutionBlockTraceRequest,
   V1ListUniqueBeaconBadBlockValuesResponse,
+  V1ListUniqueBeaconBadBlobValuesResponse,
   V1ListUniqueBeaconBlockValuesResponse,
   V1ListUniqueBeaconStateValuesResponse,
   V1ListUniqueExecutionBadBlockValuesResponse,
@@ -149,6 +159,38 @@ export function useUniqueBeaconBadBlockValues(fields: BeaconBadBlockField[], ena
   >({
     queryKey: ['list-unqiue-beacon-bad-block-values', fields],
     queryFn: () => fetchListUniqueBeaconBadBlockValues({ fields }),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useBeaconBadBlobs(request: V1ListBeaconBadBlobRequest, enabled = true) {
+  return useQuery<BeaconBadBlob[], unknown, BeaconBadBlob[], [string, V1ListBeaconBadBlobRequest]>({
+    queryKey: ['list-beacon-bad-blob', request],
+    queryFn: () => fetchListBeaconBadBlob(request),
+    enabled,
+    staleTime: 6_000,
+  });
+}
+
+export function useBeaconBadBlobsCount(request: V1CountBeaconBadBlobRequest, enabled = true) {
+  return useQuery<number, unknown, number, [string, V1CountBeaconBadBlobRequest]>({
+    queryKey: ['count-beacon-bad-blob', request],
+    queryFn: () => fetchCountBeaconBadBlob(request),
+    enabled,
+    staleTime: 6_000,
+  });
+}
+
+export function useUniqueBeaconBadBlobValues(fields: BeaconBadBlobField[], enabled = true) {
+  return useQuery<
+    V1ListUniqueBeaconBadBlobValuesResponse,
+    unknown,
+    V1ListUniqueBeaconBadBlobValuesResponse,
+    [string, BeaconBadBlobField[]]
+  >({
+    queryKey: ['list-unqiue-beacon-bad-blob-values', fields],
+    queryFn: () => fetchListUniqueBeaconBadBlobValues({ fields }),
     enabled,
     staleTime: 60_000,
   });

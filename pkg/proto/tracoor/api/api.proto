@@ -46,6 +46,20 @@ message BeaconBadBlock {
       [ json_name = "beacon_implementation" ];
 }
 
+message BeaconBadBlob {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3 [ json_name = "fetched_at" ];
+  google.protobuf.UInt64Value slot = 4;
+  google.protobuf.UInt64Value epoch = 5;
+  google.protobuf.StringValue block_root = 6 [ json_name = "block_root" ];
+  google.protobuf.StringValue node_version = 7 [ json_name = "node_version" ];
+  google.protobuf.StringValue network = 8;
+  google.protobuf.StringValue beacon_implementation = 9
+      [ json_name = "beacon_implementation" ];
+  google.protobuf.UInt64Value index = 10;
+}
+
 message ExecutionBlockTrace {
   google.protobuf.StringValue id = 1;
   google.protobuf.StringValue node = 2;
@@ -93,6 +107,13 @@ service API {
       returns (CountBeaconBadBlockResponse) {}
   rpc ListUniqueBeaconBadBlockValues(ListUniqueBeaconBadBlockValuesRequest)
       returns (ListUniqueBeaconBadBlockValuesResponse) {}
+
+  rpc ListBeaconBadBlob(ListBeaconBadBlobRequest)
+      returns (ListBeaconBadBlobResponse) {}
+  rpc CountBeaconBadBlob(CountBeaconBadBlobRequest)
+      returns (CountBeaconBadBlobResponse) {}
+  rpc ListUniqueBeaconBadBlobValues(ListUniqueBeaconBadBlobValuesRequest)
+      returns (ListUniqueBeaconBadBlobValuesResponse) {}
 
   rpc ListExecutionBlockTrace(ListExecutionBlockTraceRequest)
       returns (ListExecutionBlockTraceResponse) {}
@@ -290,6 +311,69 @@ message ListUniqueBeaconBadBlockValuesResponse {
   repeated string network = 6;
   repeated string beacon_implementation = 7
       [ json_name = "beacon_implementation" ];
+}
+
+message ListBeaconBadBlobRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4 [ json_name = "block_root" ];
+  string node_version = 5 [ json_name = "node_version" ];
+  string network = 6;
+  google.protobuf.Timestamp before = 7;
+  google.protobuf.Timestamp after = 8;
+
+  PaginationCursor pagination = 9;
+
+  string beacon_implementation = 10 [ json_name = "beacon_implementation" ];
+  string id = 11;
+  google.protobuf.UInt64Value index = 12;
+}
+
+message ListBeaconBadBlobResponse {
+  repeated BeaconBadBlob beacon_bad_blobs = 1
+      [ json_name = "beacon_bad_blobs" ];
+}
+
+message CountBeaconBadBlobRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4 [ json_name = "block_root" ];
+  string node_version = 5 [ json_name = "node_version" ];
+  string network = 6;
+  string beacon_implementation = 7 [ json_name = "beacon_implementation" ];
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+  google.protobuf.UInt64Value index = 10;
+}
+
+message CountBeaconBadBlobResponse { google.protobuf.UInt64Value count = 1; }
+
+message ListUniqueBeaconBadBlobValuesRequest {
+  enum Field {
+    node = 0;
+    slot = 1;
+    epoch = 2;
+    block_root = 3;
+    node_version = 4;
+    network = 5;
+    beacon_implementation = 6;
+    index = 7;
+  }
+  repeated Field fields = 1 [ json_name = "fields" ];
+}
+
+message ListUniqueBeaconBadBlobValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string block_root = 4 [ json_name = "block_root" ];
+  repeated string node_version = 5 [ json_name = "node_version" ];
+  repeated string network = 6;
+  repeated string beacon_implementation = 7
+      [ json_name = "beacon_implementation" ];
+  repeated uint64 index = 8;
 }
 
 message ListExecutionBlockTraceRequest {
