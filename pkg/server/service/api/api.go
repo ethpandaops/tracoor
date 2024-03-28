@@ -498,7 +498,7 @@ func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobR
 
 	resp, err := i.indexer.ListBeaconBadBlob(ctx, rq)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list beacon bad blocks: %w", err).Error())
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list beacon bad blobs: %w", err).Error())
 	}
 
 	protoBeaconBadBlobs := make([]*api.BeaconBadBlob, len(resp.BeaconBadBlobs))
@@ -538,7 +538,7 @@ func (i *API) CountBeaconBadBlob(ctx context.Context, req *api.CountBeaconBadBlo
 
 	resp, err := i.indexer.CountBeaconBadBlob(ctx, rq)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count beacon bad blocks: %w", err).Error())
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count beacon bad blobs: %w", err).Error())
 	}
 
 	return &api.CountBeaconBadBlobResponse{
@@ -586,7 +586,7 @@ func (i *API) ListUniqueBeaconBadBlobValues(ctx context.Context, req *api.ListUn
 	// Call the indexer
 	resp, err := i.indexer.ListUniqueBeaconBadBlobValues(ctx, &rq)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique beacon bad block values: %w", err).Error())
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique beacon bad blob values: %w", err).Error())
 	}
 
 	// Convert the response

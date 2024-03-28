@@ -211,7 +211,7 @@ func (r *ListUniqueBeaconBadBlockValuesRequest) Validate() error {
 
 func (s *BeaconBadBlob) Validate() error {
 	if s == nil {
-		return errors.New("beacon bad block is nil")
+		return errors.New("beacon bad blob is nil")
 	}
 
 	if s.GetEpoch() == nil {
