@@ -19,6 +19,10 @@ type BeaconBadBlockRequest struct {
 	Path string
 }
 
+type BeaconBadBlobRequest struct {
+	Path string
+}
+
 type ExecutionBlockTraceRequest struct {
 	BlockNumber uint64
 	BlockHash   string
@@ -41,6 +45,12 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 
 func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
 	s.beaconBadBlockQueue <- &BeaconBadBlockRequest{
+		Path: path,
+	}
+}
+
+func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
+	s.beaconBadBlobQueue <- &BeaconBadBlobRequest{
 		Path: path,
 	}
 }
@@ -116,6 +126,27 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBadBlockQueue,
+			time.Since(start),
+		)
+	}
+}
+
+func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
+	for badBlobRequest := range s.beaconBadBlobQueue {
+		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue))
+
+		start := time.Now()
+
+		if err := s.fetchAndIndexBeaconBadBlobs(ctx, badBlobRequest.Path); err != nil {
+			s.log.
+				WithError(err).
+				Error("Failed to fetch and index beacon bad blocks")
+
+			continue
+		}
+
+		s.metrics.ObserveQueueItemProcessingTime(
+			BeaconBadBlobQueue,
 			time.Since(start),
 		)
 	}

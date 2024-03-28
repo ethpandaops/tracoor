@@ -1,3 +1,4 @@
+import BeaconBadBlobInfo from '@components/BeaconBadBlobInfo';
 import BeaconBadBlockInfo from '@components/BeaconBadBlockInfo';
 import BeaconBlockInfo from '@components/BeaconBlockInfo';
 import BeaconStateInfo from '@components/BeaconStateInfo';
@@ -22,6 +23,9 @@ export default function Info() {
       break;
     case Selection.beacon_bad_block:
       info = <BeaconBadBlockInfo />;
+      break;
+    case Selection.beacon_bad_blob:
+      info = <BeaconBadBlobInfo />;
       break;
     case Selection.execution_block_trace:
       info = <ExecutionBlockTraceInfo />;

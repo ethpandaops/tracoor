@@ -1,0 +1,599 @@
+import { useState, useMemo, Fragment } from 'react';
+
+import { Dialog, Transition } from '@headlessui/react';
+import {
+  ArrowDownTrayIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowsUpDownIcon,
+  XMarkIcon,
+  MagnifyingGlassCircleIcon,
+} from '@heroicons/react/24/outline';
+import classNames from 'classnames';
+import { useFormContext } from 'react-hook-form';
+import TimeAgo from 'react-timeago';
+import { Link, useLocation } from 'wouter';
+
+import BeaconBadBlobId from '@components/BeaconBadBlobId';
+import Pagination from '@components/Pagination';
+import useNetwork from '@contexts/network';
+import { Selection } from '@contexts/selection';
+import { useBeaconBadBlobs, useBeaconBadBlobsCount } from '@hooks/useQuery';
+
+type SortConfig = {
+  key: string;
+  direction: 'ASC' | 'DESC';
+};
+
+export default function BeaconBadBlobTable({ id }: { id?: string }) {
+  const { network } = useNetwork();
+  const [, setLocation] = useLocation();
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: 'fetched_at',
+    direction: 'DESC',
+  });
+  const { watch, setValue } = useFormContext();
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 100;
+
+  const handleSort = (key: string) => {
+    setSortConfig((currentSortConfig: SortConfig) => {
+      if (currentSortConfig.key === key) {
+        return {
+          key,
+          direction: currentSortConfig.direction === 'ASC' ? 'DESC' : 'ASC',
+        };
+      }
+      return { key, direction: 'DESC' };
+    });
+  };
+
+  const [
+    beaconBadBlobSlot,
+    beaconBadBlobEpoch,
+    beaconBadBlobBlockRoot,
+    beaconBadBlobIndex,
+    beaconBadBlobNode,
+    beaconBadBlobNodeImplementation,
+    beaconBadBlobNodeVersion,
+  ] = watch([
+    'beaconBadBlobSlot',
+    'beaconBadBlobEpoch',
+    'beaconBadBlobBlockRoot',
+    'beaconBadBlobIndex',
+    'beaconBadBlobNode',
+    'beaconBadBlobNodeImplementation',
+    'beaconBadBlobNodeVersion',
+  ]);
+
+  const { data, isLoading, error } = useBeaconBadBlobs({
+    network: network ? network : undefined,
+    slot: beaconBadBlobSlot ? parseInt(beaconBadBlobSlot) : undefined,
+    epoch: beaconBadBlobEpoch ? parseInt(beaconBadBlobEpoch) : undefined,
+    block_root: beaconBadBlobBlockRoot ? beaconBadBlobBlockRoot : undefined,
+    index: beaconBadBlobIndex ? beaconBadBlobIndex : undefined,
+    node: beaconBadBlobNode ? beaconBadBlobNode : undefined,
+    node_version: beaconBadBlobNodeVersion ? beaconBadBlobNodeVersion : undefined,
+    beacon_implementation: beaconBadBlobNodeImplementation
+      ? beaconBadBlobNodeImplementation
+      : undefined,
+    pagination: {
+      limit: itemsPerPage,
+      offset: (currentPage - 1) * itemsPerPage,
+      order_by: `${sortConfig.key} ${sortConfig.direction}`,
+    },
+  });
+
+  const { data: count } = useBeaconBadBlobsCount({
+    network: network ? network : undefined,
+    slot: beaconBadBlobSlot ? parseInt(beaconBadBlobSlot) : undefined,
+    epoch: beaconBadBlobEpoch ? parseInt(beaconBadBlobEpoch) : undefined,
+    block_root: beaconBadBlobBlockRoot ? beaconBadBlobBlockRoot : undefined,
+    node: beaconBadBlobNode ? beaconBadBlobNode : undefined,
+    node_version: beaconBadBlobNodeVersion ? beaconBadBlobNodeVersion : undefined,
+    beacon_implementation: beaconBadBlobNodeImplementation
+      ? beaconBadBlobNodeImplementation
+      : undefined,
+    index: beaconBadBlobIndex ? parseInt(beaconBadBlobIndex) : undefined,
+  });
+
+  const totalPages = count ? Math.ceil(count / itemsPerPage) : 0;
+
+  const loading = useMemo(
+    () =>
+      Array.from({ length: itemsPerPage }, (_, i) => (
+        <tr key={i} className="divide-x divide-orange-300">
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden md:table-cell">
+            <div className="h-5 w-28 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-64 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
+            <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
+            <div className="h-5 w-96 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
+            <div className="h-5 w-16 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-24 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
+            <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+          <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-20 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
+        </tr>
+      )),
+    [],
+  );
+
+  let otherComp = undefined;
+
+  if (isLoading) {
+    otherComp = loading;
+  } else if (error) {
+    let message = 'Something went wrong fetching data';
+    if (typeof error === 'string') {
+      message = error;
+    }
+    otherComp = (
+      <tr className="">
+        <td
+          colSpan={8}
+          className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-red-600 text-center text-xl"
+        >
+          {message}
+        </td>
+      </tr>
+    );
+  } else if (!data || data.length === 0) {
+    otherComp = (
+      <tr className="">
+        <td
+          colSpan={8}
+          className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-gray-600 text-center text-xl"
+        >
+          No data available
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <>
+      <div className="mt-8 flow-root">
+        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-10">
+            <table className="min-w-full divide-y divide-orange-500 sm:rounded-lg bg-white/55 shadow overflow-hidden border-y-2 sm:border-2 border-amber-100">
+              <thead className="bg-sky-400">
+                <tr className="divide-x divide-orange-300">
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'fetched_at' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'fetched_at' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'fetched_at' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden md:table-cell',
+                    )}
+                    onClick={() => handleSort('fetched_at')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Fetched at</span>
+                      <span>
+                        {sortConfig.key === 'fetched_at' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'node' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'node' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'node' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
+                    )}
+                    onClick={() => handleSort('node')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Node</span>
+                      <span>
+                        {sortConfig.key === 'node' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'beacon_implementation' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'beacon_implementation' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'beacon_implementation' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 2xl:table-cell',
+                    )}
+                    onClick={() => handleSort('beacon_implementation')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Beacon node Implementation</span>
+                      <span>
+                        {sortConfig.key === 'beacon_implementation' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'node_version' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'node_version' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'node_version' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 4xl:table-cell',
+                    )}
+                    onClick={() => handleSort('node_version')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Node version</span>
+                      <span>
+                        {sortConfig.key === 'node_version' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'epoch' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'epoch' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'epoch' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0 hidden 3xl:table-cell',
+                    )}
+                    onClick={() => handleSort('epoch')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Epoch</span>
+                      <span>
+                        {sortConfig.key === 'epoch' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'slot' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'slot' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'slot' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
+                    )}
+                    onClick={() => handleSort('slot')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Slot</span>
+                      <span>
+                        {sortConfig.key === 'slot' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'index' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'index' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'index' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0',
+                    )}
+                    onClick={() => handleSort('index')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Index</span>
+                      <span>
+                        {sortConfig.key === 'index' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className={classNames(
+                      sortConfig.key !== 'block_root' ? 'cursor-s-resize' : '',
+                      sortConfig.key === 'block_root' && sortConfig.direction === 'DESC'
+                        ? 'cursor-n-resize'
+                        : '',
+                      sortConfig.key === 'block_root' && sortConfig.direction === 'ASC'
+                        ? 'cursor-s-resize'
+                        : '',
+                      'py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 hidden 2xl:table-cell',
+                    )}
+                    onClick={() => handleSort('block_root')}
+                  >
+                    <div className="flex">
+                      <span className="whitespace-nowrap">Block root</span>
+                      <span>
+                        {sortConfig.key === 'block_root' ? (
+                          sortConfig.direction === 'DESC' ? (
+                            <ArrowDownIcon className="ml-2 h-5 w-5" />
+                          ) : (
+                            <ArrowUpIcon className="ml-2 h-5 w-5" />
+                          )
+                        ) : (
+                          <ArrowsUpDownIcon className="ml-2 h-5 w-5" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50"
+                  ></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-orange-300">
+                {otherComp
+                  ? otherComp
+                  : data?.map((row) => (
+                      <tr key={row.id} className="divide-x divide-orange-300">
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-0 hidden md:table-cell">
+                          <span className="underline decoration-dotted underline-offset-2 cursor-help">
+                            <TimeAgo date={new Date(row.fetched_at)} />
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() => setValue('beaconBadBlobNode', row.node)}
+                            >
+                              {row.node}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() =>
+                                setValue(
+                                  'beaconBadBlobNodeImplementation',
+                                  row.beacon_implementation,
+                                )
+                              }
+                            >
+                              {row.beacon_implementation}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 4xl:table-cell">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() => setValue('beaconBadBlobNodeVersion', row.node_version)}
+                            >
+                              {row.node_version}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() => setValue('beaconBadBlobEpoch', row.epoch)}
+                            >
+                              {row.epoch}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() => setValue('beaconBadBlobSlot', row.slot)}
+                            >
+                              {row.slot}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer"
+                              onClick={() => setValue('beaconBadBlobIndex', row.index)}
+                            >
+                              {row.index}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
+                          <div className=" w-fit">
+                            <span
+                              className="relative top-1 group transition cursor-pointer font-mono"
+                              onClick={() => setValue('beaconBadBlobBlockRoot', row.block_root)}
+                            >
+                              {row.block_root}
+                              <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
+                          <div className="flex flex-row">
+                            <a
+                              href={`/download/beacon_bad_blob/${row.id}`}
+                              download={`beacon_bad_blob-${row.node}-${row.slot}-${row.block_root}-${row.index}.ssz.gz`}
+                              className="text-sky-400 hover:text-sky-600 flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600"
+                            >
+                              <ArrowDownTrayIcon className="h-6 w-6 3xl:mr-1" aria-hidden="true" />
+                              <span className="hidden 3xl:block">Download</span>
+                            </a>
+                            <Link href={`/beacon_bad_blob/${row.id}`}>
+                              <span className="text-sky-400 hover:text-sky-600 cursor-pointer flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600">
+                                <MagnifyingGlassCircleIcon
+                                  className="h-6 w-6 3xl:mr-1"
+                                  aria-hidden="true"
+                                />
+                                <span className="hidden 3xl:block">View</span>
+                              </span>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div className={classNames(totalPages <= 1 ? 'hidden' : '', 'mt-10 mb-20')}>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page: number) => setCurrentPage(page)}
+        />
+      </div>
+
+      <Transition.Root show={Boolean(id)} as={Fragment}>
+        <Dialog as="div" onClose={() => setLocation(`/${Selection.beacon_bad_blob}`)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-in-out duration-100"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in-out duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-300 bg-opacity-75 transition-opacity z-30" />
+          </Transition.Child>
+          <div className="fixed inset-0 overflow-hidden z-30">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+                <Transition.Child
+                  as={Fragment}
+                  enter="transform transition ease-in-out duration-100 sm:duration-200"
+                  enterFrom="translate-x-full"
+                  enterTo="translate-x-0"
+                  leave="transform transition ease-in-out duration-100 sm:duration-200"
+                  leaveFrom="translate-x-0"
+                  leaveTo="translate-x-full"
+                >
+                  <Dialog.Panel className="fixed inset-y-0 overflow-x-hidden right-0 w-full overflow-y-auto bg-gray-100 sm:ring-1 sm:ring-white/10 sm:max-w-screen-lg">
+                    <div className="flex h-full flex-col py-6 shadow-xl">
+                      <div className="px-4 mb-6 mt-1 sm:px-6">
+                        <div className="flex items-start justify-between">
+                          <Dialog.Title className="mt-1 flex items-center text-base font-semibold leading-6 text-amber-600">
+                            Beacon Bad Blob
+                          </Dialog.Title>
+                          <div className="ml-3 flex h-7 items-center">
+                            <button
+                              type="button"
+                              className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-900/5"
+                              onClick={() => setLocation(`/${Selection.beacon_bad_blob}`)}
+                            >
+                              <span className="sr-only">Close menu</span>
+                              <XMarkIcon className="h-7 w-7" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {id && <BeaconBadBlobId id={id} />}
+                    </div>
+                  </Dialog.Panel>
+                </Transition.Child>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      </Transition.Root>
+    </>
+  );
+}

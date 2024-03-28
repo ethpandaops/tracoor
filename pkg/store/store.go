@@ -49,6 +49,15 @@ type Store interface {
 	// DeleteBeaconBadBlock deletes a beacon bad block from the store
 	DeleteBeaconBadBlock(ctx context.Context, location string) error
 
+	// SaveBeaconBadBlob saves a beacon bad block to the store
+	SaveBeaconBadBlob(ctx context.Context, data *[]byte, location string) (string, error)
+	// GetBeaconBadBlob fetches a beacon bad block from the store
+	GetBeaconBadBlob(ctx context.Context, location string) (*[]byte, error)
+	// GetBeaconBadBlobURL returns a URL for the beacon bad block
+	GetBeaconBadBlobURL(ctx context.Context, location string, expiry int) (string, error)
+	// DeleteBeaconBadBlob deletes a beacon bad block from the store
+	DeleteBeaconBadBlob(ctx context.Context, location string) error
+
 	// SaveExecutionBlockTrace saves an execution block trace to the store
 	SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error)
 	// GetExecutionBlockTrace fetches an execution block trace from the store

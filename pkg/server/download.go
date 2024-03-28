@@ -56,6 +56,10 @@ func (d *ObjectDownloader) Start() error {
 		return fmt.Errorf("failed to register beacon bad block download handler: %v", err)
 	}
 
+	if err := d.mux.HandlePath("GET", "/download/beacon_bad_blob/{id}", d.beaconBadBlobHandler); err != nil {
+		return fmt.Errorf("failed to register beacon bad blob download handler: %v", err)
+	}
+
 	if err := d.mux.HandlePath("GET", "/download/execution_block_trace/{id}", d.executionBlockTraceHandler); err != nil {
 		return fmt.Errorf("failed to register execution block trace download handler: %v", err)
 	}
@@ -280,6 +284,83 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		d.log.WithError(err).Errorf("Failed to get beacon bad block from store for ID %s from %s", id, block.Location.Value)
 
 		d.writeJSONError(w, "Failed to get beacon bad block", http.StatusInternalServerError)
+
+		return
+	}
+
+	if err = setResponseCompression(w, r, data); err != nil {
+		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	_, err = w.Write(*data)
+	if err != nil {
+		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
+func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	ctx := r.Context()
+
+	id := pathParams["id"]
+	if id == "" {
+		d.writeJSONError(w, "No ID provided", http.StatusBadRequest)
+
+		return
+	}
+
+	resp, err := d.indexer.ListBeaconBadBlob(ctx, &indexer.ListBeaconBadBlobRequest{
+		Id: id,
+		Pagination: &indexer.PaginationCursor{
+			Limit: 1,
+		},
+	})
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to list beacon bad blobs for ID %s", id)
+
+		d.writeJSONError(w, "Failed to list beacon bad blobs", http.StatusInternalServerError)
+
+		return
+	}
+
+	if len(resp.BeaconBadBlobs) == 0 {
+		d.writeJSONError(w, "No beacon bad blobs found", http.StatusNotFound)
+
+		return
+	}
+
+	if len(resp.BeaconBadBlobs) > 1 {
+		d.writeJSONError(w, "More than one beacon bad blob found", http.StatusInternalServerError)
+
+		return
+	}
+
+	blob := resp.BeaconBadBlobs[0]
+
+	if d.store.PreferURLs() {
+		var itemURL string
+
+		itemURL, err = d.store.GetBeaconBadBlobURL(ctx, blob.Location.Value, 3600)
+		if err != nil {
+			d.log.WithError(err).Errorf("Failed to get URL for beacon bad blob ID %s", id)
+			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
+
+			return
+		}
+
+		http.Redirect(w, r, itemURL, http.StatusTemporaryRedirect)
+
+		return
+	}
+
+	data, err := d.store.GetBeaconBadBlob(ctx, blob.Location.Value)
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to get beacon bad blob from store for ID %s from %s", id, blob.Location.Value)
+
+		d.writeJSONError(w, "Failed to get beacon bad blob", http.StatusInternalServerError)
 
 		return
 	}

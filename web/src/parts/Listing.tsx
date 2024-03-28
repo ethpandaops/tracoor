@@ -1,3 +1,4 @@
+import BeaconBadBlobTable from '@components/BeaconBadBlobTable';
 import BeaconBadBlockTable from '@components/BeaconBadBlockTable';
 import BeaconBlockTable from '@components/BeaconBlockTable';
 import BeaconStateTable from '@components/BeaconStateTable';
@@ -18,6 +19,9 @@ export default function Listing({ id }: { id?: string }) {
       break;
     case Selection.beacon_bad_block:
       table = <BeaconBadBlockTable id={id} />;
+      break;
+    case Selection.beacon_bad_blob:
+      table = <BeaconBadBlobTable id={id} />;
       break;
     case Selection.execution_block_trace:
       table = <ExecutionBlockTraceTable id={id} />;

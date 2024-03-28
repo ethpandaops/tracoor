@@ -114,6 +114,20 @@ func (c *Client) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeacon
 	return c.pb.ListBeaconBadBlock(ctx, req, grpc.UseCompressor(gzip.Name))
 }
 
+func (c *Client) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBeaconBadBlobRequest) (*indexer.CreateBeaconBadBlobResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreateBeaconBadBlob(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
+func (c *Client) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeaconBadBlobRequest) (*indexer.ListBeaconBadBlobResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.ListBeaconBadBlob(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
 func (c *Client) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	md := metadata.New(c.config.Headers)
 	ctx = metadata.NewOutgoingContext(ctx, md)

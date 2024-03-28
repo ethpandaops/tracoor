@@ -15,6 +15,7 @@ func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 		"beacon_state":          i.config.Retention.BeaconStates.Duration,
 		"beacon_block":          i.config.Retention.BeaconBlocks.Duration,
 		"beacon_bad_block":      i.config.Retention.BeaconBadBlocks.Duration,
+		"beacon_bad_blob":       i.config.Retention.BeaconBadBlobs.Duration,
 		"execution_block_trace": i.config.Retention.ExecutionBlockTraces.Duration,
 		"execution_bad_block":   i.config.Retention.ExecutionBadBlocks.Duration,
 	}).Info("Starting retention watcher")
@@ -30,6 +31,10 @@ func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 
 		if err := i.purgeOldBeaconBadBlocks(ctx); err != nil {
 			i.log.WithError(err).Error("Failed to delete old beacon bad blocks")
+		}
+
+		if err := i.purgeOldBeaconBadBlobs(ctx); err != nil {
+			i.log.WithError(err).Error("Failed to delete old beacon bad blobs")
 		}
 
 		if err := i.purgeOldExecutionTraces(ctx); err != nil {
@@ -181,6 +186,53 @@ func (i *Indexer) purgeOldBeaconBadBlocks(ctx context.Context) error {
 				"id":      block.ID,
 			},
 		).Debug("Deleted beacon bad block")
+	}
+
+	return nil
+}
+
+func (i *Indexer) purgeOldBeaconBadBlobs(ctx context.Context) error {
+	before := time.Now().Add(-i.config.Retention.BeaconBadBlobs.Duration)
+
+	filter := &persistence.BeaconBadBlobFilter{
+		Before: &before,
+	}
+
+	blobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	i.log.WithField("before", before).Debugf("Purging %d old beacon bad blobs", len(blobs))
+
+	for _, blob := range blobs {
+		// Delete from the store first
+		if err := i.store.DeleteBeaconBadBlob(ctx, blob.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				i.log.WithField("blob_id", blob.ID).Warn("Beacon bad blob not found in store")
+			} else {
+				i.log.WithError(err).WithField("blob_id", blob.ID).Error("Failed to delete beacon bad blob from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := i.db.DeleteBeaconBadBlob(ctx, blob.ID)
+		if err != nil {
+			i.log.WithError(err).WithField("blob_id", blob.ID).Error("Failed to delete beacon bad blob")
+
+			continue
+		}
+
+		i.log.WithFields(
+			logrus.Fields{
+				"node":    blob.Node,
+				"network": blob.Network,
+				"slot":    blob.Slot,
+				"index":   blob.Index,
+				"id":      blob.ID,
+			},
+		).Debug("Deleted beacon bad blob")
 	}
 
 	return nil

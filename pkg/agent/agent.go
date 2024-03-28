@@ -45,6 +45,7 @@ type agent struct {
 	beaconStateQueue         chan *BeaconStateRequest
 	beaconBlockQueue         chan *BeaconBlockRequest
 	beaconBadBlockQueue      chan *BeaconBadBlockRequest
+	beaconBadBlobQueue       chan *BeaconBadBlobRequest
 	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
 	executionBadBlockQueue   chan *ExecutionBadBlockRequest
 }
@@ -83,6 +84,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		beaconStateQueue:         make(chan *BeaconStateRequest, 1000),
 		beaconBlockQueue:         make(chan *BeaconBlockRequest, 1000),
 		beaconBadBlockQueue:      make(chan *BeaconBadBlockRequest, 1000),
+		beaconBadBlobQueue:       make(chan *BeaconBadBlobRequest, 1000),
 		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
 		executionBadBlockQueue:   make(chan *ExecutionBadBlockRequest, 1000),
 	}, nil
@@ -165,6 +167,7 @@ func (s *agent) Start(ctx context.Context) error {
 		go s.processBeaconStateQueue(ctx)
 		go s.processBeaconBlockQueue(ctx)
 		go s.processBeaconBadBlockQueue(ctx)
+		go s.processBeaconBadBlobQueue(ctx)
 
 		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
@@ -273,6 +276,18 @@ func (s *agent) Start(ctx context.Context) error {
 			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath
 			if path != nil {
 				s.enqueueBeaconBadBlock(ctx, *path)
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	if s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath != nil {
+		_, err := s.scheduler.Every(30).Seconds().Do(func() {
+			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath
+			if path != nil {
+				s.enqueueBeaconBadBlob(ctx, *path)
 			}
 		})
 		if err != nil {

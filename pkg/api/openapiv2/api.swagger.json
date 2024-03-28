@@ -17,6 +17,45 @@
   ],
   "paths": {},
   "definitions": {
+    "apiBeaconBadBlob": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "fetched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "slot": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "block_root": {
+          "type": "string"
+        },
+        "node_version": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        },
+        "beacon_implementation": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
     "apiBeaconBadBlock": {
       "type": "object",
       "properties": {
@@ -119,6 +158,15 @@
         },
         "beacon_implementation": {
           "type": "string"
+        }
+      }
+    },
+    "apiCountBeaconBadBlobResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "uint64"
         }
       }
     },
@@ -232,6 +280,18 @@
         }
       }
     },
+    "apiListBeaconBadBlobResponse": {
+      "type": "object",
+      "properties": {
+        "beacon_bad_blobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/apiBeaconBadBlob"
+          }
+        }
+      }
+    },
     "apiListBeaconBadBlockResponse": {
       "type": "object",
       "properties": {
@@ -288,6 +348,76 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/apiExecutionBlockTrace"
+          }
+        }
+      }
+    },
+    "apiListUniqueBeaconBadBlobValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "node",
+        "slot",
+        "epoch",
+        "block_root",
+        "node_version",
+        "network",
+        "beacon_implementation",
+        "index"
+      ],
+      "default": "node"
+    },
+    "apiListUniqueBeaconBadBlobValuesResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slot": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "epoch": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "block_root": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "node_version": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "beacon_implementation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "index": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
           }
         }
       }
