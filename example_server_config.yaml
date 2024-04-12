@@ -15,6 +15,7 @@ services:
       beaconStates: 30m
       beaconBlocks: 30m
       beaconBadBlocks: 30m
+      beaconBadBlobs: 30m
       executionBlockTrace: 30m
       executionBadBlocks: 30m
 
