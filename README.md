@@ -102,7 +102,7 @@ Flags:
 Download the latest release from the [Releases page](https://github.com/ethpandaops/tracoor/releases). Extract and run with:
 
 ```bash
-./tracoor --config your-config.yaml
+./tracoor --help
 ```
 
 ### Docker
@@ -118,18 +118,23 @@ Available as a docker image at [ethpandaops/tracoor](https://hub.docker.com/r/et
 **Quick start**
 
 ```bash
-docker run -d  --name tracoor -v $HOST_DIR_CHANGE_ME/config.yaml:/opt/tracoor/config.yaml -p 9090:9090 -p 5555:5555 -it ethpandaops/tracoor:latest --config /opt/tracoor/config.yaml;
+docker run -d  --name tracoor -v $HOST_DIR_CHANGE_ME/config.yaml:/opt/tracoor/config.yaml -p 9090:9090 -p 5555:5555 -it ethpandaops/tracoor:latest server --config /opt/tracoor/config.yaml;
 docker logs -f tracoor;
 ```
 
 ### Kubernetes via Helm
 
-[Read more](https://github.com/skylenet/ethereum-helm-charts/tree/master/charts/tracoor)
+- [tracoor-server](https://github.com/skylenet/ethereum-helm-charts/tree/master/charts/tracoor-server)
+- [tracoor-agent](https://github.com/skylenet/ethereum-helm-charts/tree/master/charts/tracoor-agent)
 
 ```bash
 helm repo add ethereum-helm-charts https://ethpandaops.github.io/ethereum-helm-charts
 
-helm install tracoor ethereum-helm-charts/tracoor -f your_values.yaml
+# server
+helm install tracoor ethereum-helm-charts/tracoor-server -f your_values.yaml
+
+# agent
+helm install tracoor ethereum-helm-charts/tracoor-agent -f your_values.yaml
 ```
 
 ### Building yourself
@@ -138,17 +143,21 @@ helm install tracoor ethereum-helm-charts/tracoor -f your_values.yaml
    ```sh
    go get github.com/ethpandaops/tracoor
    ```
-2. Change directories
+1. Change directories
    ```sh
    cd ./tracoor
    ```
-3. Build the binary
+1. Build the binary
    ```sh  
     go build -o tracoor .
    ```
-4. Run the service
+1. Run the server
    ```sh  
-    ./tracoor
+    ./tracoor server --config example_server_config.yaml
+   ```
+1. Run the agent
+   ```sh  
+    ./tracoor agent --config example_agent_config.yaml
    ```
 
 ## Contributing
@@ -156,18 +165,23 @@ helm install tracoor ethereum-helm-charts/tracoor -f your_values.yaml
 Contributions are greatly appreciated! Pull requests will be reviewed and merged promptly if you're interested in improving the tracoor!
 
 1. Fork the project
-2. Create your feature branch:
+1. Create your feature branch:
     - `git checkout -b feat/new-feature`
-3. Commit your changes:
+1. Commit your changes:
     - `git commit -m 'feat(profit): new feature`
-4. Push to the branch:
+1. Push to the branch:
     -`git push origin feat/new-feature`
-5. Open a pull request
+1. Open a pull request
 
 ### Running locally
-#### Backend
+#### Server
 ```
-go run main.go --config your_config.yaml
+go run main.go server --config example_server_config.yaml
+```
+
+#### Agent
+```
+go run main.go agent --config example_agent_config.yaml
 ```
 
 #### Frontend
