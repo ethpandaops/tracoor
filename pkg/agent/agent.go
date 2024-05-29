@@ -18,12 +18,12 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
 	"github.com/ethpandaops/tracoor/pkg/networks"
+	"github.com/ethpandaops/tracoor/pkg/observability"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor"
 	pIndexer "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/go-co-op/gocron"
 	"github.com/google/uuid"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,7 +77,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		Config:                   config,
 		node:                     node,
 		log:                      log,
-		metrics:                  NewMetrics(namespace),
+		metrics:                  GetMetricsInstance(namespace, config.Name),
 		scheduler:                gocron.NewScheduler(time.Local),
 		indexer:                  indexerClient,
 		store:                    st,
@@ -91,8 +91,8 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 }
 
 func (s *agent) Start(ctx context.Context) error {
-	if err := s.ServeMetrics(ctx); err != nil {
-		return err
+	if s.Config.MetricsAddr != "" {
+		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
 	}
 
 	if s.Config.PProfAddr != nil {
@@ -366,27 +366,6 @@ func (s *agent) performTokenHandshake(ctx context.Context) error {
 	}
 
 	s.log.Info("Storage handshake complete 🤝 - we are connected to the same storage backend as the indexer")
-
-	return nil
-}
-
-func (s *agent) ServeMetrics(ctx context.Context) error {
-	go func() {
-		sm := http.NewServeMux()
-		sm.Handle("/metrics", promhttp.Handler())
-
-		server := &http.Server{
-			Addr:              s.Config.MetricsAddr,
-			ReadHeaderTimeout: 15 * time.Second,
-			Handler:           sm,
-		}
-
-		s.log.Infof("Serving metrics at %s", s.Config.MetricsAddr)
-
-		if err := server.ListenAndServe(); err != nil {
-			s.log.Fatal(err)
-		}
-	}()
 
 	return nil
 }

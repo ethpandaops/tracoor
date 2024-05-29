@@ -64,7 +64,7 @@ func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig,
 		o.UsePathStyle = config.UsePathStyle
 	})
 
-	metrics := NewBasicMetrics(namespace, string(S3StoreType), opts.MetricsEnabled)
+	metrics := GetBasicMetricsInstance(namespace, string(S3StoreType), opts.MetricsEnabled)
 
 	return &S3Store{
 		s3Client:     s3Client,

@@ -148,7 +148,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 
 	blockRootAsString := blockRoot.String()
 
-	location := CreateBeaconStateFileName(
+	location := CreateBeaconBlockFileName(
 		s.Config.Name,
 		string(s.node.Beacon().Metadata().Network.Name),
 		slot,

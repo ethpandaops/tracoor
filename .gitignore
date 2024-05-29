@@ -7,4 +7,6 @@ store.db
 index.db
 server.yaml
 agent.yaml
+single.yaml
 .vscode/launch.json
+.DS_Store
