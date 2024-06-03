@@ -1,6 +1,10 @@
 package persistence
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 type BasicMetrics struct {
 	namespace string
@@ -10,7 +14,19 @@ type BasicMetrics struct {
 	operationsErrors *prometheus.CounterVec
 }
 
+var (
+	metricsInstances = make(map[string]*BasicMetrics)
+	mu               sync.Mutex
+)
+
 func NewBasicMetrics(namespace, driverName string, enabled bool) *BasicMetrics {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if instance, exists := metricsInstances[driverName]; exists {
+		return instance
+	}
+
 	m := &BasicMetrics{
 		namespace: namespace,
 		info: prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -38,6 +54,7 @@ func NewBasicMetrics(namespace, driverName string, enabled bool) *BasicMetrics {
 	}
 
 	m.info.WithLabelValues(driverName).Set(1)
+	metricsInstances[driverName] = m
 
 	return m
 }

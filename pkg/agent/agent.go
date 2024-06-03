@@ -77,7 +77,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		Config:                   config,
 		node:                     node,
 		log:                      log,
-		metrics:                  GetMetricsInstance(namespace, config.Name),
+		metrics:                  GetMetricsInstance(namespace),
 		scheduler:                gocron.NewScheduler(time.Local),
 		indexer:                  indexerClient,
 		store:                    st,

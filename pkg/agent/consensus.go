@@ -114,7 +114,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
-	s.metrics.IncrementItemExported(BeaconStateQueue)
+	s.metrics.IncrementItemExported(BeaconStateQueue, s.Config.Name)
 
 	s.log.
 		WithField("state_root", rootAsString).
@@ -225,7 +225,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
-	s.metrics.IncrementItemExported(BeaconBlockQueue)
+	s.metrics.IncrementItemExported(BeaconBlockQueue, s.Config.Name)
 
 	s.log.
 		WithField("block_root", blockRootAsString).
@@ -408,7 +408,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 					continue
 				}
 
-				s.metrics.IncrementItemExported(BeaconBadBlockQueue)
+				s.metrics.IncrementItemExported(BeaconBadBlockQueue, s.Config.Name)
 
 				s.log.
 					WithField("block_root", blockRoot).
@@ -618,7 +618,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 					continue
 				}
 
-				s.metrics.IncrementItemExported(BeaconBadBlobQueue)
+				s.metrics.IncrementItemExported(BeaconBadBlobQueue, s.Config.Name)
 
 				s.log.
 					WithField("blockRoot", blockRoot).

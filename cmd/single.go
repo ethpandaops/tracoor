@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"os"
-	"sync"
 
 	"github.com/creasty/defaults"
-	"github.com/ethpandaops/tracoor/pkg/agent"
-	"github.com/ethpandaops/tracoor/pkg/server"
 	"github.com/ethpandaops/tracoor/pkg/single"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -49,59 +45,11 @@ var singleCmd = &cobra.Command{
 
 		log.SetLevel(logLevel)
 
-		var wg sync.WaitGroup
+		s := single.New(log, config)
 
-		// Create a context that can be canceled
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		s, err := server.NewServer(ctx, log.WithField("container", "server"), config.Server)
-		if err != nil {
+		if err := s.Start(cmd.Context()); err != nil {
 			log.Fatal(err)
 		}
-
-		// Start server
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			log.Info("Starting server")
-
-			if err := s.Start(ctx); err != nil {
-				log.Fatal(err)
-			}
-
-			log.Info("tracoor server exited - cya!")
-
-			// Cancel the context to signal all agents to exit
-			cancel()
-		}()
-
-		// Wait for the server to start before starting agents
-		go func() {
-			<-s.Started
-
-			// Start all the agents
-			for _, cfg := range config.Agents {
-				wg.Add(1)
-
-				go func(cfg *agent.Config) {
-					defer wg.Done()
-
-					agent, err := agent.New(ctx, log.WithField("container", "agent").WithField("name", cfg.Name), cfg)
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					if err := agent.Start(ctx); err != nil {
-						log.Fatal(err)
-					}
-
-					log.Info("tracoor agent exited - cya!")
-				}(cfg)
-			}
-		}()
-
-		wg.Wait()
 	},
 }
 

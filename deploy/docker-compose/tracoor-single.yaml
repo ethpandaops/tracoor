@@ -1,0 +1,36 @@
+server:
+  addr: ":8081"
+  metricsAddr: ":9091"
+  pprofAddr: ":6060"
+  preStopSleepSeconds: 1
+  ntpServer: time.google.com
+
+  persistence:
+    dsn: "file:/tmp/tracoor1.db?parseTime=True"
+    driver_name: sqlite
+
+  services:
+    indexer:
+      retention:
+        beaconStates: 1m
+        executionBlockTraces: 1m
+        beaconBlocks: 1m
+
+agents:
+  - name: example
+    ethereum:
+      overrideNetworkName: example-network
+      beacon:
+        nodeAddress: http://example.com:5052
+      execution:
+        nodeAddress: http://example.com:8545
+
+shared:
+  metricsAddr: ":9091"
+  logging: "debug"
+  indexer:
+    address: localhost:8081
+  store:
+    type: fs
+    config:
+      base_path: "/tmp/pepega"

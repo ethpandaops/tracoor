@@ -112,11 +112,11 @@ func (f *BeaconStateFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", f.Before)
+		query = query.Where("fetched_at <= ?", timestampFormatForDB(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", f.After)
+		query = query.Where("fetched_at >= ?", timestampFormatForDB(*f.After))
 	}
 
 	if f.Slot != nil {

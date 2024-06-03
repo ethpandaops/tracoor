@@ -13,7 +13,6 @@ type Metrics struct {
 	queueSize               *prometheus.GaugeVec
 	queueItemProcessingTime *prometheus.HistogramVec
 	itemExported            *prometheus.CounterVec
-	serveOnce               sync.Once
 }
 
 type Queue string
@@ -32,34 +31,25 @@ var (
 	once            sync.Once
 )
 
-func GetMetricsInstance(namespace string, agentName string) *Metrics {
+func GetMetricsInstance(namespace string) *Metrics {
 	once.Do(func() {
 		metricsInstance = &Metrics{
 			queueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "queue_size",
 				Help:      "The size of the queue",
-				ConstLabels: prometheus.Labels{
-					"agent": agentName,
-				},
-			}, []string{"queue"}),
+			}, []string{"queue", "agent"}),
 			queueItemProcessingTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 				Namespace: namespace,
 				Name:      "queue_item_processing_time_seconds",
 				Help:      "The time it takes to process an item from the queue",
 				Buckets:   prometheus.LinearBuckets(0, 3, 10),
-				ConstLabels: prometheus.Labels{
-					"agent": agentName,
-				},
-			}, []string{"queue"}),
+			}, []string{"queue", "agent"}),
 			itemExported: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "item_exported",
 				Help:      "The number of items exported",
-				ConstLabels: prometheus.Labels{
-					"agent": agentName,
-				},
-			}, []string{"queue"}),
+			}, []string{"queue", "agent"}),
 		}
 
 		prometheus.MustRegister(metricsInstance.queueSize)
@@ -70,16 +60,16 @@ func GetMetricsInstance(namespace string, agentName string) *Metrics {
 	return metricsInstance
 }
 
-func (m *Metrics) SetQueueSize(queue Queue, count int) {
-	m.queueSize.WithLabelValues(string(queue)).Set(float64(count))
+func (m *Metrics) SetQueueSize(queue Queue, count int, agentName string) {
+	m.queueSize.WithLabelValues(string(queue), agentName).Set(float64(count))
 }
 
-func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration) {
-	m.queueItemProcessingTime.WithLabelValues(string(queue)).Observe(duration.Seconds())
+func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration, agentName string) {
+	m.queueItemProcessingTime.WithLabelValues(string(queue), agentName).Observe(duration.Seconds())
 }
 
-func (m *Metrics) IncrementItemExported(queue Queue) {
-	m.itemExported.WithLabelValues(string(queue)).Inc()
+func (m *Metrics) IncrementItemExported(queue Queue, agentName string) {
+	m.itemExported.WithLabelValues(string(queue), agentName).Inc()
 }
 
 func (m *Metrics) ServeMetrics(ctx context.Context, addr string) {

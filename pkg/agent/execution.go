@@ -73,7 +73,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		return err
 	}
 
-	s.metrics.IncrementItemExported(ExecutionBlockTraceQueue)
+	s.metrics.IncrementItemExported(ExecutionBlockTraceQueue, s.Config.Name)
 
 	s.log.
 		WithField("id", rrsp.GetId().GetValue()).
@@ -183,7 +183,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 		return errors.Wrapf(err, "failed to index execution bad block: %v", block.Hash)
 	}
 
-	s.metrics.IncrementItemExported(ExecutionBadBlockQueue)
+	s.metrics.IncrementItemExported(ExecutionBadBlockQueue, s.Config.Name)
 
 	s.log.
 		WithField("id", rrsp.GetId().GetValue()).
