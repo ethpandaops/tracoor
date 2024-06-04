@@ -156,6 +156,9 @@ func (x *Server) Start(ctx context.Context) error {
 		return nil
 	})
 
+	// Sleep for a little bit to give the http servers time to start.
+	time.Sleep(2 * time.Second)
+
 	// Signal that the server has fully started
 	close(x.Started)
 
