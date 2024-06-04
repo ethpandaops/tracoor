@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethpandaops/beacon/pkg/human"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
-	pindexer "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -85,7 +84,7 @@ func TestIndexerGetStorageHandshakeToken(t *testing.T) {
 		t.Fatalf("failed to save storage handshake token: %v", err)
 	}
 
-	_, err = index.GetStorageHandshakeToken(ctx, &pindexer.GetStorageHandshakeTokenRequest{
+	_, err = index.GetStorageHandshakeToken(ctx, &indexer.GetStorageHandshakeTokenRequest{
 		Node:  node,
 		Token: token,
 	})
@@ -108,7 +107,6 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 	}
 
 	defer func() {
-
 		if err := cleanup(); err != nil {
 			t.Fatalf("failed to cleanup: %v", err)
 		}

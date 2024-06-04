@@ -28,11 +28,13 @@ var singleCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		if err := config.Validate(); err != nil {
+		err = config.Validate()
+		if err != nil {
 			log.Fatal(err)
 		}
 
-		if config.ApplyShared(); err != nil {
+		err = config.ApplyShared()
+		if err != nil {
 			log.Fatal(err)
 		}
 
