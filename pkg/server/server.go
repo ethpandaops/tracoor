@@ -14,13 +14,13 @@ import (
 	_ "net/http/pprof"
 
 	gw "github.com/ethpandaops/tracoor/pkg/api"
+	"github.com/ethpandaops/tracoor/pkg/observability"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/server/service"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/go-co-op/gocron"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -54,6 +54,8 @@ type Server struct {
 
 	//nolint:unused // Required
 	frontendFS fs.FS
+
+	Started chan struct{}
 }
 
 const namespace = "tracoor_server"
@@ -90,6 +92,7 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 		services:       services,
 		grpcClientConn: conf.Addr,
 		grpcClientOpts: opts,
+		Started:        make(chan struct{}),
 	}, nil
 }
 
@@ -152,6 +155,9 @@ func (x *Server) Start(ctx context.Context) error {
 
 		return nil
 	})
+
+	// Signal that the server has fully started
+	close(x.Started)
 
 	err := g.Wait()
 
@@ -283,21 +289,9 @@ func (x *Server) startGrpcGateway(ctx context.Context) error {
 }
 
 func (x *Server) startMetrics(ctx context.Context) error {
-	sm := http.NewServeMux()
-	sm.Handle("/metrics", promhttp.Handler())
+	observability.StartMetricsServer(ctx, x.config.MetricsAddr)
 
-	x.log.WithField("addr", x.config.MetricsAddr).Info("Starting metrics server")
-
-	x.metricsServer = &http.Server{
-		Addr:              x.config.MetricsAddr,
-		ReadHeaderTimeout: 15 * time.Second,
-		Handler:           sm,
-		BaseContext: func(l net.Listener) context.Context {
-			return ctx
-		},
-	}
-
-	return x.metricsServer.ListenAndServe()
+	return nil
 }
 
 func (x *Server) startPProf(ctx context.Context) error {

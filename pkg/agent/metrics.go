@@ -1,8 +1,11 @@
 package agent
 
 import (
+	"context"
+	"sync"
 	"time"
 
+	"github.com/ethpandaops/tracoor/pkg/observability"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -23,40 +26,52 @@ var (
 	ExecutionBadBlockQueue   Queue = "execution_bad_block"
 )
 
-func NewMetrics(namespace string) *Metrics {
-	m := &Metrics{
-		queueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "queue_size",
-			Help:      "The size of the queue",
-		}, []string{"queue"}),
-		queueItemProcessingTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "queue_item_processing_time_seconds",
-			Help:      "The time it takes to process an item from the queue",
-			Buckets:   prometheus.LinearBuckets(0, 3, 10),
-		}, []string{"queue"}),
-		itemExported: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "item_exported",
-			Help:      "The number of items exported",
-		}, []string{"queue"}),
-	}
+var (
+	metricsInstance *Metrics
+	once            sync.Once
+)
 
-	prometheus.MustRegister(m.queueSize)
-	prometheus.MustRegister(m.queueItemProcessingTime)
+func GetMetricsInstance(namespace string) *Metrics {
+	once.Do(func() {
+		metricsInstance = &Metrics{
+			queueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "queue_size",
+				Help:      "The size of the queue",
+			}, []string{"queue", "agent"}),
+			queueItemProcessingTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "queue_item_processing_time_seconds",
+				Help:      "The time it takes to process an item from the queue",
+				Buckets:   prometheus.LinearBuckets(0, 3, 10),
+			}, []string{"queue", "agent"}),
+			itemExported: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "item_exported",
+				Help:      "The number of items exported",
+			}, []string{"queue", "agent"}),
+		}
 
-	return m
+		prometheus.MustRegister(metricsInstance.queueSize)
+		prometheus.MustRegister(metricsInstance.queueItemProcessingTime)
+		prometheus.MustRegister(metricsInstance.itemExported)
+	})
+
+	return metricsInstance
 }
 
-func (m *Metrics) SetQueueSize(queue Queue, count int) {
-	m.queueSize.WithLabelValues(string(queue)).Set(float64(count))
+func (m *Metrics) SetQueueSize(queue Queue, count int, agentName string) {
+	m.queueSize.WithLabelValues(string(queue), agentName).Set(float64(count))
 }
 
-func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration) {
-	m.queueItemProcessingTime.WithLabelValues(string(queue)).Observe(duration.Seconds())
+func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration, agentName string) {
+	m.queueItemProcessingTime.WithLabelValues(string(queue), agentName).Observe(duration.Seconds())
 }
 
-func (m *Metrics) IncrementItemExported(queue Queue) {
-	m.itemExported.WithLabelValues(string(queue)).Inc()
+func (m *Metrics) IncrementItemExported(queue Queue, agentName string) {
+	m.itemExported.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) ServeMetrics(ctx context.Context, addr string) {
+	observability.StartMetricsServer(ctx, addr)
 }

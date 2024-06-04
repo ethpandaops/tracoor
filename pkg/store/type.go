@@ -5,11 +5,14 @@ type Type string
 const (
 	UnknownStore Type = "unknown"
 	S3StoreType  Type = "s3"
+	FSStoreType  Type = "fs"
 )
 
 func IsValidStoreType(st Type) bool {
 	switch st {
 	case S3StoreType:
+		return true
+	case FSStoreType:
 		return true
 	default:
 		return false

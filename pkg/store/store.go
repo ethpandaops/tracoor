@@ -94,6 +94,14 @@ func NewStore(namespace string, log logrus.FieldLogger, storeType Type, config y
 		}
 
 		return NewS3Store(namespace, log, s3Config, opts)
+	case FSStoreType:
+		var fsConfig *FSStoreConfig
+
+		if err := config.Unmarshal(&fsConfig); err != nil {
+			return nil, err
+		}
+
+		return NewFSStore(namespace, log, fsConfig, opts)
 	default:
 		return nil, fmt.Errorf("unknown store type: %s", storeType)
 	}

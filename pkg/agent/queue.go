@@ -68,7 +68,7 @@ func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
 	for stateRequest := range s.beaconStateQueue {
-		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue))
+		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -84,13 +84,14 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconStateQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
 
 func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 	for blockRequest := range s.beaconBlockQueue {
-		s.metrics.SetQueueSize(BeaconBlockQueue, len(s.beaconBlockQueue))
+		s.metrics.SetQueueSize(BeaconBlockQueue, len(s.beaconBlockQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -106,13 +107,14 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBlockQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
 
 func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 	for badBlockRequest := range s.beaconBadBlockQueue {
-		s.metrics.SetQueueSize(BeaconBadBlockQueue, len(s.beaconBadBlockQueue))
+		s.metrics.SetQueueSize(BeaconBadBlockQueue, len(s.beaconBadBlockQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -127,13 +129,14 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBadBlockQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
 
 func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 	for badBlobRequest := range s.beaconBadBlobQueue {
-		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue))
+		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -148,13 +151,14 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBadBlobQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
 
 func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 	for traceRequest := range s.executionBlockTraceQueue {
-		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue))
+		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -171,13 +175,14 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			ExecutionBlockTraceQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
 
 func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 	for range s.executionBadBlockQueue {
-		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue))
+		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue), s.Config.Name)
 
 		start := time.Now()
 
@@ -192,6 +197,7 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		s.metrics.ObserveQueueItemProcessingTime(
 			ExecutionBadBlockQueue,
 			time.Since(start),
+			s.Config.Name,
 		)
 	}
 }
