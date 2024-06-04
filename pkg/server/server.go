@@ -168,9 +168,13 @@ func (x *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to wait for GRPC server to be alive: %v", err)
 	}
 
+	x.log.Info("GRPC server is alive")
+
 	if err := x.waitForTCPAlive(newCtx, x.config.GatewayAddr); err != nil {
 		return fmt.Errorf("failed to wait for GRPC Gateway server to be alive: %v", err)
 	}
+
+	x.log.Info("GRPC Gateway server is alive")
 
 	// Signal that the server has fully started
 	close(x.Started)
