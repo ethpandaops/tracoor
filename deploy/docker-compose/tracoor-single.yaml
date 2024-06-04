@@ -1,5 +1,5 @@
 server:
-  addr: ":8081"
+  addr: ":8085"
   metricsAddr: ":9091"
   pprofAddr: ":6060"
   gatewayAddr: ":7007"
@@ -30,7 +30,7 @@ shared:
   metricsAddr: ":9091"
   logging: "debug"
   indexer:
-    address: localhost:8081
+    address: localhost:8085
   store:
     type: fs
     config:

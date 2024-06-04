@@ -157,7 +157,20 @@ func (x *Server) Start(ctx context.Context) error {
 	})
 
 	// Sleep for a little bit to give the http servers time to start.
-	time.Sleep(2 * time.Second)
+	time.Sleep(100 * time.Millisecond)
+
+	// Wait for 5 mins max
+	newCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	// Wait for all the servers to start
+	if err := x.waitForTCPAlive(newCtx, x.config.Addr); err != nil {
+		return fmt.Errorf("failed to wait for GRPC server to be alive: %v", err)
+	}
+
+	if err := x.waitForTCPAlive(newCtx, x.config.GatewayAddr); err != nil {
+		return fmt.Errorf("failed to wait for GRPC Gateway server to be alive: %v", err)
+	}
 
 	// Signal that the server has fully started
 	close(x.Started)
@@ -211,6 +224,26 @@ func (x *Server) stop(ctx context.Context) error {
 	x.log.Info("Server stopped")
 
 	return nil
+}
+
+func (x *Server) waitForTCPAlive(ctx context.Context, addr string) error {
+	dialer := &net.Dialer{}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			conn, err := dialer.DialContext(ctx, "tcp", addr)
+			if err == nil {
+				conn.Close()
+
+				return nil
+			}
+
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func (x *Server) startGrpcServer(ctx context.Context) error {
