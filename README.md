@@ -3,6 +3,8 @@
 
 Tracoor captures, stores and makes available beacon states, beacon blocks, execution debug traces, execution bad blocks and invalid gossiped verified blocks.
 
+![Tracoor](./tracooor.png)
+
 ----------
 
 <p align="center">
