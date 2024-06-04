@@ -2,6 +2,7 @@ server:
   addr: ":8081"
   metricsAddr: ":9091"
   pprofAddr: ":6060"
+  gatewayAddr: ":7007"
   preStopSleepSeconds: 1
   ntpServer: time.google.com
 
