@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     command: single --single-config /etc/config.yaml
     ports:
-      - '8081:8081'
+      - '8085:8085'
       - '9091:9091'
       - '7007:7007'
     volumes:
