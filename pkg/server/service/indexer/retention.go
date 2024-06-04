@@ -114,15 +114,6 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 	i.log.WithField("before", before).Debugf("Purging %d old beacon blocks", len(blocks))
 
 	for _, block := range blocks {
-		i.log.WithFields(
-			logrus.Fields{
-				"node":       block.Node,
-				"id":         block.ID,
-				"fetched_at": block.FetchedAt,
-				"age":        time.Since(block.FetchedAt),
-				"retention":  i.config.Retention.BeaconBlocks.Duration,
-			},
-		).Debug("Deleting beacon block")
 		// Delete from the store first
 		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
