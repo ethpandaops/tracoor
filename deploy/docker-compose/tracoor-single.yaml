@@ -20,6 +20,13 @@ server:
 agents:
   - name: example
     ethereum:
+      features:
+        fetchBeaconState: true
+        fetchBeaconBlock: true
+        fetchBeaconBadBlock: true
+        fetchBeaconBadBlob: true
+        fetchExecutionBlockTrace: true
+        fetchExecutionBadBlock: true
       overrideNetworkName: example-network
       beacon:
         nodeAddress: http://example.com:5052
