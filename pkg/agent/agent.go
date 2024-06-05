@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,6 +91,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
+//nolint:gocyclo // Most logic in callback functions that are self contained.
 func (s *agent) Start(ctx context.Context) error {
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
@@ -101,8 +103,11 @@ func (s *agent) Start(ctx context.Context) error {
 		}
 	}
 
+	enabledFeatures := s.Config.Ethereum.Features.EnabledFlags()
+
 	s.log.
 		WithField("version", tracoor.Full()).
+		WithField("enabled_features", strings.Join(enabledFeatures, ", ")).
 		Info("Starting tracoor in agent mode")
 
 	s.node.OnReady(ctx, func(ctx context.Context) error {
@@ -112,6 +117,10 @@ func (s *agent) Start(ctx context.Context) error {
 		go s.processExecutionBadBlockQueue(ctx)
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
+			if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() {
+				return nil
+			}
+
 			logCtx := logrus.WithFields(logrus.Fields{
 				"event_slot": event.Slot,
 				"event_root": fmt.Sprintf("%#x", event.Block),
@@ -221,6 +230,10 @@ func (s *agent) Start(ctx context.Context) error {
 
 			// Go back and fetch all the new execution block traces
 			for slot := chainReorg.Slot; slot < phase0.Slot(headSlot.Number()); slot++ {
+				if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() {
+					continue
+				}
+
 				logCtx := logrus.WithField("target_slot", slot)
 
 				block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%d", slot))
@@ -271,7 +284,7 @@ func (s *agent) Start(ctx context.Context) error {
 		s.log.WithField("network", s.Config.Ethereum.OverrideNetworkName).Info("Overriding network name")
 	}
 
-	if s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath != nil {
+	if s.Config.Ethereum.Features.GetFetchBeaconBadBlock() && s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath != nil {
 		_, err := s.scheduler.Every(30).Seconds().Do(func() {
 			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlocksPath
 			if path != nil {
@@ -283,7 +296,7 @@ func (s *agent) Start(ctx context.Context) error {
 		}
 	}
 
-	if s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath != nil {
+	if *s.Config.Ethereum.Features.FetchBeaconBadBlob && s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath != nil {
 		_, err := s.scheduler.Every(30).Seconds().Do(func() {
 			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath
 			if path != nil {
