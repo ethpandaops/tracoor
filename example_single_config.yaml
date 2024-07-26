@@ -1,6 +1,5 @@
 server:
   addr: ":8081"
-  metricsAddr: ":9091"
   gatewayAddr: ":7007"
   pprofAddr: ":6060"
   preStopSleepSeconds: 1
@@ -21,10 +20,23 @@ agents:
   - name: instance-1
     ethereum:
       overrideNetworkName: mainnet
+      # features:
+      #   fetchBeaconState: true
+      #   fetchBeaconBlock: true
+      #   fetchBeaconBadBlock: true
+      #   fetchBeaconBadBlob: true
+      #   fetchExecutionBlockTrace: true
+      #   fetchExecutionBadBlock: true
       beacon:
         nodeAddress: http://instance-1:5052
+        # invalidGossipVerifiedBlocksPath: /some/path/to/dump/invalid
+        # invalidGossipVerifiedBlobsPath: /some/path/to/dump/invalid
       execution:
         nodeAddress: http://instance-1:8545
+        traceDisableMemory: true
+        traceDisableStack: true
+        traceDisableStorage: true
+
 shared:
   metricsAddr: ":9091"
   logging: "debug"
