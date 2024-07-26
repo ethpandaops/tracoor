@@ -296,7 +296,7 @@ func (s *agent) Start(ctx context.Context) error {
 		}
 	}
 
-	if *s.Config.Ethereum.Features.FetchBeaconBadBlob && s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath != nil {
+	if s.Config.Ethereum.Features.GetFetchBeaconBadBlob() && s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath != nil {
 		_, err := s.scheduler.Every(30).Seconds().Do(func() {
 			path := s.Config.Ethereum.Beacon.InvalidGossipVerifiedBlobsPath
 			if path != nil {
