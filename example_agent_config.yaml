@@ -5,10 +5,29 @@ pprofAddr: ":6065"
 name: example-agent
 
 ethereum:
+  # features:
+  #   fetchBeaconState: true
+  #   fetchBeaconBlock: true
+  #   fetchBeaconBadBlock: true
+  #   fetchBeaconBadBlob: true
+  #   fetchExecutionBlockTrace: true
+  #   fetchExecutionBadBlock: true
   beacon:
     nodeAddress: http://localhost:5052
-    # invalidGossipVerifiedBlocksPath: /some/path/to/dump/invalid
-    # invalidGossipVerifiedBlobsPath: /some/path/to/dump/invalid
+    # Prysm
+    # requires --save-invalid-block-temp and --save-invalid-blob-temp flags enabled
+    # Always stored in os.tmpdir(), eg. /tmp
+    # invalidGossipVerifiedBlocksPath: /tmp
+    # invalidGossipVerifiedBlobsPath: /tmp
+
+    # Nimbus
+    # requires --dump flag enabled
+    # replace data-dir with the --data-dir flag value
+    # invalidGossipVerifiedBlocksPath: /data-dir/dump/invalid
+
+    # Lighthouse
+    # requires --invalid-gossip-verified-blocks-path flag set eg. =/data/invalid
+    # invalidGossipVerifiedBlocksPath: /data/invalid
   execution:
     nodeAddress: http://localhost:8545
     traceDisableMemory: true

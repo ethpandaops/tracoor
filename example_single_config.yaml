@@ -29,8 +29,20 @@ agents:
       #   fetchExecutionBadBlock: true
       beacon:
         nodeAddress: http://instance-1:5052
-        # invalidGossipVerifiedBlocksPath: /some/path/to/dump/invalid
-        # invalidGossipVerifiedBlobsPath: /some/path/to/dump/invalid
+        # Prysm
+        # requires --save-invalid-block-temp and --save-invalid-blob-temp flags enabled
+        # Always stored in os.tmpdir(), eg. /tmp
+        # invalidGossipVerifiedBlocksPath: /tmp
+        # invalidGossipVerifiedBlobsPath: /tmp
+
+        # Nimbus
+        # requires --dump flag enabled
+        # replace data-dir with the --data-dir flag value
+        # invalidGossipVerifiedBlocksPath: /data-dir/dump/invalid
+
+        # Lighthouse
+        # requires --invalid-gossip-verified-blocks-path flag set eg. =/data/invalid
+        # invalidGossipVerifiedBlocksPath: /data/invalid
       execution:
         nodeAddress: http://instance-1:8545
         traceDisableMemory: true
@@ -46,3 +58,6 @@ shared:
     type: fs
     config:
       base_path: "/tmp/tracoor"
+
+
+ethpandaops/tracoor:0.0.20-debian
