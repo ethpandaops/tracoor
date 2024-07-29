@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -59,6 +60,21 @@ func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkN
 		beacon:   node,
 		services: svcs,
 	}
+}
+
+func (b *Node) GetVersionImmuneBlock(ctx context.Context, blockID string) (*VersionImmuneBlock, error) {
+	data, err := b.beacon.FetchRawBlock(ctx, blockID, "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	block := &VersionImmuneBlock{}
+
+	if err := json.Unmarshal(data, block); err != nil {
+		return nil, err
+	}
+
+	return block, nil
 }
 
 func (b *Node) Start(ctx context.Context) error {
