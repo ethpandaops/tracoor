@@ -1,4 +1,3 @@
-//nolint:govet // This is a test
 package indexer
 
 import (
