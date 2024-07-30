@@ -149,5 +149,3 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
-
-replace github.com/ethpandaops/beacon => /home/savid/eth/beacon
