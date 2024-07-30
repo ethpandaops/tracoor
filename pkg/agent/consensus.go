@@ -128,22 +128,9 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%d", slot))
+	blockRoot, err := s.node.Beacon().Node().FetchBlockRoot(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
-		return errors.Wrap(err, "failed to fetch beacon block")
-	}
-
-	if block == nil {
-		s.log.
-			WithField("slot", slot).
-			Debug("no beacon block found for slot")
-
-		return nil
-	}
-
-	blockRoot, err := block.Root()
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch beacon block")
+		return errors.Wrap(err, "failed to fetch beacon block root")
 	}
 
 	blockRootAsString := blockRoot.String()
