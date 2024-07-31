@@ -1,37 +1,36 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	tStore "github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/klauspost/compress/gzip"
-	"github.com/klauspost/compress/snappy"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 type ObjectDownloader struct {
-	log      logrus.FieldLogger
-	store    tStore.Store
-	mux      *runtime.ServeMux
-	indexer  indexer.IndexerClient
-	grpcConn string
-	grpcOpts []grpc.DialOption
+	log        logrus.FieldLogger
+	store      tStore.Store
+	mux        *runtime.ServeMux
+	indexer    indexer.IndexerClient
+	grpcConn   string
+	grpcOpts   []grpc.DialOption
+	compressor *compression.Compressor
 }
 
 func NewObjectDownloader(log logrus.FieldLogger, store tStore.Store, mux *runtime.ServeMux, grpcConn string, grpcOpts []grpc.DialOption) *ObjectDownloader {
 	return &ObjectDownloader{
-		log:      log,
-		store:    store,
-		mux:      mux,
-		grpcConn: grpcConn,
-		grpcOpts: grpcOpts,
+		log:        log,
+		store:      store,
+		mux:        mux,
+		grpcConn:   grpcConn,
+		grpcOpts:   grpcOpts,
+		compressor: compression.NewCompressor(),
 	}
 }
 
@@ -134,10 +133,9 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -211,10 +209,9 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -288,10 +285,9 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -365,10 +361,9 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(blob.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -442,10 +437,9 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -519,10 +513,9 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err = setResponseCompression(w, r, data); err != nil {
-		d.writeJSONError(w, err.Error(), http.StatusBadRequest)
-
-		return
+	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -531,56 +524,6 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
 	}
-}
-
-func setResponseCompression(w http.ResponseWriter, r *http.Request, data *[]byte) error {
-	compression := r.Header.Get("Accept-Encoding")
-	if compression == "" {
-		// If no compression is specified, directly write the data without compression.
-		return nil
-	}
-
-	if strings.Contains(compression, "gzip") {
-		w.Header().Set("Content-Encoding", "gzip")
-
-		var b bytes.Buffer
-
-		gz := gzip.NewWriter(&b)
-
-		if _, err := gz.Write(*data); err != nil {
-			return err
-		}
-
-		if err := gz.Close(); err != nil {
-			return err
-		}
-
-		*data = b.Bytes()
-
-		return nil
-	}
-
-	if strings.Contains(compression, "snappy") {
-		w.Header().Set("Content-Encoding", "snappy")
-
-		var b bytes.Buffer
-
-		df := snappy.NewBufferedWriter(&b)
-
-		if _, err := df.Write(*data); err != nil {
-			return err
-		}
-
-		if err := df.Close(); err != nil {
-			return err
-		}
-
-		*data = b.Bytes()
-
-		return nil
-	}
-
-	return nil
 }
 
 func (d *ObjectDownloader) writeJSONError(w http.ResponseWriter, message string, statusCode int) {

@@ -210,8 +210,8 @@ export default function BeaconStateId({ id }: { id: string }) {
                 href={`/download/beacon_state/${id}`}
                 download={
                   state
-                    ? `beacon_state-${state.node}-${state.slot}-${state.state_root}.ssz.gz`
-                    : `beacon_state-${id}.ssz.gz`
+                    ? `beacon_state-${state.node}-${state.slot}-${state.state_root}.ssz`
+                    : `beacon_state-${id}.ssz`
                 }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >

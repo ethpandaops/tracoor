@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/networks"
 	"github.com/ethpandaops/tracoor/pkg/observability"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor"
@@ -49,6 +51,8 @@ type agent struct {
 	beaconBadBlobQueue       chan *BeaconBadBlobRequest
 	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
 	executionBadBlockQueue   chan *ExecutionBadBlockRequest
+
+	compressor *compression.Compressor
 }
 
 const namespace = "tracoor_agent"
@@ -88,10 +92,10 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		beaconBadBlobQueue:       make(chan *BeaconBadBlobRequest, 1000),
 		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
 		executionBadBlockQueue:   make(chan *ExecutionBadBlockRequest, 1000),
+		compressor:               compression.NewCompressor(),
 	}, nil
 }
 
-//nolint:gocyclo // Most logic in callback functions that are self contained.
 func (s *agent) Start(ctx context.Context) error {
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
@@ -134,7 +138,7 @@ func (s *agent) Start(ctx context.Context) error {
 			}
 
 			// Fetch the beacon block from the beacon node.
-			block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%#x", event.Block))
+			block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, fmt.Sprintf("%#x", event.Block))
 			if err != nil {
 				logCtx.WithError(err).Error("Failed to fetch beacon block")
 
@@ -148,21 +152,18 @@ func (s *agent) Start(ctx context.Context) error {
 			}
 
 			// Rip out the execution block number from the block
-			executionBlockNumber, err := block.ExecutionBlockNumber()
+			executionBlockNumber := block.Data.Message.Body.ExecutionPayload.BlockNumber
+
+			executionBlockHash := block.Data.Message.Body.ExecutionPayload.BlockHash
+
+			executionBlockNumberUint, err := strconv.ParseUint(executionBlockNumber, 10, 64)
 			if err != nil {
-				logCtx.WithError(err).Error("Failed to get execution block number from beacon block")
+				logCtx.WithError(err).Error("Failed to parse execution block number when processing beacon block event")
 
 				return err
 			}
 
-			executionBlockHash, err := block.ExecutionBlockHash()
-			if err != nil {
-				logCtx.WithError(err).Error("Failed to get execution block hash from beacon block")
-
-				return err
-			}
-
-			s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
+			s.enqueueExecutionBlockTrace(ctx, executionBlockHash, executionBlockNumberUint)
 
 			return nil
 		})
@@ -236,42 +237,32 @@ func (s *agent) Start(ctx context.Context) error {
 
 				logCtx := logrus.WithField("target_slot", slot)
 
-				block, err := s.node.Beacon().Node().FetchBlock(ctx, fmt.Sprintf("%d", slot))
+				// Fetch a version immune beacon block from the beacon node.
+				block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, fmt.Sprintf("%d", slot))
 				if err != nil {
-					logCtx.
-						WithError(err).
-						Error("Failed to fetch beacon block when processing chain reorg")
+					logCtx.WithError(err).Error("Failed to fetch beacon block")
 
-					continue
-				}
-
-				if block == nil {
-					logCtx.Error("Failed to fetch beacon block - the beacon node returned a nil block.")
-
-					continue
+					return err
 				}
 
 				// Rip out the execution block number from the block
-				executionBlockNumber, err := block.ExecutionBlockNumber()
+				executionBlockNumber := block.Data.Message.Body.ExecutionPayload.BlockNumber
+
+				executionBlockHash := block.Data.Message.Body.ExecutionPayload.BlockHash
+
+				executionBlockNumberUint, err := strconv.ParseUint(executionBlockNumber, 10, 64)
 				if err != nil {
-					logCtx.WithError(err).Error("Failed to get execution block number from beacon block")
+					logCtx.WithError(err).Error("Failed to parse execution block number when processing beacon block event")
 
-					continue
-				}
-
-				executionBlockHash, err := block.ExecutionBlockHash()
-				if err != nil {
-					logCtx.WithError(err).Error("Failed to get execution block hash from beacon block")
-
-					continue
+					return err
 				}
 
 				logCtx.WithFields(logrus.Fields{
 					"execution_block_number": executionBlockNumber,
-					"execution_block_hash":   executionBlockHash.String(),
+					"execution_block_hash":   executionBlockHash,
 				}).Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
 
-				s.enqueueExecutionBlockTrace(ctx, executionBlockHash.String(), executionBlockNumber)
+				s.enqueueExecutionBlockTrace(ctx, executionBlockHash, executionBlockNumberUint)
 			}
 
 			return nil

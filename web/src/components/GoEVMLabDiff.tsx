@@ -74,12 +74,8 @@ export default function GoEVMLabDiff() {
     if (trace1 && trace2 && goEvmLabDiffTx !== '' && goEvmLabDiffTx !== undefined) {
       return `# Download the state and block
 # Note: requires wget
-wget -O ${trace1FileName}.json.gz -q ${window.location.origin}/download/execution_block_trace/${trace1.id}
-wget -O ${trace2FileName}.json.gz -q ${window.location.origin}/download/execution_block_trace/${trace2.id}
-
-# Decompress the state and block
-gzip -f -d ${trace1FileName}.json.gz
-gzip -f -d ${trace2FileName}.json.gz
+wget -O ${trace1FileName}.json -q ${window.location.origin}/download/execution_block_trace/${trace1.id}
+wget -O ${trace2FileName}.json -q ${window.location.origin}/download/execution_block_trace/${trace2.id}
 
 # Pull out the transaction
 # Note: requires jq

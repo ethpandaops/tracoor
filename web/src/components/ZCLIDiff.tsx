@@ -49,10 +49,7 @@ export default function ZCLIStateTransition() {
     if (state && zcliFileName) {
       return `# Download the state
 # Note: requires wget
-wget -O ${stateFileName}.ssz.gz -q ${window.location.origin}/download/beacon_state/${state.id}
-
-# Decompress the state
-gzip -f -d ${stateFileName}.ssz.gz
+wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
 
 # Diff the states
 # Note: change "deneb" to the correct phase as required

@@ -431,7 +431,7 @@ export default function ExecutionBlockTraceTable({ id }: { id?: string }) {
                           <div className="flex flex-row">
                             <a
                               href={`/download/execution_block_trace/${row.id}`}
-                              download={`execution_block_trace-${row.block_number}-${row.block_hash}-${row.node}.json.gz`}
+                              download={`execution_block_trace-${row.block_number}-${row.block_hash}-${row.node}.json`}
                               className="text-sky-400 hover:text-sky-600 flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6 3xl:mr-1" aria-hidden="true" />

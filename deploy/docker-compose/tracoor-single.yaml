@@ -14,7 +14,7 @@ server:
     indexer:
       retention:
         beaconStates: 1m
-        executionBlockTraces: 1m
+        executionBlockTraces: 15m
         beaconBlocks: 1m
 
 agents:
@@ -29,9 +29,9 @@ agents:
         fetchExecutionBadBlock: true
       overrideNetworkName: example-network
       beacon:
-        nodeAddress: http://example.com:5052
+        nodeAddress: http://example:5052
       execution:
-        nodeAddress: http://example.com:8545
+        nodeAddress: http://example:8545
 
 shared:
   metricsAddr: ":9091"

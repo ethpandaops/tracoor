@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -43,6 +44,11 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 
 	now := time.Now()
 
+	compressedData, err := s.compressor.Compress(data, compression.Gzip)
+	if err != nil {
+		return errors.Wrapf(err, "failed to compress execution block trace")
+	}
+
 	location := CreateExecutionBlockTraceFileName(
 		s.Config.Name,
 		string(s.node.Beacon().Metadata().Network.Name),
@@ -52,8 +58,10 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 
 	location = fmt.Sprintf("%s.json", location)
 
+	location = compression.AddExtension(location, compression.Gzip)
+
 	// Upload the execution block trace to the store.
-	location, err = s.store.SaveExecutionBlockTrace(ctx, data, location)
+	location, err = s.store.SaveExecutionBlockTrace(ctx, &compressedData, location)
 	if err != nil {
 		return errors.Wrap(err, "failed to save execution block trace to store")
 	}
@@ -136,6 +144,14 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 		return err
 	}
 
+	// Compress it
+	compressedBlockData, err := s.compressor.Compress(&rawBlockData, compression.Gzip)
+	if err != nil {
+		s.log.WithError(err).Error("Failed to compress execution bad block")
+
+		return err
+	}
+
 	location := CreateExecutionBadBlockFileName(
 		s.Config.Name,
 		string(s.node.Beacon().Metadata().Network.Name),
@@ -144,8 +160,10 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 
 	location = fmt.Sprintf("%s.json", location)
 
+	location = compression.AddExtension(location, compression.Gzip)
+
 	// Upload the execution block trace to the store.
-	location, err = s.store.SaveExecutionBadBlock(ctx, &rawBlockData, location)
+	location, err = s.store.SaveExecutionBadBlock(ctx, &compressedBlockData, location)
 	if err != nil {
 		return errors.Wrap(err, "failed to save execution bad block to store")
 	}
