@@ -19,7 +19,6 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
-	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/networks"
 	"github.com/ethpandaops/tracoor/pkg/observability"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor"
@@ -51,8 +50,6 @@ type agent struct {
 	beaconBadBlobQueue       chan *BeaconBadBlobRequest
 	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
 	executionBadBlockQueue   chan *ExecutionBadBlockRequest
-
-	compressor *compression.Compressor
 }
 
 const namespace = "tracoor_agent"
@@ -92,7 +89,6 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		beaconBadBlobQueue:       make(chan *BeaconBadBlobRequest, 1000),
 		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
 		executionBadBlockQueue:   make(chan *ExecutionBadBlockRequest, 1000),
-		compressor:               compression.NewCompressor(),
 	}, nil
 }
 
