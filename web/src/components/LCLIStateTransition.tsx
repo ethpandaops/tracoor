@@ -104,12 +104,9 @@ export default function LCLIStateTransition() {
     if (state && (block || badBlock)) {
       return `# Download the state and block
 # Note: requires wget
-wget -O ${stateFileName}.ssz.gz -q ${window.location.origin}/download/beacon_state/${state.id}
-wget -O ${blockFileName}.ssz.gz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
+wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
+wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
 
-# Decompress the state and block
-gzip -f -d ${stateFileName}.ssz.gz
-gzip -f -d ${blockFileName}.ssz.gz
 
 # Transition the state
 cargo run --release -- transition-blocks \\

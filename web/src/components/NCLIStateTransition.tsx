@@ -104,12 +104,8 @@ export default function NCLIStateTransition() {
     if (state && (block || badBlock)) {
       return `# Download the state and block
 # Note: requires wget
-wget -O ${stateFileName}.ssz.gz -q ${window.location.origin}/download/beacon_state/${state.id}
-wget -O ${blockFileName}.ssz.gz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
-
-# Decompress the state and block
-gzip -f -d ${stateFileName}.ssz.gz
-gzip -f -d ${blockFileName}.ssz.gz
+wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
+wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
 
 # Transition the state
 # ncli transition <state_file> <block_file> <output_file> <verify_state_root>

@@ -203,8 +203,8 @@ export default function ExecutionBadBlockId({ id }: { id: string }) {
                 href={`/download/execution_bad_block/${id}`}
                 download={
                   badBlock
-                    ? `execution_bad_block-${badBlock.block_number}-${badBlock.block_hash}-${badBlock.node}.json.gz`
-                    : `execution_bad_block-${id}.json.gz`
+                    ? `execution_bad_block-${badBlock.block_number}-${badBlock.block_hash}-${badBlock.node}.json`
+                    : `execution_bad_block-${id}.json`
                 }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >

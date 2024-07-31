@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -245,6 +246,10 @@ func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BeaconStateDataType))
@@ -337,6 +342,10 @@ func (s *S3Store) GetBeaconBlockURL(ctx context.Context, location string, expiry
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBlockDataType))
@@ -429,6 +438,10 @@ func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, location string, exp
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlockDataType))
@@ -520,6 +533,10 @@ func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, location string, expi
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlobDataType))
@@ -628,6 +645,10 @@ func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, location string
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BlockTraceDataType))
@@ -720,6 +741,10 @@ func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
 	if err == nil {
 		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+
+		location = compression.RemoveExtension(location, compressionAlgorithm)
+
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
 	}
 
 	s.basicMetrics.ObserveItemURLRetreived(string(BadBlockDataType))
