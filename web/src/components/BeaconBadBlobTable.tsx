@@ -509,7 +509,7 @@ export default function BeaconBadBlobTable({ id }: { id?: string }) {
                           <div className="flex flex-row">
                             <a
                               href={`/download/beacon_bad_blob/${row.id}`}
-                              download={`beacon_bad_blob-${row.node}-${row.slot}-${row.block_root}-${row.index}.ssz.gz`}
+                              download={`beacon_bad_blob-${row.node}-${row.slot}-${row.block_root}-${row.index}.ssz`}
                               className="text-sky-400 hover:text-sky-600 flex items-center bg-white/35 hover:bg-white/50 rounded-xl px-3 3xl:px-2 py-2 3xl:py-1 mx-0.5 border-2 border-sky-400 hover:border-sky-600"
                             >
                               <ArrowDownTrayIcon className="h-6 w-6 3xl:mr-1" aria-hidden="true" />

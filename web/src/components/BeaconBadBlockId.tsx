@@ -210,8 +210,8 @@ export default function BeaconBadBlockId({ id }: { id: string }) {
                 href={`/download/beacon_bad_block/${id}`}
                 download={
                   block
-                    ? `beacon_bad_block-${block.node}-${block.slot}-${block.block_root}.ssz.gz`
-                    : `beacon_bad_block-${id}.ssz.gz`
+                    ? `beacon_bad_block-${block.node}-${block.slot}-${block.block_root}.ssz`
+                    : `beacon_bad_block-${id}.ssz`
                 }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >

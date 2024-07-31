@@ -230,8 +230,8 @@ export default function BeaconBadBlobId({ id }: { id: string }) {
                 href={`/download/beacon_bad_blob/${id}`}
                 download={
                   blob
-                    ? `beacon_bad_blob-${blob.node}-${blob.slot}-${blob.block_root}-${blob.index}.ssz.gz`
-                    : `beacon_bad_blob-${id}.ssz.gz`
+                    ? `beacon_bad_blob-${blob.node}-${blob.slot}-${blob.block_root}-${blob.index}.ssz`
+                    : `beacon_bad_blob-${id}.ssz`
                 }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >

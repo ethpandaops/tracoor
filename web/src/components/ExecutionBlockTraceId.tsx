@@ -193,8 +193,8 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
                 href={`/download/execution_block_trace/${id}`}
                 download={
                   trace
-                    ? `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}.json.gz`
-                    : `execution_block_trace-${id}.json.gz`
+                    ? `execution_block_trace-${trace.block_number}-${trace.block_hash}-${trace.node}.json`
+                    : `execution_block_trace-${id}.json`
                 }
                 className="text-amber-500 hover:text-amber-600 px-2 flex"
               >
