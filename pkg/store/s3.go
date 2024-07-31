@@ -306,10 +306,9 @@ func (s *S3Store) SaveBeaconBlock(ctx context.Context, data *[]byte, location st
 	}
 
 	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:          aws.String(s.config.BucketName),
-		Key:             aws.String(location),
-		Body:            bytes.NewBuffer(*data),
-		ContentEncoding: aws.String("gzip"),
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+		Body:   bytes.NewBuffer(*data),
 	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
