@@ -9,14 +9,13 @@ import (
 type BasicMetrics struct {
 	namespace string
 
-	info                        *prometheus.GaugeVec
-	itemsAdded                  *prometheus.CounterVec
-	itemsAddedBytes             *prometheus.HistogramVec
-	itemsAddedBytesUncompressed *prometheus.HistogramVec
-	itemsRemoved                *prometheus.CounterVec
-	itemsRetreived              *prometheus.CounterVec
-	itemsUrlsRetreived          *prometheus.CounterVec
-	itemsStored                 *prometheus.GaugeVec
+	info               *prometheus.GaugeVec
+	itemsAdded         *prometheus.CounterVec
+	itemsAddedBytes    *prometheus.HistogramVec
+	itemsRemoved       *prometheus.CounterVec
+	itemsRetreived     *prometheus.CounterVec
+	itemsUrlsRetreived *prometheus.CounterVec
+	itemsStored        *prometheus.GaugeVec
 
 	cacheHit  *prometheus.CounterVec
 	cacheMiss *prometheus.CounterVec
@@ -79,19 +78,12 @@ func GetBasicMetricsInstance(namespace, storeType string, enabled bool) *BasicMe
 				Help:      "Size of items added to the store",
 				Buckets:   prometheus.ExponentialBuckets(1024000, 2, 13),
 			}, []string{"type"}),
-			itemsAddedBytesUncompressed: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-				Namespace: namespace,
-				Name:      "items_added_uncompressed_bytes",
-				Help:      "Size of items added to the store when uncompressed",
-				Buckets:   prometheus.ExponentialBuckets(1024000, 2, 13),
-			}, []string{"type"}),
 		}
 
 		if enabled {
 			prometheus.MustRegister(instance.info)
 			prometheus.MustRegister(instance.itemsAdded)
 			prometheus.MustRegister(instance.itemsAddedBytes)
-			prometheus.MustRegister(instance.itemsAddedBytesUncompressed)
 			prometheus.MustRegister(instance.itemsRemoved)
 			prometheus.MustRegister(instance.itemsRetreived)
 			prometheus.MustRegister(instance.itemsUrlsRetreived)
@@ -112,10 +104,6 @@ func (m *BasicMetrics) ObserveItemAdded(itemType string) {
 
 func (m *BasicMetrics) ObserveItemAddedBytes(itemType string, size int) {
 	m.itemsAddedBytes.WithLabelValues(itemType).Observe(float64(size))
-}
-
-func (m *BasicMetrics) ObserveItemAddedBytesUncompressed(itemType string, size int) {
-	m.itemsAddedBytesUncompressed.WithLabelValues(itemType).Observe(float64(size))
 }
 
 func (m *BasicMetrics) ObserveItemRemoved(itemType string) {

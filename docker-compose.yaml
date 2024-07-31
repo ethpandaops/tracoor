@@ -24,8 +24,5 @@ services:
       - '7007:7007'
     volumes:
       - ./deploy/docker-compose/tracoor-single.yaml:/etc/config.yaml
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - tracoor-net

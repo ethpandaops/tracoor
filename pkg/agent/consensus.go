@@ -11,6 +11,7 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -81,8 +82,16 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	s.log.WithField("location", location).Debug("Saving beacon state")
 
+	// Compress it
+	compressedState, err := s.compressor.Compress(&state, compression.Gzip)
+	if err != nil {
+		return errors.Wrap(err, "failed to compress beacon state")
+	}
+
+	location = compression.AddExtension(location, compression.Gzip)
+
 	// Upload the state to the store
-	location, err = s.store.SaveBeaconState(ctx, &state, location)
+	location, err = s.store.SaveBeaconState(ctx, &compressedState, location)
 	if err != nil {
 		return err
 	}
@@ -177,10 +186,18 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
+	// Compress it
+	compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Gzip)
+	if err != nil {
+		return errors.Wrap(err, "failed to compress beacon block")
+	}
+
+	location = compression.AddExtension(location, compression.Gzip)
+
 	s.log.WithField("location", location).Debug("Saving beacon block")
 
 	// Upload the block to the store
-	location, err = s.store.SaveBeaconBlock(ctx, &blockRaw, location)
+	location, err = s.store.SaveBeaconBlock(ctx, &compressedBlock, location)
 	if err != nil {
 		return err
 	}
@@ -343,9 +360,16 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 			if !exists {
 				now := time.Now()
 
+				compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Gzip)
+				if err != nil {
+					return errors.Wrap(err, "failed to compress beacon bad block")
+				}
+
+				location = compression.AddExtension(location, compression.Gzip)
+
 				s.log.WithField("location", location).Debug("Saving beacon bad block")
 
-				location, err = s.store.SaveBeaconBadBlock(ctx, &blockRaw, location)
+				location, err = s.store.SaveBeaconBadBlock(ctx, &compressedBlock, location)
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
 						"slot":      slot,
@@ -549,9 +573,17 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 			if !exists {
 				now := time.Now()
 
+				// Compress it
+				compressedBlob, err := s.compressor.Compress(&blobRaw, compression.Gzip)
+				if err != nil {
+					return errors.Wrap(err, "failed to compress beacon bad block")
+				}
+
+				location = compression.AddExtension(location, compression.Gzip)
+
 				s.log.WithField("location", location).Debug("Saving beacon bad blob")
 
-				location, err = s.store.SaveBeaconBadBlob(ctx, &blobRaw, location)
+				location, err = s.store.SaveBeaconBadBlob(ctx, &compressedBlob, location)
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
 						"slot":      slot,
