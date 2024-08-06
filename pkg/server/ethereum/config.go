@@ -1,9 +1,8 @@
 package ethereum
 
 type Config struct {
-	Network string        `yaml:"network"`
-	Config  ConfigDetails `yaml:"config"`
-	Tools   ToolsConfig   `yaml:"tools"`
+	Config ConfigDetails `yaml:"config"`
+	Tools  ToolsConfig   `yaml:"tools"`
 }
 
 type ConfigDetails struct {

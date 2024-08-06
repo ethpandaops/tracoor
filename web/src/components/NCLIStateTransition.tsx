@@ -14,9 +14,11 @@ import CopyToClipboard from '@components/CopyToClipboard';
 import Loading from '@components/Loading';
 import NCLISetup from '@components/NCLISetup';
 import useNetwork from '@contexts/network';
-import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates } from '@hooks/useQuery';
+import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates, useConfig } from '@hooks/useQuery';
+import { isCustomNetwork } from '@utils/config';
 
 export default function NCLIStateTransition() {
+  const { data: config } = useConfig({});
   const { watch, setValue } = useFormContext();
   const [, setLocation] = useLocation();
   const { network } = useNetwork();
@@ -107,9 +109,13 @@ export default function NCLIStateTransition() {
 wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
 wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
 
-# Transition the state
-# ncli transition <state_file> <block_file> <output_file> <verify_state_root>
-build/ncli transition \\
+# Transition the state${
+        config && isCustomNetwork(config)
+          ? `
+# Note: requires the network config in the local directory "${network}", read the setup instructions above`
+          : ''
+      }
+build/ncli --network=${network} transition \\
   ${stateFileName}.ssz \\
   ${blockFileName}.ssz \\
   ${stateFileName}-post.ssz \\

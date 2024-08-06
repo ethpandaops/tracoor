@@ -14,9 +14,11 @@ import CopyToClipboard from '@components/CopyToClipboard';
 import LCLISetup from '@components/LCLISetup';
 import Loading from '@components/Loading';
 import useNetwork from '@contexts/network';
-import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates } from '@hooks/useQuery';
+import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates, useConfig } from '@hooks/useQuery';
+import { isCustomNetwork } from '@utils/config';
 
 export default function LCLIStateTransition() {
+  const { data: config } = useConfig({});
   const { watch, setValue } = useFormContext();
   const [, setLocation] = useLocation();
   const { network } = useNetwork();
@@ -107,10 +109,14 @@ export default function LCLIStateTransition() {
 wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
 wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
 
-
-# Transition the state
+# Transition the state${
+        config && isCustomNetwork(config)
+          ? `
+# Note: requires the network config in the local directory "${network}", read the setup instructions above`
+          : ''
+      }
 cargo run --release -- transition-blocks \\
-  --network ${network} \\
+  ${config && isCustomNetwork(config) ? `--testnet-dir=./${network}` : `--network=${network}`} \\
   --pre-state-path ${stateFileName}.ssz \\
   --block-path ${blockFileName}.ssz \\
   --post-state-output-path ${stateFileName}-post.ssz`;
