@@ -16,21 +16,21 @@ server:
         beaconStates: 1m
         executionBlockTraces: 15m
         beaconBlocks: 1m
-  ethereum:
-    network: pepega-21
-    config:
-      repository: github.com/ethpandaops/pepega-devnets
-      branch: main
-      path: pepega-21
-    tools:
-      ncli:
-        repository: github.com/ethpandaops/ncli
-        branch: main
-      lcli:
-        repository: github.com/ethpandaops/lcli
-        branch: main
-      zcli:
-        fork: uwotmate
+  # ethereum:
+  #   network: devnet-name
+  #   config:
+  #     repository: github.com/ethpandaops/devnet-repo
+  #     branch: main
+  #     path: network-configs/devnet-name/metadata
+  #   tools:
+  #     ncli:
+  #       repository: status-im/nimbus-eth2
+  #       branch: unstable
+  #     lcli:
+  #       repository: sigp/lighthouse
+  #       branch: devnet-branch
+  #     zcli:
+  #       fork: fork-name
 
 agents:
   - name: example
