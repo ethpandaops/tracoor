@@ -1,4 +1,4 @@
-import { Disclosure } from '@headlessui/react';
+import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/react';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
@@ -6,20 +6,43 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { railscasts } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import CopyToClipboard from '@components/CopyToClipboard';
+import useNetwork from '@contexts/network';
+import { useConfig } from '@hooks/useQuery';
+import { getLCLIConfig, isCustomNetwork, getNetworkConfig } from '@utils/config';
 
 export default function LCLISetup() {
-  const cmd = `# download the source code
-git clone https://github.com/sigp/lighthouse.git
-cd lighthouse/lcli
+  const { data: config } = useConfig({});
+  const { network } = useNetwork();
 
-# check the command works
+  const lcliConfig = getLCLIConfig(config ?? {});
+  const networkConfig = getNetworkConfig(config ?? {});
+
+  const cmd = `# download the source code
+git clone https://github.com/${lcliConfig.repository}.git
+cd lighthouse/lcli
+${
+  lcliConfig.branch
+    ? `
+# checkout the branch
+git checkout ${lcliConfig.branch}
+`
+    : ''
+}
+${
+  isCustomNetwork(config ?? {})
+    ? `# pull the network config locally
+TMP_DIR="$(mktemp -d)" && git clone --depth 1 --branch ${networkConfig.branch} https://github.com/${networkConfig.repository}.git $TMP_DIR && cp -r $TMP_DIR/${networkConfig.path} ./${network} && rm -rf $TMP_DIR
+
+`
+    : ''
+}# check the command works
 # note: requires Rust and Cargo to be installed
 cargo run --release -- --help`;
   return (
     <Disclosure>
       {({ open }) => (
         <>
-          <Disclosure.Button
+          <DisclosureButton
             className={classNames(
               open ? 'rounded-t-xl border-t-2 border-x-2' : 'rounded-xl border-2',
               'bg-white/25 mt-1 px-4 p-5 sm:px-6 min-w-full border-amber-200',
@@ -47,9 +70,9 @@ cargo run --release -- --help`;
                 )}
               </span>
             </h3>
-          </Disclosure.Button>
+          </DisclosureButton>
 
-          <Disclosure.Panel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl border-b-2 border-x-2 border-amber-200">
+          <DisclosurePanel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl border-b-2 border-x-2 border-amber-200">
             <h3 className="text-base font-semibold leading-6 text-gray-600 pt-5">
               Install{' '}
               <a
@@ -71,7 +94,7 @@ cargo run --release -- --help`;
                 </SyntaxHighlighter>
               </div>
             </div>
-          </Disclosure.Panel>
+          </DisclosurePanel>
         </>
       )}
     </Disclosure>

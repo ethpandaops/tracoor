@@ -76,7 +76,6 @@ func (i *Indexer) GetConfig(ctx context.Context, req *indexer.GetConfigRequest) 
 	return &indexer.GetConfigResponse{
 		Config: &indexer.Config{
 			Ethereum: &indexer.EthereumConfig{
-				Network: wrapperspb.String(i.ethereumConfig.Network),
 				Config: &indexer.EthereumNetworkConfig{
 					Repository: wrapperspb.String(i.ethereumConfig.Config.Repository),
 					Branch:     wrapperspb.String(i.ethereumConfig.Config.Branch),

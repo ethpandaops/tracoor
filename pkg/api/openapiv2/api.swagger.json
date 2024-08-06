@@ -226,9 +226,6 @@
     "apiEthereumConfig": {
       "type": "object",
       "properties": {
-        "network": {
-          "type": "string"
-        },
         "config": {
           "$ref": "#/definitions/apiEthereumNetworkConfig"
         },

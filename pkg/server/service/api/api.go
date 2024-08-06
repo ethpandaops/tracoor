@@ -75,7 +75,6 @@ func (i *API) GetConfig(ctx context.Context, req *api.GetConfigRequest) (*api.Ge
 	rsp := &api.GetConfigResponse{
 		Config: &api.Config{
 			Ethereum: &api.EthereumConfig{
-				Network: conf.GetConfig().GetEthereum().GetNetwork().GetValue(),
 				Config: &api.EthereumNetworkConfig{
 					Repository: conf.GetConfig().GetEthereum().GetConfig().GetRepository().GetValue(),
 					Branch:     conf.GetConfig().GetEthereum().GetConfig().GetBranch().GetValue(),

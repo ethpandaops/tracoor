@@ -20,7 +20,6 @@ services:
       executionBadBlocks: 30m
   # Use the following to configure Tracoor for a devnet
   # ethereum:
-  #   network: devnet-name
   #   config:
   #     repository: github.com/ethpandaops/devnet-repo
   #     branch: main

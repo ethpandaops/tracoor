@@ -124,6 +124,29 @@ export type ExecutionBadBlockField =
   | 'execution_implementation'
   | 'block_extra_data';
 
+export interface Config {
+  ethereum?: {
+    config?: {
+      repository?: string;
+      branch?: string;
+      path?: string;
+    };
+    tools?: {
+      ncli?: {
+        repository?: string;
+        branch?: string;
+      };
+      lcli?: {
+        repository?: string;
+        branch?: string;
+      };
+      zcli?: {
+        fork?: string;
+      };
+    };
+  };
+}
+
 /* REQUESTS */
 export interface PaginationCursor {
   limit?: number;
@@ -323,6 +346,8 @@ export interface V1ListUniqueExecutionBadBlockValuesRequest {
   fields: ExecutionBadBlockField[];
 }
 
+export interface V1GetConfigRequest {}
+
 /* RESPONSE */
 export interface V1ListBeaconStateResponse {
   beacon_states?: BeaconState[];
@@ -430,4 +455,8 @@ export interface V1ListUniqueExecutionBadBlockValuesResponse {
   network?: string[];
   execution_implementation?: string[];
   block_extra_data?: string[];
+}
+
+export interface V1GetConfigResponse {
+  config: Config;
 }

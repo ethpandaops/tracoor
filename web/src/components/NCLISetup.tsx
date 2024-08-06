@@ -1,4 +1,4 @@
-import { Disclosure } from '@headlessui/react';
+import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/react';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
@@ -6,22 +6,45 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { railscasts } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import CopyToClipboard from '@components/CopyToClipboard';
+import useNetwork from '@contexts/network';
+import { useConfig } from '@hooks/useQuery';
+import { getNCLIConfig, isCustomNetwork, getNetworkConfig } from '@utils/config';
 
 export default function NCLISetup() {
-  const cmd = `# download the source code
-git clone https://github.com/status-im/nimbus-eth2.git
-cd nimbus-eth2
+  const { data: config } = useConfig({});
+  const { network } = useNetwork();
 
+  const ncliConfig = getNCLIConfig(config ?? {});
+  const devnetConfig = getNetworkConfig(config ?? {});
+
+  const cmd = `# download the source code
+git clone https://github.com/${ncliConfig.repository}.git
+cd nimbus-eth2
+${
+  ncliConfig.branch
+    ? `
+# checkout the branch
+git checkout ${ncliConfig.branch}
+`
+    : ''
+}
 # build ncli
 make NIMFLAGS="-d:release" ncli
 
-# check the command works
+${
+  isCustomNetwork(config ?? {})
+    ? `# pull the network config locally
+TMP_DIR="$(mktemp -d)" && git clone --depth 1 --branch ${devnetConfig.branch} https://github.com/${devnetConfig.repository}.git $TMP_DIR && cp -r $TMP_DIR/${devnetConfig.path} ./${network} && rm -rf $TMP_DIR
+
+`
+    : ''
+}# check the command works
 build/ncli --help`;
   return (
     <Disclosure>
       {({ open }) => (
         <>
-          <Disclosure.Button
+          <DisclosureButton
             className={classNames(
               open ? 'rounded-t-xl border-t-2 border-x-2' : 'rounded-xl border-2',
               'bg-white/25 mt-1 px-4 p-5 sm:px-6 min-w-full border-amber-200',
@@ -49,9 +72,9 @@ build/ncli --help`;
                 )}
               </span>
             </h3>
-          </Disclosure.Button>
+          </DisclosureButton>
 
-          <Disclosure.Panel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl border-b-2 border-x-2 border-amber-200">
+          <DisclosurePanel className="text-gray-500 px-5 pb-5 bg-white/35 rounded-b-xl border-b-2 border-x-2 border-amber-200">
             <h3 className="text-base font-semibold leading-6 text-gray-600 pt-5">
               Install{' '}
               <a
@@ -73,7 +96,7 @@ build/ncli --help`;
                 </SyntaxHighlighter>
               </div>
             </div>
-          </Disclosure.Panel>
+          </DisclosurePanel>
         </>
       )}
     </Disclosure>

@@ -151,9 +151,8 @@ message Config {
 }
 
 message EthereumConfig {
-  string network = 1;
-  EthereumNetworkConfig config = 2;
-  ToolsConfig tools = 3;
+  EthereumNetworkConfig config = 1;
+  ToolsConfig tools = 2;
 }
 
 message EthereumNetworkConfig {
