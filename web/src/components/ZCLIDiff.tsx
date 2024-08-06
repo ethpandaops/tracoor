@@ -12,11 +12,14 @@ import CopyToClipboard from '@components/CopyToClipboard';
 import Loading from '@components/Loading';
 import ZCLISetup from '@components/ZCLISetup';
 import useNetwork from '@contexts/network';
-import { useBeaconStates } from '@hooks/useQuery';
+import { useBeaconStates, useConfig } from '@hooks/useQuery';
+import { getZCLIConfig } from '@utils/config';
 
 export default function ZCLIStateTransition() {
+  const { data: config } = useConfig({});
   const { register, watch, setValue } = useFormContext();
   const { network } = useNetwork();
+  const zcliConfig = getZCLIConfig(config ?? {});
 
   const [zcliFileName, beaconStateSelectorId] = watch(['zcliFileName', 'beaconStateSelectorId']);
 
@@ -52,10 +55,10 @@ export default function ZCLIStateTransition() {
 wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
 
 # Diff the states
-# Note: change "deneb" to the correct phase as required
+# Note: change "${zcliConfig.fork}" to the correct phase as required
 zcli \\
   diff \\
-  deneb \\
+  ${zcliConfig.fork} \\
   BeaconState \\
   ssz:${stateFileName}.ssz \\
   ssz:${zcliFileName}`;

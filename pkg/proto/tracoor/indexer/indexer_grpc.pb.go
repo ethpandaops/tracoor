@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
+	Indexer_GetConfig_FullMethodName                           = "/indexer.Indexer/GetConfig"
 	Indexer_GetStorageHandshakeToken_FullMethodName            = "/indexer.Indexer/GetStorageHandshakeToken"
 	Indexer_CreateBeaconState_FullMethodName                   = "/indexer.Indexer/CreateBeaconState"
 	Indexer_ListBeaconState_FullMethodName                     = "/indexer.Indexer/ListBeaconState"
@@ -50,6 +51,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IndexerClient interface {
+	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
 	GetStorageHandshakeToken(ctx context.Context, in *GetStorageHandshakeTokenRequest, opts ...grpc.CallOption) (*GetStorageHandshakeTokenResponse, error)
 	// BeaconState
 	CreateBeaconState(ctx context.Context, in *CreateBeaconStateRequest, opts ...grpc.CallOption) (*CreateBeaconStateResponse, error)
@@ -89,6 +91,15 @@ type indexerClient struct {
 
 func NewIndexerClient(cc grpc.ClientConnInterface) IndexerClient {
 	return &indexerClient{cc}
+}
+
+func (c *indexerClient) GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error) {
+	out := new(GetConfigResponse)
+	err := c.cc.Invoke(ctx, Indexer_GetConfig_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *indexerClient) GetStorageHandshakeToken(ctx context.Context, in *GetStorageHandshakeTokenRequest, opts ...grpc.CallOption) (*GetStorageHandshakeTokenResponse, error) {
@@ -320,6 +331,7 @@ func (c *indexerClient) ListUniqueExecutionBadBlockValues(ctx context.Context, i
 // All implementations must embed UnimplementedIndexerServer
 // for forward compatibility
 type IndexerServer interface {
+	GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
 	GetStorageHandshakeToken(context.Context, *GetStorageHandshakeTokenRequest) (*GetStorageHandshakeTokenResponse, error)
 	// BeaconState
 	CreateBeaconState(context.Context, *CreateBeaconStateRequest) (*CreateBeaconStateResponse, error)
@@ -358,6 +370,9 @@ type IndexerServer interface {
 type UnimplementedIndexerServer struct {
 }
 
+func (UnimplementedIndexerServer) GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
+}
 func (UnimplementedIndexerServer) GetStorageHandshakeToken(context.Context, *GetStorageHandshakeTokenRequest) (*GetStorageHandshakeTokenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStorageHandshakeToken not implemented")
 }
@@ -444,6 +459,24 @@ type UnsafeIndexerServer interface {
 
 func RegisterIndexerServer(s grpc.ServiceRegistrar, srv IndexerServer) {
 	s.RegisterService(&Indexer_ServiceDesc, srv)
+}
+
+func _Indexer_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).GetConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_GetConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).GetConfig(ctx, req.(*GetConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Indexer_GetStorageHandshakeToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -903,6 +936,10 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "indexer.Indexer",
 	HandlerType: (*IndexerServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetConfig",
+			Handler:    _Indexer_GetConfig_Handler,
+		},
 		{
 			MethodName: "GetStorageHandshakeToken",
 			Handler:    _Indexer_GetStorageHandshakeToken_Handler,

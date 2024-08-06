@@ -86,7 +86,40 @@ message ExecutionBadBlock {
   google.protobuf.StringValue block_extra_data = 10;
 }
 
+message Config {
+  EthereumConfig ethereum = 1;
+}
+
+message EthereumConfig {
+  google.protobuf.StringValue network = 1;
+  EthereumNetworkConfig config = 2;
+  ToolsConfig tools = 3;
+}
+
+message EthereumNetworkConfig {
+  google.protobuf.StringValue repository = 1;
+  google.protobuf.StringValue branch = 2;
+  google.protobuf.StringValue path = 3;
+}
+
+message ToolsConfig {
+  GitRepositoryConfig ncli = 1;
+  GitRepositoryConfig lcli = 2;
+  ZcliConfig zcli = 3;
+}
+
+message GitRepositoryConfig {
+  google.protobuf.StringValue repository = 1;
+  google.protobuf.StringValue branch = 2;
+}
+
+message ZcliConfig {
+  google.protobuf.StringValue fork = 1;
+}
+
 service Indexer {
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse) {}
+
   rpc GetStorageHandshakeToken(GetStorageHandshakeTokenRequest)
       returns (GetStorageHandshakeTokenResponse) {}
   // BeaconState
@@ -145,6 +178,12 @@ service Indexer {
   rpc ListUniqueExecutionBadBlockValues(
       ListUniqueExecutionBadBlockValuesRequest)
       returns (ListUniqueExecutionBadBlockValuesResponse) {}
+}
+
+message GetConfigRequest {}
+
+message GetConfigResponse {
+  Config config = 1;
 }
 
 message GetStorageHandshakeTokenRequest {

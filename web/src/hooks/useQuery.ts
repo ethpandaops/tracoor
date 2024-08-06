@@ -20,6 +20,7 @@ import {
   fetchListBeaconState,
   fetchCountBeaconState,
 } from '@api/beaconState';
+import { fetchGetConfig } from '@api/config';
 import {
   fetchListUniqueExecutionBadBlockValues,
   fetchListExecutionBadBlock,
@@ -61,6 +62,8 @@ import {
   V1ListUniqueBeaconStateValuesResponse,
   V1ListUniqueExecutionBadBlockValuesResponse,
   V1ListUniqueExecutionBlockTraceValuesResponse,
+  V1GetConfigRequest,
+  Config,
 } from '@app/types/api';
 
 export function useBeaconStates(request: V1ListBeaconStateRequest, enabled = true) {
@@ -276,5 +279,14 @@ export function useUniqueExecutionBadBlockValues(fields: ExecutionBadBlockField[
     queryFn: () => fetchListUniqueExecutionBadBlockValues({ fields }),
     enabled,
     staleTime: 60_000,
+  });
+}
+
+export function useConfig(request: V1GetConfigRequest, enabled = true) {
+  return useQuery<Config, unknown, Config, [string, V1GetConfigRequest]>({
+    queryKey: ['get-config', request],
+    queryFn: () => fetchGetConfig(request),
+    enabled,
+    staleTime: 600_000,
   });
 }

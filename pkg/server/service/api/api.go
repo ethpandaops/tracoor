@@ -66,6 +66,40 @@ func (i *API) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (i *API) GetConfig(ctx context.Context, req *api.GetConfigRequest) (*api.GetConfigResponse, error) {
+	conf, err := i.indexer.GetConfig(ctx, &indexer.GetConfigRequest{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to get config: %w", err).Error())
+	}
+
+	rsp := &api.GetConfigResponse{
+		Config: &api.Config{
+			Ethereum: &api.EthereumConfig{
+				Config: &api.EthereumNetworkConfig{
+					Repository: conf.GetConfig().GetEthereum().GetConfig().GetRepository().GetValue(),
+					Branch:     conf.GetConfig().GetEthereum().GetConfig().GetBranch().GetValue(),
+					Path:       conf.GetConfig().GetEthereum().GetConfig().GetPath().GetValue(),
+				},
+				Tools: &api.ToolsConfig{
+					Ncli: &api.GitRepositoryConfig{
+						Repository: conf.GetConfig().GetEthereum().GetTools().GetNcli().GetRepository().GetValue(),
+						Branch:     conf.GetConfig().GetEthereum().GetTools().GetNcli().GetBranch().GetValue(),
+					},
+					Lcli: &api.GitRepositoryConfig{
+						Repository: conf.GetConfig().GetEthereum().GetTools().GetLcli().GetRepository().GetValue(),
+						Branch:     conf.GetConfig().GetEthereum().GetTools().GetLcli().GetBranch().GetValue(),
+					},
+					Zcli: &api.ZcliConfig{
+						Fork: conf.GetConfig().GetEthereum().GetTools().GetZcli().GetFork().GetValue(),
+					},
+				},
+			},
+		},
+	}
+
+	return rsp, nil
+}
+
 func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateRequest) (*api.ListBeaconStateResponse, error) {
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,

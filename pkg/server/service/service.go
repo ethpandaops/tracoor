@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/creasty/defaults"
+	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/server/service/api"
 	"github.com/ethpandaops/tracoor/pkg/server/service/indexer"
@@ -27,7 +28,7 @@ const (
 	ServiceTypeAPI     Type = api.ServiceType
 )
 
-func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store, grpcConn string, grpcOpts []grpc.DialOption) ([]GRPCService, error) {
+func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store, grpcConn string, grpcOpts []grpc.DialOption, ethConfig *ethereum.Config) ([]GRPCService, error) {
 	services := []GRPCService{}
 
 	// Indexer
@@ -35,7 +36,7 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 		return nil, err
 	}
 
-	ind, err := indexer.NewIndexer(ctx, log, &cfg.Indexer, p, c)
+	ind, err := indexer.NewIndexer(ctx, log, &cfg.Indexer, p, c, ethConfig)
 	if err != nil {
 		return nil, err
 	}

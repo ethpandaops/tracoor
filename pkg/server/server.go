@@ -78,7 +78,7 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	services, err := service.CreateGRPCServices(ctx, log, &conf.Services, db, st, conf.Addr, opts)
+	services, err := service.CreateGRPCServices(ctx, log, &conf.Services, db, st, conf.Addr, opts, &conf.Ethereum)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/google/uuid"
@@ -29,14 +30,17 @@ type Indexer struct {
 	db *persistence.Indexer
 
 	config *Config
+
+	ethereumConfig *ethereum.Config
 }
 
-func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store) (*Indexer, error) {
+func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
 	i := &Indexer{
-		log:    log.WithField("server/module", ServiceType),
-		db:     db,
-		store:  st,
-		config: conf,
+		log:            log.WithField("server/module", ServiceType),
+		db:             db,
+		store:          st,
+		config:         conf,
+		ethereumConfig: ethereumConfig,
 	}
 
 	return i, nil
@@ -66,6 +70,33 @@ func (i *Indexer) Stop(ctx context.Context) error {
 
 func (i *Indexer) Store() store.Store {
 	return i.store
+}
+
+func (i *Indexer) GetConfig(ctx context.Context, req *indexer.GetConfigRequest) (*indexer.GetConfigResponse, error) {
+	return &indexer.GetConfigResponse{
+		Config: &indexer.Config{
+			Ethereum: &indexer.EthereumConfig{
+				Config: &indexer.EthereumNetworkConfig{
+					Repository: wrapperspb.String(i.ethereumConfig.Config.Repository),
+					Branch:     wrapperspb.String(i.ethereumConfig.Config.Branch),
+					Path:       wrapperspb.String(i.ethereumConfig.Config.Path),
+				},
+				Tools: &indexer.ToolsConfig{
+					Ncli: &indexer.GitRepositoryConfig{
+						Repository: wrapperspb.String(i.ethereumConfig.Tools.Ncli.Repository),
+						Branch:     wrapperspb.String(i.ethereumConfig.Tools.Ncli.Branch),
+					},
+					Lcli: &indexer.GitRepositoryConfig{
+						Repository: wrapperspb.String(i.ethereumConfig.Tools.Lcli.Repository),
+						Branch:     wrapperspb.String(i.ethereumConfig.Tools.Lcli.Branch),
+					},
+					Zcli: &indexer.ZcliConfig{
+						Fork: wrapperspb.String(i.ethereumConfig.Tools.Zcli.Fork),
+					},
+				},
+			},
+		},
+	}, nil
 }
 
 func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {

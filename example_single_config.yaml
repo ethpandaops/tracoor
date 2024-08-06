@@ -15,6 +15,21 @@ server:
         beaconStates: 30m
         executionBlockTraces: 30m
         beaconBlocks: 30m
+  # Use the following to configure Tracoor for a custom network
+  # ethereum:
+  #   config:
+  #     repository: ethpandaops/devnet-repo
+  #     branch: master
+  #     path: network-configs/devnet-name/metadata
+  #   tools:
+  #     ncli:
+  #       repository: status-im/nimbus-eth2
+  #       branch: unstable
+  #     lcli:
+  #       repository: sigp/lighthouse
+  #       branch: unstable
+  #     zcli:
+  #       fork: consensus-fork-name
 
 agents:
   - name: instance-1
