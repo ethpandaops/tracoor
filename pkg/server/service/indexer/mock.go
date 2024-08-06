@@ -5,6 +5,7 @@ import (
 	"context"
 	"math/rand"
 
+	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/pkg/errors"
@@ -38,7 +39,7 @@ func NewMockIndexer(ctx context.Context, config *Config) (*Indexer, func() error
 		return &Indexer{}, nil, err
 	}
 
-	index, err := NewIndexer(ctx, logrus.New(), config, db, st)
+	index, err := NewIndexer(ctx, logrus.New(), config, db, st, &ethereum.Config{})
 	if err != nil {
 		if errr := cleanup(); errr != nil {
 			return &Indexer{}, nil, errors.Wrapf(err, "failed to cleanup: %v", errr)

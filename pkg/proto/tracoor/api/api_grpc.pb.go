@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
+	API_GetConfig_FullMethodName                           = "/api.API/GetConfig"
 	API_ListBeaconState_FullMethodName                     = "/api.API/ListBeaconState"
 	API_CountBeaconState_FullMethodName                    = "/api.API/CountBeaconState"
 	API_ListUniqueBeaconStateValues_FullMethodName         = "/api.API/ListUniqueBeaconStateValues"
@@ -43,6 +44,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type APIClient interface {
+	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
 	ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error)
 	CountBeaconState(ctx context.Context, in *CountBeaconStateRequest, opts ...grpc.CallOption) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(ctx context.Context, in *ListUniqueBeaconStateValuesRequest, opts ...grpc.CallOption) (*ListUniqueBeaconStateValuesResponse, error)
@@ -69,6 +71,15 @@ type aPIClient struct {
 
 func NewAPIClient(cc grpc.ClientConnInterface) APIClient {
 	return &aPIClient{cc}
+}
+
+func (c *aPIClient) GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error) {
+	out := new(GetConfigResponse)
+	err := c.cc.Invoke(ctx, API_GetConfig_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *aPIClient) ListBeaconState(ctx context.Context, in *ListBeaconStateRequest, opts ...grpc.CallOption) (*ListBeaconStateResponse, error) {
@@ -237,6 +248,7 @@ func (c *aPIClient) ListUniqueExecutionBadBlockValues(ctx context.Context, in *L
 // All implementations must embed UnimplementedAPIServer
 // for forward compatibility
 type APIServer interface {
+	GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
 	ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error)
 	CountBeaconState(context.Context, *CountBeaconStateRequest) (*CountBeaconStateResponse, error)
 	ListUniqueBeaconStateValues(context.Context, *ListUniqueBeaconStateValuesRequest) (*ListUniqueBeaconStateValuesResponse, error)
@@ -262,6 +274,9 @@ type APIServer interface {
 type UnimplementedAPIServer struct {
 }
 
+func (UnimplementedAPIServer) GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
+}
 func (UnimplementedAPIServer) ListBeaconState(context.Context, *ListBeaconStateRequest) (*ListBeaconStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListBeaconState not implemented")
 }
@@ -327,6 +342,24 @@ type UnsafeAPIServer interface {
 
 func RegisterAPIServer(s grpc.ServiceRegistrar, srv APIServer) {
 	s.RegisterService(&API_ServiceDesc, srv)
+}
+
+func _API_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).GetConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: API_GetConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).GetConfig(ctx, req.(*GetConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _API_ListBeaconState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -660,6 +693,10 @@ var API_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "api.API",
 	HandlerType: (*APIServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetConfig",
+			Handler:    _API_GetConfig_Handler,
+		},
 		{
 			MethodName: "ListBeaconState",
 			Handler:    _API_ListBeaconState_Handler,

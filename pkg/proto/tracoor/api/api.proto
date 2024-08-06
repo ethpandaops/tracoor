@@ -87,6 +87,8 @@ message ExecutionBadBlock {
 }
 
 service API {
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse) {}
+
   rpc ListBeaconState(ListBeaconStateRequest)
       returns (ListBeaconStateResponse) {}
   rpc CountBeaconState(CountBeaconStateRequest)
@@ -136,6 +138,43 @@ message PaginationCursor {
   int32 limit = 1;
   int32 offset = 2;
   string order_by = 3;
+}
+
+message GetConfigRequest {}
+
+message GetConfigResponse {
+  Config config = 1;
+}
+
+message Config {
+  EthereumConfig ethereum = 1;
+}
+
+message EthereumConfig {
+  string network = 1;
+  EthereumNetworkConfig config = 2;
+  ToolsConfig tools = 3;
+}
+
+message EthereumNetworkConfig {
+  string repository = 1;
+  string branch = 2;
+  string path = 3;
+}
+
+message ToolsConfig {
+  GitRepositoryConfig ncli = 1;
+  GitRepositoryConfig lcli = 2;
+  ZcliConfig zcli = 3;
+}
+
+message GitRepositoryConfig {
+  string repository = 1;
+  string branch = 2;
+}
+
+message ZcliConfig {
+  string fork = 1 [ json_name = "fork" ];
 }
 
 message ListBeaconStateRequest {

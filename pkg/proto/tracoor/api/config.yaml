@@ -3,6 +3,9 @@ config_version: 3
 
 http:
   rules:
+    - selector: api.API.GetConfig
+      post: /v1/api/get-config
+      body: "*"
 
     - selector: api.API.ListBeaconState
       post: /v1/api/list-beacon-state

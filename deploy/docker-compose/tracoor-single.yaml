@@ -16,6 +16,21 @@ server:
         beaconStates: 1m
         executionBlockTraces: 15m
         beaconBlocks: 1m
+  ethereum:
+    network: pepega-21
+    config:
+      repository: github.com/ethpandaops/pepega-devnets
+      branch: main
+      path: pepega-21
+    tools:
+      ncli:
+        repository: github.com/ethpandaops/ncli
+        branch: main
+      lcli:
+        repository: github.com/ethpandaops/lcli
+        branch: main
+      zcli:
+        fork: uwotmate
 
 agents:
   - name: example

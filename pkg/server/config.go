@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/server/service"
 	"github.com/ethpandaops/tracoor/pkg/store"
@@ -30,6 +31,8 @@ type Config struct {
 	Store store.Config `yaml:"store"`
 	// Services is the list of services to run.
 	Services service.Config `yaml:"services"`
+	// Ethereum is the ethereum network configuration.
+	Ethereum ethereum.Config `yaml:"ethereum"`
 }
 
 func (c *Config) Validate() error {
@@ -42,6 +45,10 @@ func (c *Config) Validate() error {
 	}
 
 	if err := c.Store.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Ethereum.Validate(); err != nil {
 		return err
 	}
 

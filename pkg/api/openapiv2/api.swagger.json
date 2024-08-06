@@ -161,6 +161,14 @@
         }
       }
     },
+    "apiConfig": {
+      "type": "object",
+      "properties": {
+        "ethereum": {
+          "$ref": "#/definitions/apiEthereumConfig"
+        }
+      }
+    },
     "apiCountBeaconBadBlobResponse": {
       "type": "object",
       "properties": {
@@ -212,6 +220,34 @@
         "count": {
           "type": "string",
           "format": "uint64"
+        }
+      }
+    },
+    "apiEthereumConfig": {
+      "type": "object",
+      "properties": {
+        "network": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/definitions/apiEthereumNetworkConfig"
+        },
+        "tools": {
+          "$ref": "#/definitions/apiToolsConfig"
+        }
+      }
+    },
+    "apiEthereumNetworkConfig": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
         }
       }
     },
@@ -276,6 +312,25 @@
           "type": "string"
         },
         "node_version": {
+          "type": "string"
+        }
+      }
+    },
+    "apiGetConfigResponse": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/apiConfig"
+        }
+      }
+    },
+    "apiGitRepositoryConfig": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "branch": {
           "type": "string"
         }
       }
@@ -735,6 +790,28 @@
           "format": "int32"
         },
         "orderBy": {
+          "type": "string"
+        }
+      }
+    },
+    "apiToolsConfig": {
+      "type": "object",
+      "properties": {
+        "ncli": {
+          "$ref": "#/definitions/apiGitRepositoryConfig"
+        },
+        "lcli": {
+          "$ref": "#/definitions/apiGitRepositoryConfig"
+        },
+        "zcli": {
+          "$ref": "#/definitions/apiZcliConfig"
+        }
+      }
+    },
+    "apiZcliConfig": {
+      "type": "object",
+      "properties": {
+        "fork": {
           "type": "string"
         }
       }
