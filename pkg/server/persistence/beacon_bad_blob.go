@@ -12,19 +12,20 @@ import (
 type BeaconBadBlob struct {
 	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index"`
+	Node string `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:1"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"where:deleted_at IS NULL"`
+	Slot                 int64 `gorm:"index:idx_beacon_bad_blob_slot,where:deleted_at IS NULL;index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:2"`
 	Epoch                int64
-	BlockRoot            string
-	FetchedAt            time.Time `gorm:"index"`
+	BlockRoot            string    `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:3"`
+	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:4;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:1"`
 	BeaconImplementation string
-	NodeVersion          string `gorm:"not null;default:''"`
-	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:''"`
-	Index                int64
+	NodeVersion          string         `gorm:"not null;default:''"`
+	Location             string         `gorm:"not null;default:''"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:5"`
+	Index                int64          `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:6"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:7;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:2"`
 }
 
 type BeaconBadBlobFilter struct {

@@ -12,18 +12,19 @@ import (
 type BeaconState struct {
 	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index"`
+	Node string `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:1"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_slot,where:deleted_at IS NULL"`
+	Slot                 int64 `gorm:"index:idx_beacon_state_slot,where:deleted_at IS NULL;index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:2"`
 	Epoch                int64
-	StateRoot            string
-	FetchedAt            time.Time `gorm:"index"`
+	StateRoot            string    `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:3"`
+	FetchedAt            time.Time `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:5;index:idx_beacon_state_fetchedat_deletedat,priority:1"`
 	BeaconImplementation string
-	NodeVersion          string `gorm:"not null;default:''"`
-	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:''"`
+	NodeVersion          string         `gorm:"not null;default:''"`
+	Location             string         `gorm:"not null;default:''"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:4"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:6;index:idx_beacon_state_fetchedat_deletedat,priority:2"`
 }
 
 type BeaconStateFilter struct {
