@@ -23,9 +23,9 @@ type BeaconBadBlob struct {
 	BeaconImplementation string
 	NodeVersion          string         `gorm:"not null;default:''"`
 	Location             string         `gorm:"not null;default:''"`
-	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:5"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:5;index:idx_beacon_bad_blob_network_deletedat,priority:1"`
 	Index                int64          `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:6"`
-	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:7;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:2"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:7;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:2;index:idx_beacon_bad_blob_network_deletedat,priority:2"`
 }
 
 type BeaconBadBlobFilter struct {

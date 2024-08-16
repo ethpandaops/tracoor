@@ -17,10 +17,10 @@ type ExecutionBlockTrace struct {
 	ExecutionImplementation string
 	NodeVersion             string `gorm:"not null;default:''"`
 	Location                string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network_deletedat,priority:4"`
+	Network                 string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network_deletedat,priority:4;index:idx_execution_block_trace_network_deletedat,priority:1"`
 	BlockHash               string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network_deletedat,priority:2"`
 	BlockNumber             int64
-	DeletedAt               gorm.DeletedAt `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network_deletedat,priority:5;index:idx_execution_block_trace_fetchedat_deletedat,priority:2"`
+	DeletedAt               gorm.DeletedAt `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network_deletedat,priority:5;index:idx_execution_block_trace_fetchedat_deletedat,priority:2;index:idx_execution_block_trace_network_deletedat,priority:2"`
 }
 
 type ExecutionBlockTraceFilter struct {

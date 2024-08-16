@@ -23,8 +23,8 @@ type BeaconState struct {
 	BeaconImplementation string
 	NodeVersion          string         `gorm:"not null;default:''"`
 	Location             string         `gorm:"not null;default:''"`
-	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:4"`
-	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:6;index:idx_beacon_state_fetchedat_deletedat,priority:2"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:4;index:idx_beacon_state_network_deletedat,priority:1"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat_deletedat,priority:6;index:idx_beacon_state_fetchedat_deletedat,priority:2;index:idx_beacon_state_network_deletedat,priority:2"`
 }
 
 type BeaconStateFilter struct {
