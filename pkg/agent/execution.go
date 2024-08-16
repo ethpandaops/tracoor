@@ -23,6 +23,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	rsp, err := s.indexer.ListExecutionBlockTrace(ctx, &indexer.ListExecutionBlockTraceRequest{
 		Node:      s.Config.Name,
 		BlockHash: blockHash,
+		Network:   string(s.node.Beacon().Metadata().Network.Name),
 	})
 	if err != nil {
 		s.log.
@@ -118,6 +119,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 	rsp, err := s.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
 		Node:      s.Config.Name,
 		BlockHash: block.Hash,
+		Network:   string(s.node.Beacon().Metadata().Network.Name),
 	})
 	if err != nil {
 		s.log.

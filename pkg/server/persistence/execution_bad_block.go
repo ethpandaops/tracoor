@@ -13,13 +13,13 @@ import (
 type ExecutionBadBlock struct {
 	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
-	Node                    string    `gorm:"index"`
-	FetchedAt               time.Time `gorm:"index"`
+	Node                    string    `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1"`
+	FetchedAt               time.Time `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:iidx_execution_bad_block_fetchedat,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	ExecutionImplementation string
 	NodeVersion             string `gorm:"not null;default:''"`
 	Location                string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:''"`
-	BlockHash               string `gorm:"not null;default:''"`
+	Network                 string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:iidx_execution_bad_block_network,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	BlockHash               string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 	BlockNumber             sql.NullInt64
 	BlockExtraData          sql.NullString
 }

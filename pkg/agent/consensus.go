@@ -44,6 +44,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		Node:      s.Config.Name,
 		StateRoot: rootAsString,
 		Slot:      uint64(slot),
+		Network:   string(s.node.Beacon().Metadata().Network.Name),
 	})
 	if err != nil {
 		s.log.
@@ -158,6 +159,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 		Node:      s.Config.Name,
 		BlockRoot: blockRootAsString,
 		Slot:      uint64(slot),
+		Network:   string(s.node.Beacon().Metadata().Network.Name),
 	})
 	if err != nil {
 		s.log.
@@ -339,6 +341,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				Node:      s.Config.Name,
 				BlockRoot: blockRoot,
 				Slot:      slotI,
+				Network:   string(s.node.Beacon().Metadata().Network.Name),
 			})
 			if err != nil {
 				s.log.
@@ -550,6 +553,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				BlockRoot: blockRoot,
 				Slot:      slotI,
 				Index:     wrapperspb.UInt64(index),
+				Network:   string(s.node.Beacon().Metadata().Network.Name),
 			})
 			if err != nil {
 				s.log.
