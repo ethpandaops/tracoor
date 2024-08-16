@@ -12,19 +12,18 @@ import (
 type BeaconBlock struct {
 	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:1"`
+	Node string `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:1"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:2"`
+	Slot                 int64 `gorm:"index:idx_beacon_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
 	Epoch                int64
-	BlockRoot            string    `gorm:"index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:4;index:idx_beacon_block_fetchedat_deletedat,priority:1;index:idx_beacon_block_fetchedat_network_deletedat,priority:1"`
+	BlockRoot            string    `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:3"`
+	FetchedAt            time.Time `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_block_fetchedat,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	BeaconImplementation string
-	NodeVersion          string         `gorm:"not null;default:''"`
-	Location             string         `gorm:"not null;default:''"`
-	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:5;index:idx_beacon_block_network_deletedat,priority:1;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network_deletedat,priority:2"`
-	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_block_node_slot_blockroot_fetchedat_network_deletedat,priority:6;index:idx_beacon_block_fetchedat_deletedat,priority:2;index:idx_beacon_block_network_deletedat,priority:2;index:idx_beacon_block_fetchedat_network_deletedat,priority:3"`
+	NodeVersion          string `gorm:"not null;default:''"`
+	Location             string `gorm:"not null;default:''"`
+	Network              string `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 }
 
 type BeaconBlockFilter struct {
