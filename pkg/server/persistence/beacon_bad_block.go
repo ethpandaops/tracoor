@@ -19,12 +19,12 @@ type BeaconBadBlock struct {
 	Slot                 int64 `gorm:"index:idx_beacon_bad_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:2"`
 	Epoch                int64
 	BlockRoot            string    `gorm:"index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:4;index:idx_beacon_bad_block_fetchedat_deletedat,priority:1;index:idx_beacon_bad_block_fetchedat_network_deletedat,priority:1"`
+	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:4;index:idx_beacon_bad_block_fetchedat_deletedat,priority:1"`
 	BeaconImplementation string
 	NodeVersion          string         `gorm:"not null;default:''"`
 	Location             string         `gorm:"not null;default:''"`
-	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:5;index:idx_beacon_bad_block_network_deletedat,priority:1;index:idx_beacon_bad_block_fetchedat_network_deletedat,priority:1"`
-	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:6;index:idx_beacon_bad_block_fetchedat_deletedat,priority:2;index:idx_beacon_bad_block_network_deletedat,priority:2;index:idx_beacon_bad_block_fetchedat_network_deletedat,priority:1"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:5;index:idx_beacon_bad_block_network_deletedat,priority:1;index:idx_beacon_bad_block_network,where:deleted_at IS NULL"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_block_node_slot_blockroot_fetchedat_network_deletedat,priority:6;index:idx_beacon_bad_block_fetchedat_deletedat,priority:2;index:idx_beacon_bad_block_network_deletedat,priority:2"`
 }
 
 type BeaconBadBlockFilter struct {

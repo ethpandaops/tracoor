@@ -19,13 +19,13 @@ type BeaconBadBlob struct {
 	Slot                 int64 `gorm:"index:idx_beacon_bad_blob_slot,where:deleted_at IS NULL;index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:2"`
 	Epoch                int64
 	BlockRoot            string    `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:4;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:1;index:idx_beacon_bad_blob_fetchedat_network_deletedat,priority:1"`
+	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:4;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:1"`
 	BeaconImplementation string
 	NodeVersion          string         `gorm:"not null;default:''"`
 	Location             string         `gorm:"not null;default:''"`
-	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:5;index:idx_beacon_bad_blob_network_deletedat,priority:1;index:idx_beacon_bad_blob_fetchedat_network_deletedat,priority:1"`
+	Network              string         `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:5;index:idx_beacon_bad_blob_network_deletedat,priority:1;index:idx_beacon_bad_blob_network,where:deleted_at IS NULL"`
 	Index                int64          `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:6"`
-	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:7;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:2;index:idx_beacon_bad_blob_network_deletedat,priority:2;index:idx_beacon_bad_blob_fetchedat_network_deletedat,priority:1"`
+	DeletedAt            gorm.DeletedAt `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_fetchedat_network_index_deletedat,priority:7;index:idx_beacon_bad_blob_fetchedat_deletedat,priority:2;index:idx_beacon_bad_blob_network_deletedat,priority:2"`
 }
 
 type BeaconBadBlobFilter struct {

@@ -14,15 +14,15 @@ type ExecutionBadBlock struct {
 	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
 	Node                    string    `gorm:"index;index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:1"`
-	FetchedAt               time.Time `gorm:"index;index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:2;index:idx_execution_bad_block_fetchedat_deletedat,priority:1;index:idx_execution_bad_block_fetchedat_network_deletedat,priority:1"`
+	FetchedAt               time.Time `gorm:"index;index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:2;index:idx_execution_bad_block_fetchedat_deletedat,priority:1"`
 	ExecutionImplementation string
 	NodeVersion             string `gorm:"not null;default:''"`
 	Location                string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:3;index:idx_execution_bad_block_network_deletedat,priority:1;index:idx_execution_bad_block_fetchedat_network_deletedat,priority:1"`
+	Network                 string `gorm:"not null;default:'';index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:3;index:idx_execution_bad_block_network_deletedat,priority:1;index:idx_execution_bad_block_network,where:deleted_at IS NULL"`
 	BlockHash               string `gorm:"not null;default:'';index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:2"`
 	BlockNumber             sql.NullInt64
 	BlockExtraData          sql.NullString
-	DeletedAt               gorm.DeletedAt `gorm:"index;index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:5;index:idx_execution_bad_block_fetchedat_deletedat,priority:2;index:idx_execution_bad_block_network_deletedat,priority:2;index:idx_execution_bad_block_fetchedat_network_deletedat,priority:1"`
+	DeletedAt               gorm.DeletedAt `gorm:"index;index:idx_execution_bad_block_node_blockhash_fetchedat_network_deletedat,priority:5;index:idx_execution_bad_block_fetchedat_deletedat,priority:2;index:idx_execution_bad_block_network_deletedat,priority:2"`
 }
 
 type ExecutionBadBlockFilter struct {
