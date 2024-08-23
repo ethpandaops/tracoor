@@ -261,12 +261,19 @@ func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (st
 			// Set the content encoding
 			input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
 
-			// Set the content type correctly. Without this, a filename of data.json.gz would be detected as a .gz rather than a .json
-			params.Location = compression.RemoveExtension(params.Location, compressionAlgorithm)
+			extension = compression.RemoveExtension(extension, compressionAlgorithm)
 
-			input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(params.Location)))
+			// Set the content type correctly. Without this, a filename of data.json.gz would be detected as a .gz rather than a .json
+			input.ResponseContentDisposition = aws.String(
+				fmt.Sprintf("attachment; filename=%q",
+					compression.RemoveExtension(
+						filepath.Base(params.Location),
+						compressionAlgorithm,
+					),
+				),
+			)
 			input.ResponseContentType = aws.String(string(
-				mime.GetContentTypeFromExtension(compression.RemoveExtension(params.Location, compressionAlgorithm)),
+				mime.GetContentTypeFromExtension(extension),
 			))
 		}
 	} else {
