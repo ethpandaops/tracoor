@@ -245,9 +245,17 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, params *SaveParams) (stri
 func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
 
+	s.log.WithFields(logrus.Fields{
+		"location":         params.Location,
+		"expiry":           params.Expiry,
+		"content_encoding": params.ContentEncoding,
+	}).Info("Getting presigned URL")
+
 	// Remove the compression extension if it exists
-	extension := compression.RemoveExtension(
-		filepath.Ext(params.Location),
+	extension := filepath.Ext(
+		compression.RemoveExtension(
+			params.Location,
+		),
 	)
 
 	input := &s3.GetObjectInput{
@@ -285,6 +293,15 @@ func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (st
 	} else {
 		input.ResponseContentEncoding = aws.String(params.ContentEncoding)
 	}
+
+	s.log.WithFields(logrus.Fields{
+		"extension":           extension,
+		"content_disposition": input.ResponseContentDisposition,
+		"content_type":        input.ResponseContentType,
+		"content_encoding":    input.ResponseContentEncoding,
+		"location":            params.Location,
+		"expiry":              params.Expiry,
+	}).Info("Generated presigned URL")
 
 	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(params.Expiry)*time.Second))
 	if err != nil {
