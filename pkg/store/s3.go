@@ -16,6 +16,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/sirupsen/logrus"
 )
 
@@ -239,8 +240,9 @@ func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
@@ -335,8 +337,9 @@ func (s *S3Store) GetBeaconBlockURL(ctx context.Context, location string, expiry
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
@@ -431,8 +434,9 @@ func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, location string, exp
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
@@ -526,8 +530,9 @@ func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, location string, expi
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
@@ -638,8 +643,9 @@ func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, location string
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
@@ -734,8 +740,9 @@ func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, 
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
 	}
 
 	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)

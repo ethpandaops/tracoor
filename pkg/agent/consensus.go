@@ -12,6 +12,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -76,7 +77,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	}
 
 	// Fetch the state
-	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, "application/octet-stream")
+	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	stateID := fmt.Sprintf("%d", slot)
 
 	// Fetch the block
-	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, stateID, "application/octet-stream")
+	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
 		return err
 	}

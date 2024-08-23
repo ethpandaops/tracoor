@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	tStore "github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -138,7 +139,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -214,7 +215,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -290,7 +291,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -366,7 +367,7 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -442,7 +443,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", string(mime.ContentTypeJSON))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -518,7 +519,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", string(mime.ContentTypeJSON))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -527,7 +528,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 }
 
 func (d *ObjectDownloader) writeJSONError(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", string(mime.ContentTypeJSON))
 
 	w.WriteHeader(statusCode)
 
