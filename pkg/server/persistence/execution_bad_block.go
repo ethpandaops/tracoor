@@ -17,7 +17,7 @@ type ExecutionBadBlock struct {
 	FetchedAt               time.Time `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:iidx_execution_bad_block_fetchedat,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	ExecutionImplementation string
 	NodeVersion             string `gorm:"not null;default:''"`
-	ContentEncoding         string `gorm:"not null;default:'gzip'"` // Default to gzip for backwards compatibility. If the content is not compressed, the creator should set this to `identity`.
+	ContentEncoding         string `gorm:"not null;default:''"`
 	Location                string `gorm:"not null;default:''"`
 	Network                 string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:iidx_execution_bad_block_network,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 	BlockHash               string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
