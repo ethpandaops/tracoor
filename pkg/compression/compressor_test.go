@@ -164,7 +164,7 @@ func TestRemoveExtension(t *testing.T) {
 		testCase := tc
 
 		t.Run(testCase.name, func(t *testing.T) {
-			result := compression.RemoveExtension(testCase.filename, testCase.algorithm)
+			result := compression.RemoveExtension(testCase.filename)
 			assert.Equal(t, testCase.want, result)
 		})
 	}

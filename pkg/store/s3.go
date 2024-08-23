@@ -245,13 +245,20 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, params *SaveParams) (stri
 func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
 
-	extension := filepath.Ext(params.Location)
+	// Remove the compression extension if it exists
+	extension := compression.RemoveExtension(
+		filepath.Ext(params.Location),
+	)
 
 	input := &s3.GetObjectInput{
-		Bucket:                     aws.String(s.config.BucketName),
-		Key:                        aws.String(params.Location),
-		ResponseContentType:        aws.String(string(mime.GetContentTypeFromExtension(extension))),
-		ResponseContentDisposition: aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(params.Location))),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(params.Location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(extension))),
+		ResponseContentDisposition: aws.String(
+			fmt.Sprintf("attachment; filename=%q", compression.RemoveExtension(
+				filepath.Base(params.Location),
+			)),
+		),
 	}
 
 	// Backwards compatibility for old locations that still have the compression algorithm in the filename
@@ -261,14 +268,13 @@ func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (st
 			// Set the content encoding
 			input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
 
-			extension = compression.RemoveExtension(extension, compressionAlgorithm)
+			extension = compression.RemoveExtension(extension)
 
 			// Set the content type correctly. Without this, a filename of data.json.gz would be detected as a .gz rather than a .json
 			input.ResponseContentDisposition = aws.String(
 				fmt.Sprintf("attachment; filename=%q",
 					compression.RemoveExtension(
 						filepath.Base(params.Location),
-						compressionAlgorithm,
 					),
 				),
 			)

@@ -114,13 +114,21 @@ func AddExtension(filename string, algorithm *CompressionAlgorithm) string {
 }
 
 // RemoveExtension removes the compression extension from the filename if it's present
-func RemoveExtension(filename string, algorithm *CompressionAlgorithm) string {
-	return strings.TrimSuffix(filename, algorithm.Extension)
+func RemoveExtension(filename string) string {
+	filename = strings.TrimSuffix(filename, Gzip.Extension)
+	filename = strings.TrimSuffix(filename, None.Extension)
+
+	return filename
 }
 
 // HasCompressionExtension checks if the filename has the compression extension
 func HasCompressionExtension(filename string, algorithm *CompressionAlgorithm) bool {
 	return strings.HasSuffix(filename, algorithm.Extension)
+}
+
+// HasCompressionExtension checks if the filename has the compression extension
+func HasAnyCompressionExtension(filename string) bool {
+	return strings.HasSuffix(filename, Gzip.Extension) || strings.HasSuffix(filename, None.Extension)
 }
 
 func GetCompressionAlgorithm(filename string) (*CompressionAlgorithm, error) {

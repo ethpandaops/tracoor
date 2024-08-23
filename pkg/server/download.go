@@ -140,14 +140,19 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+
+	filename := filepath.Base(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -222,14 +227,19 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+
+	filename := filepath.Base(block.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(block.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -304,14 +314,19 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+
+	filename := filepath.Base(block.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(block.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -386,14 +401,19 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(blob.Location.Value))))
+
+	filename := filepath.Base(blob.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(blob.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(blob.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(blob.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(blob.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -468,14 +488,19 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+
+	filename := filepath.Base(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -550,14 +575,19 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+
+	filename := filepath.Base(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasAnyCompressionExtension(state.Location.Value) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+		filename = compression.RemoveExtension(filename)
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
-
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	_, err = w.Write(*data)
 	if err != nil {
