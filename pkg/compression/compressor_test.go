@@ -152,6 +152,12 @@ func TestRemoveExtension(t *testing.T) {
 			algorithm: compression.Gzip,
 			want:      "test",
 		},
+		{
+			name:      "Remove Gzip extension from .json.gz",
+			filename:  "test.json.gz",
+			algorithm: compression.Gzip,
+			want:      "test.json",
+		},
 	}
 
 	for _, tc := range testCases {

@@ -1,5 +1,10 @@
 package mime
 
+import (
+	"fmt"
+	"strings"
+)
+
 // ContentType represents the MIME type of a file.
 type ContentType string
 
@@ -11,6 +16,13 @@ const (
 
 // GetContentTypeFromExtension returns the MIME type of a file based on its extension.
 func GetContentTypeFromExtension(extension string) ContentType {
+	fmt.Println("Extension: ", extension)
+	if extension == "" {
+		return ContentTypeUnknown
+	}
+
+	extension = strings.TrimPrefix(extension, ".")
+
 	if extension == "json" {
 		return ContentTypeJSON
 	}

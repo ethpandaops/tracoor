@@ -135,12 +135,16 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	extension := filepath.Ext(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(state.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -211,12 +215,16 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	extension := filepath.Ext(block.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(block.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -287,12 +295,16 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	extension := filepath.Ext(block.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(block.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -363,12 +375,16 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	extension := filepath.Ext(blob.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(blob.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(blob.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(blob.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -439,12 +455,16 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		return
 	}
 
+	extension := filepath.Ext(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(state.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -515,12 +535,16 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	extension := filepath.Ext(state.Location.Value)
+
 	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		extension = filepath.Ext(compression.RemoveExtension(state.Location.Value, algo))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
 
 	_, err = w.Write(*data)
 	if err != nil {
