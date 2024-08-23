@@ -265,7 +265,9 @@ func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (st
 			params.Location = compression.RemoveExtension(params.Location, compressionAlgorithm)
 
 			input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(params.Location)))
-			input.ResponseContentType = aws.String(string(mime.GetContentTypeFromExtension(extension)))
+			input.ResponseContentType = aws.String(string(
+				mime.GetContentTypeFromExtension(compression.RemoveExtension(params.Location, compressionAlgorithm)),
+			))
 		}
 	} else {
 		input.ResponseContentEncoding = aws.String(params.ContentEncoding)
