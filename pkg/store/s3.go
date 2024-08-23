@@ -252,7 +252,7 @@ func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
@@ -354,7 +354,7 @@ func (s *S3Store) GetBeaconBlockURL(ctx context.Context, location string, expiry
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
@@ -456,7 +456,7 @@ func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, location string, exp
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
@@ -558,7 +558,7 @@ func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, location string, expi
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
@@ -676,7 +676,7 @@ func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, location string
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
@@ -778,7 +778,7 @@ func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, 
 
 		location = compression.RemoveExtension(location, compressionAlgorithm)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filepath.Base(location)))
 
 		extension = filepath.Ext(compression.RemoveExtension(location, compressionAlgorithm))
 	}
