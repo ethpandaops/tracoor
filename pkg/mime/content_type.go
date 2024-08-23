@@ -1,7 +1,6 @@
 package mime
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -16,7 +15,6 @@ const (
 
 // GetContentTypeFromExtension returns the MIME type of a file based on its extension.
 func GetContentTypeFromExtension(extension string) ContentType {
-	fmt.Println("Extension: ", extension)
 	if extension == "" {
 		return ContentTypeUnknown
 	}
