@@ -23,6 +23,7 @@ type BeaconBadBlock struct {
 	BeaconImplementation string
 	NodeVersion          string `gorm:"not null;default:''"`
 	Location             string `gorm:"not null;default:''"`
+	ContentEncoding      string `gorm:"not null;default:''"`
 	Network              string `gorm:"not null;default:'';index;index:idx_beacon_bad_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_bad_block_network,where:deleted_at IS NULL;index:idx_beacon_bad_block_network,where:deleted_at IS NULL;index:idx_beacon_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 }
 

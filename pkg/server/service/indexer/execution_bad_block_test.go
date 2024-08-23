@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	pindexer "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/ethpandaops/tracoor/pkg/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -259,7 +261,18 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 	t.Run("Downloading", func(t *testing.T) {
 		data := []byte("{\"key\": \"value\"}")
 
-		location, err := index.Store().SaveExecutionBadBlock(ctx, &data, "data.json")
+		compressor := compression.NewCompressor()
+
+		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		if err != nil {
+			t.Fatalf("failed to compress data: %v", err)
+		}
+
+		location, err := index.Store().SaveExecutionBadBlock(ctx, &store.SaveParams{
+			Data:            &compressedData,
+			Location:        "data.json",
+			ContentEncoding: compression.Gzip.ContentEncoding,
+		})
 		if err != nil {
 			t.Fatalf("failed to save execution bad block: %v", err)
 		}
@@ -278,7 +291,11 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 			t.Fatalf("failed to get execution bad block: %v", err)
 		}
 
-		url, err := index.Store().GetExecutionBadBlockURL(ctx, rsp.ExecutionBadBlocks[0].Location.GetValue(), 60)
+		url, err := index.Store().GetExecutionBadBlockURL(ctx, &store.GetURLParams{
+			Location:        rsp.ExecutionBadBlocks[0].Location.GetValue(),
+			Expiry:          60,
+			ContentEncoding: rsp.ExecutionBadBlocks[0].ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			t.Fatalf("failed to get execution bad block URL: %v", err)
 		}

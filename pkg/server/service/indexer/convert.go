@@ -19,6 +19,7 @@ func ProtoBeaconStateToDBBeaconState(bs *indexer.BeaconState) *persistence.Beaco
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
 		NodeVersion:          bs.GetNodeVersion().GetValue(),
 		Location:             bs.GetLocation().GetValue(),
+		ContentEncoding:      bs.GetContentEncoding().GetValue(),
 		Network:              bs.GetNetwork().GetValue(),
 		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
 	}
@@ -34,6 +35,7 @@ func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.Beaco
 		FetchedAt:            timestamppb.New(bs.FetchedAt),
 		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
 		Location:             &wrapperspb.StringValue{Value: bs.Location},
+		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
 		Network:              &wrapperspb.StringValue{Value: bs.Network},
 		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
 	}
@@ -49,6 +51,7 @@ func ProtoBeaconBlockToDBBeaconBlock(bs *indexer.BeaconBlock) *persistence.Beaco
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
 		NodeVersion:          bs.GetNodeVersion().GetValue(),
 		Location:             bs.GetLocation().GetValue(),
+		ContentEncoding:      bs.GetContentEncoding().GetValue(),
 		Network:              bs.GetNetwork().GetValue(),
 		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
 	}
@@ -65,6 +68,7 @@ func DBBeaconBlockToProtoBeaconBlock(bs *persistence.BeaconBlock) *indexer.Beaco
 		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
 		Location:             &wrapperspb.StringValue{Value: bs.Location},
 		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
 		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
 	}
 }
@@ -79,6 +83,7 @@ func ProtoBeaconBadBlockToDBBeaconBadBlock(bs *indexer.BeaconBadBlock) *persiste
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
 		NodeVersion:          bs.GetNodeVersion().GetValue(),
 		Location:             bs.GetLocation().GetValue(),
+		ContentEncoding:      bs.GetContentEncoding().GetValue(),
 		Network:              bs.GetNetwork().GetValue(),
 		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
 	}
@@ -95,6 +100,7 @@ func DBBeaconBadBlockToProtoBeaconBadBlock(bs *persistence.BeaconBadBlock) *inde
 		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
 		Location:             &wrapperspb.StringValue{Value: bs.Location},
 		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
 		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
 	}
 }
@@ -110,6 +116,7 @@ func ProtoBeaconBadBlobToDBBeaconBadBlob(bs *indexer.BeaconBadBlob) *persistence
 		NodeVersion:          bs.GetNodeVersion().GetValue(),
 		Location:             bs.GetLocation().GetValue(),
 		Network:              bs.GetNetwork().GetValue(),
+		ContentEncoding:      bs.GetContentEncoding().GetValue(),
 		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
 		Index:                int64(bs.GetIndex().GetValue()),
 	}
@@ -126,6 +133,7 @@ func DBBeaconBadBlobToProtoBeaconBadBlob(bs *persistence.BeaconBadBlob) *indexer
 		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
 		Location:             &wrapperspb.StringValue{Value: bs.Location},
 		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
 		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
 		Index:                &wrapperspb.UInt64Value{Value: uint64(bs.Index)},
 	}
@@ -140,6 +148,7 @@ func ProtoExecutionBlockTraceToDBExecutionBlockTrace(eb *indexer.ExecutionBlockT
 		FetchedAt:               eb.GetFetchedAt().AsTime(),
 		Location:                eb.GetLocation().GetValue(),
 		Network:                 eb.GetNetwork().GetValue(),
+		ContentEncoding:         eb.GetContentEncoding().GetValue(),
 		ExecutionImplementation: eb.GetExecutionImplementation().GetValue(),
 		ID:                      eb.GetId().GetValue(),
 	}
@@ -155,6 +164,7 @@ func DBExecutionBlockTraceToProtoExecutionBlockTrace(eb *persistence.ExecutionBl
 		Location:                &wrapperspb.StringValue{Value: eb.Location},
 		Network:                 &wrapperspb.StringValue{Value: eb.Network},
 		ExecutionImplementation: &wrapperspb.StringValue{Value: eb.ExecutionImplementation},
+		ContentEncoding:         &wrapperspb.StringValue{Value: eb.ContentEncoding},
 		Id:                      &wrapperspb.StringValue{Value: eb.ID},
 	}
 }
@@ -168,6 +178,7 @@ func ProtoExecutionBadBlockToDBExecutionBadBlock(eb *indexer.ExecutionBadBlock) 
 		FetchedAt:               eb.GetFetchedAt().AsTime(),
 		Location:                eb.GetLocation().GetValue(),
 		Network:                 eb.GetNetwork().GetValue(),
+		ContentEncoding:         eb.GetContentEncoding().GetValue(),
 		ExecutionImplementation: eb.GetExecutionImplementation().GetValue(),
 		ID:                      eb.GetId().GetValue(),
 		BlockExtraData:          sql.NullString{String: eb.GetBlockExtraData().GetValue(), Valid: true},
@@ -184,6 +195,7 @@ func DBExecutionBadBlockToProtoExecutionBadBlock(eb *persistence.ExecutionBadBlo
 		Location:                &wrapperspb.StringValue{Value: eb.Location},
 		Network:                 &wrapperspb.StringValue{Value: eb.Network},
 		ExecutionImplementation: &wrapperspb.StringValue{Value: eb.ExecutionImplementation},
+		ContentEncoding:         &wrapperspb.StringValue{Value: eb.ContentEncoding},
 		Id:                      &wrapperspb.StringValue{Value: eb.ID},
 		BlockExtraData:          &wrapperspb.StringValue{Value: eb.BlockExtraData.String},
 	}

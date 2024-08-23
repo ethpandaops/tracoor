@@ -16,6 +16,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/sirupsen/logrus"
 )
 
@@ -208,12 +209,18 @@ func (s *S3Store) Exists(ctx context.Context, location string) (bool, error) {
 	return true, nil
 }
 
-func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+func (s *S3Store) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -224,42 +231,80 @@ func (s *S3Store) SaveBeaconState(ctx context.Context, data *[]byte, location st
 			case *s3types.NotFound:
 				return "", ErrNotFound
 			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
+				return "", errors.New("failed to save beacon state: " + apiErr.Error())
 			}
 		}
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
-func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (string, error) {
 	presignClient := s3.NewPresignClient(s.s3Client)
 
+	// Remove the compression extension if it exists
+	extension := filepath.Ext(
+		compression.RemoveExtension(
+			params.Location,
+		),
+	)
+
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
+		Bucket:              aws.String(s.config.BucketName),
+		Key:                 aws.String(params.Location),
+		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(extension))),
+		ResponseContentDisposition: aws.String(
+			fmt.Sprintf("attachment; filename=%q", compression.RemoveExtension(
+				filepath.Base(params.Location),
+			)),
+		),
 	}
 
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
+	// Backwards compatibility for old locations that still have the compression algorithm in the filename
+	if params.ContentEncoding == "" {
+		compressionAlgorithm, err := compression.GetCompressionAlgorithm(params.Location)
+		if err == nil {
+			// Set the content encoding
+			input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
 
-		location = compression.RemoveExtension(location, compressionAlgorithm)
+			extension = compression.RemoveExtension(extension)
 
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
+			// Set the content type correctly. Without this, a filename of data.json.gz would be detected as a .gz rather than a .json
+			input.ResponseContentDisposition = aws.String(
+				fmt.Sprintf("attachment; filename=%q",
+					compression.RemoveExtension(
+						filepath.Base(params.Location),
+					),
+				),
+			)
+			input.ResponseContentType = aws.String(string(
+				mime.GetContentTypeFromExtension(extension),
+			))
+		}
+	} else {
+		input.ResponseContentEncoding = aws.String(params.ContentEncoding)
 	}
 
-	s.basicMetrics.ObserveItemURLRetreived(string(BeaconStateDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(params.Expiry)*time.Second))
 	if err != nil {
 		return "", err
 	}
 
 	return resp.URL, nil
+}
+
+func (s *S3Store) GetBeaconStateURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconStateDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) GetBeaconState(ctx context.Context, location string) (*[]byte, error) {
@@ -300,16 +345,22 @@ func (s *S3Store) DeleteBeaconState(ctx context.Context, location string) error 
 	return err
 }
 
-func (s *S3Store) SaveBeaconBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	if data == nil {
+func (s *S3Store) SaveBeaconBlock(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
 		return "", errors.New("data is nil")
 	}
 
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -326,36 +377,20 @@ func (s *S3Store) SaveBeaconBlock(ctx context.Context, data *[]byte, location st
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBlockDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBlockDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
-func (s *S3Store) GetBeaconBlockURL(ctx context.Context, location string, expiry int) (string, error) {
-	presignClient := s3.NewPresignClient(s.s3Client)
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-	}
-
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
-
-		location = compression.RemoveExtension(location, compressionAlgorithm)
-
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
-	}
-
-	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBlockDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+func (s *S3Store) GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.URL, nil
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBlockDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) GetBeaconBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -396,16 +431,22 @@ func (s *S3Store) DeleteBeaconBlock(ctx context.Context, location string) error 
 	return err
 }
 
-func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	if data == nil {
+func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
 		return "", errors.New("data is nil")
 	}
 
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -422,36 +463,20 @@ func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, data *[]byte, location
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconBadBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlockDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlockDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
-func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
-	presignClient := s3.NewPresignClient(s.s3Client)
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-	}
-
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
-
-		location = compression.RemoveExtension(location, compressionAlgorithm)
-
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
-	}
-
-	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlockDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.URL, nil
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlockDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) GetBeaconBadBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -461,6 +486,7 @@ func (s *S3Store) GetBeaconBadBlock(ctx context.Context, location string) (*[]by
 	if err != nil {
 		return nil, err
 	}
+
 	s.basicMetrics.ObserveItemRetreived(string(BeaconBadBlockDataType))
 
 	b := data.Bytes()
@@ -491,16 +517,22 @@ func (s *S3Store) DeleteBeaconBadBlock(ctx context.Context, location string) err
 	return err
 }
 
-func (s *S3Store) SaveBeaconBadBlob(ctx context.Context, data *[]byte, location string) (string, error) {
-	if data == nil {
+func (s *S3Store) SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
 		return "", errors.New("data is nil")
 	}
 
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -517,36 +549,20 @@ func (s *S3Store) SaveBeaconBadBlob(ctx context.Context, data *[]byte, location 
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BeaconBadBlobDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlobDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlobDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
-func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, location string, expiry int) (string, error) {
-	presignClient := s3.NewPresignClient(s.s3Client)
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-	}
-
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
-
-		location = compression.RemoveExtension(location, compressionAlgorithm)
-
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
-	}
-
-	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlobDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.URL, nil
+	s.basicMetrics.ObserveItemURLRetreived(string(BeaconBadBlobDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) GetBeaconBadBlob(ctx context.Context, location string) (*[]byte, error) {
@@ -587,16 +603,22 @@ func (s *S3Store) DeleteBeaconBadBlob(ctx context.Context, location string) erro
 	return err
 }
 
-func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error) {
-	if data == nil {
+func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
 		return "", errors.New("data is nil")
 	}
 
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -613,9 +635,9 @@ func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, loc
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BlockTraceDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BlockTraceDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BlockTraceDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
 func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error) {
@@ -631,34 +653,17 @@ func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (
 	b := data.Bytes()
 
 	return &b, nil
-
 }
 
-func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, location string, expiry int) (string, error) {
-	presignClient := s3.NewPresignClient(s.s3Client)
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-	}
-
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
-
-		location = compression.RemoveExtension(location, compressionAlgorithm)
-
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
-	}
-
-	s.basicMetrics.ObserveItemURLRetreived(string(BlockTraceDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+func (s *S3Store) GetExecutionBlockTraceURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.URL, nil
+	s.basicMetrics.ObserveItemURLRetreived(string(BlockTraceDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) DeleteExecutionBlockTrace(ctx context.Context, location string) error {
@@ -684,16 +689,22 @@ func (s *S3Store) DeleteExecutionBlockTrace(ctx context.Context, location string
 	return err
 }
 
-func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	if data == nil {
+func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
 		return "", errors.New("data is nil")
 	}
 
-	_, err := s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-		Body:   bytes.NewBuffer(*data),
-	}, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
 	if err != nil {
 		var apiErr smithy.APIError
 
@@ -710,9 +721,9 @@ func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, data *[]byte, locat
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(BadBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BadBlockDataType), len(*data))
+	s.basicMetrics.ObserveItemAddedBytes(string(BadBlockDataType), len(*params.Data))
 
-	return location, err
+	return params.Location, err
 }
 
 func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -730,31 +741,15 @@ func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[
 	return &b, nil
 }
 
-func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
-	presignClient := s3.NewPresignClient(s.s3Client)
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(location),
-	}
-
-	compressionAlgorithm, err := compression.GetCompressionAlgorithm(location)
-	if err == nil {
-		input.ResponseContentEncoding = aws.String(compressionAlgorithm.ContentEncoding)
-
-		location = compression.RemoveExtension(location, compressionAlgorithm)
-
-		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%s", filepath.Base(location)))
-	}
-
-	s.basicMetrics.ObserveItemURLRetreived(string(BadBlockDataType))
-
-	resp, err := presignClient.PresignGetObject(ctx, input, s3.WithPresignExpires(time.Duration(expiry)*time.Second))
+func (s *S3Store) GetExecutionBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.URL, nil
+	s.basicMetrics.ObserveItemURLRetreived(string(BadBlockDataType))
+
+	return url, nil
 }
 
 func (s *S3Store) DeleteExecutionBadBlock(ctx context.Context, location string) error {

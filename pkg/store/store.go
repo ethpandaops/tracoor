@@ -8,6 +8,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type SaveParams struct {
+	Data            *[]byte
+	Location        string
+	ContentEncoding string
+}
+
+type GetURLParams struct {
+	Location        string
+	Expiry          int
+	ContentEncoding string
+}
+
 // Store is an interface for different persistence implementations.
 type Store interface {
 	// Healthy checks if the store is healthy
@@ -23,56 +35,56 @@ type Store interface {
 	GetStorageHandshakeToken(ctx context.Context, node string) (string, error)
 
 	// SaveBeaconState saves a beacon state to the store
-	SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveBeaconState(ctx context.Context, params *SaveParams) (string, error)
 	// GetBeaconState fetches a beacon state from the store
 	GetBeaconState(ctx context.Context, location string) (*[]byte, error)
 	// GetBeaconStateURL returns a URL for the beacon state
-	GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error)
+	GetBeaconStateURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconState deletes a beacon state from the store
 	DeleteBeaconState(ctx context.Context, location string) error
 
 	// SaveBeaconBlock saves a beacon block to the store
-	SaveBeaconBlock(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveBeaconBlock(ctx context.Context, params *SaveParams) (string, error)
 	// GetBeaconBlock fetches a beacon block from the store
 	GetBeaconBlock(ctx context.Context, location string) (*[]byte, error)
 	// GetBeaconBlockURL returns a URL for the beacon block
-	GetBeaconBlockURL(ctx context.Context, location string, expiry int) (string, error)
+	GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconBlock deletes a beacon block from the store
 	DeleteBeaconBlock(ctx context.Context, location string) error
 
 	// SaveBeaconBadBlock saves a beacon bad block to the store
-	SaveBeaconBadBlock(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error)
 	// GetBeaconBadBlock fetches a beacon bad block from the store
 	GetBeaconBadBlock(ctx context.Context, location string) (*[]byte, error)
 	// GetBeaconBadBlockURL returns a URL for the beacon bad block
-	GetBeaconBadBlockURL(ctx context.Context, location string, expiry int) (string, error)
+	GetBeaconBadBlockURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconBadBlock deletes a beacon bad block from the store
 	DeleteBeaconBadBlock(ctx context.Context, location string) error
 
 	// SaveBeaconBadBlob saves a beacon bad block to the store
-	SaveBeaconBadBlob(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (string, error)
 	// GetBeaconBadBlob fetches a beacon bad block from the store
 	GetBeaconBadBlob(ctx context.Context, location string) (*[]byte, error)
 	// GetBeaconBadBlobURL returns a URL for the beacon bad block
-	GetBeaconBadBlobURL(ctx context.Context, location string, expiry int) (string, error)
+	GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconBadBlob deletes a beacon bad block from the store
 	DeleteBeaconBadBlob(ctx context.Context, location string) error
 
 	// SaveExecutionBlockTrace saves an execution block trace to the store
-	SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveExecutionBlockTrace(ctx context.Context, params *SaveParams) (string, error)
 	// GetExecutionBlockTrace fetches an execution block trace from the store
 	GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error)
 	// GetExecutionBlockTraceURL returns a URL for the execution block trace
-	GetExecutionBlockTraceURL(ctx context.Context, location string, expiry int) (string, error)
+	GetExecutionBlockTraceURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteExecutionBlockTrace deletes an execution block trace from the store
 	DeleteExecutionBlockTrace(ctx context.Context, location string) error
 
 	// SaveExecutionBadBlock saves an execution bad block to the store
-	SaveExecutionBadBlock(ctx context.Context, data *[]byte, location string) (string, error)
+	SaveExecutionBadBlock(ctx context.Context, params *SaveParams) (string, error)
 	// GetExecutionBadBlock fetches an execution bad block from the store
 	GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error)
 	// GetExecutionBadBlockURL returns a URL for the execution bad block
-	GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error)
+	GetExecutionBadBlockURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteExecutionBadBlock deletes an execution bad block from the store
 	DeleteExecutionBadBlock(ctx context.Context, location string) error
 

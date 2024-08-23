@@ -18,6 +18,7 @@ message BeaconState {
   google.protobuf.StringValue location = 8;
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
+  google.protobuf.StringValue content_encoding = 11;
 }
 
 message BeaconBlock {
@@ -31,6 +32,7 @@ message BeaconBlock {
   google.protobuf.StringValue location = 8;
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
+  google.protobuf.StringValue content_encoding = 11;
 }
 
 message BeaconBadBlock {
@@ -44,6 +46,7 @@ message BeaconBadBlock {
   google.protobuf.StringValue location = 8;
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
+  google.protobuf.StringValue content_encoding = 11;
 }
 
 
@@ -59,6 +62,7 @@ message BeaconBadBlob {
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.UInt64Value index = 11;
+  google.protobuf.StringValue content_encoding = 12;
 }
 
 message ExecutionBlockTrace {
@@ -71,6 +75,7 @@ message ExecutionBlockTrace {
   google.protobuf.StringValue network = 7;
   google.protobuf.StringValue execution_implementation = 8;
   google.protobuf.StringValue node_version = 9;
+  google.protobuf.StringValue content_encoding = 10;
 }
 
 message ExecutionBadBlock {
@@ -84,6 +89,7 @@ message ExecutionBadBlock {
   google.protobuf.StringValue execution_implementation = 8;
   google.protobuf.StringValue node_version = 9;
   google.protobuf.StringValue block_extra_data = 10;
+  google.protobuf.StringValue content_encoding = 11;
 }
 
 message Config {
@@ -203,6 +209,7 @@ message CreateBeaconStateRequest {
   google.protobuf.StringValue location = 7;
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
+  google.protobuf.StringValue content_encoding = 10;
 }
 
 message CreateBeaconStateResponse { google.protobuf.StringValue id = 1; }
@@ -217,6 +224,7 @@ message CreateBeaconBlockRequest {
   google.protobuf.StringValue location = 7;
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
+  google.protobuf.StringValue content_encoding = 10;
 }
 
 message CreateBeaconBlockResponse { google.protobuf.StringValue id = 1; }
@@ -231,6 +239,7 @@ message CreateBeaconBadBlockRequest {
   google.protobuf.StringValue location = 7;
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
+  google.protobuf.StringValue content_encoding = 10;
 }
 
 message CreateBeaconBadBlockResponse { google.protobuf.StringValue id = 1; }
@@ -246,6 +255,7 @@ message CreateBeaconBadBlobRequest {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.UInt64Value index = 10;
+  google.protobuf.StringValue content_encoding = 11;
 }
 
 message CreateBeaconBadBlobResponse { google.protobuf.StringValue id = 1; }
@@ -259,6 +269,7 @@ message CreateExecutionBlockTraceRequest {
   google.protobuf.StringValue network = 6;
   google.protobuf.StringValue execution_implementation = 7;
   google.protobuf.StringValue node_version = 8;
+  google.protobuf.StringValue content_encoding = 9;
 }
 
 message CreateExecutionBlockTraceResponse {
@@ -585,6 +596,7 @@ message CreateExecutionBadBlockRequest {
   google.protobuf.StringValue execution_implementation = 7;
   google.protobuf.StringValue node_version = 8;
   google.protobuf.StringValue block_extra_data = 9;
+  google.protobuf.StringValue content_encoding = 10;
 }
 
 message CreateExecutionBadBlockResponse { google.protobuf.StringValue id = 1; }

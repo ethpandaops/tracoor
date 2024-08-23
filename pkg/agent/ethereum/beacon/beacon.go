@@ -9,6 +9,7 @@ import (
 
 	bn "github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
+	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/go-co-op/gocron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -63,7 +64,7 @@ func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkN
 }
 
 func (b *Node) GetVersionImmuneBlock(ctx context.Context, blockID string) (*VersionImmuneBlock, error) {
-	data, err := b.beacon.FetchRawBlock(ctx, blockID, "application/json")
+	data, err := b.beacon.FetchRawBlock(ctx, blockID, string(mime.ContentTypeJSON))
 	if err != nil {
 		return nil, err
 	}

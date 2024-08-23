@@ -22,6 +22,7 @@ type BeaconBlock struct {
 	FetchedAt            time.Time `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_block_fetchedat,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	BeaconImplementation string
 	NodeVersion          string `gorm:"not null;default:''"`
+	ContentEncoding      string `gorm:"not null;default:''"`
 	Location             string `gorm:"not null;default:''"`
 	Network              string `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 }

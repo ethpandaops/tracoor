@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"testing"
+
+	"github.com/ethpandaops/tracoor/pkg/compression"
 )
 
 func TestS3StoreOperations(t *testing.T) {
@@ -49,12 +51,23 @@ func testBeaconState(ctx context.Context, t *testing.T, store Store) {
 
 	var err error
 
+	compressor := compression.NewCompressor()
+
 	t.Run("BeaconState", func(t *testing.T) {
 		if err = store.Healthy(ctx); err != nil {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		location, err = store.SaveBeaconState(ctx, &data, location)
+		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		if err != nil {
+			t.Fatalf("Failed to compress data: %v", err)
+		}
+
+		location, err = store.SaveBeaconState(ctx, &SaveParams{
+			Data:            &compressedData,
+			Location:        location,
+			ContentEncoding: compression.Gzip.ContentEncoding,
+		})
 		if err != nil {
 			t.Fatalf("Failed to save beacon state: %v", err)
 		}
@@ -105,7 +118,11 @@ func testBeaconBlock(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		location, err = store.SaveBeaconBlock(ctx, &data, location)
+		location, err = store.SaveBeaconBlock(ctx, &SaveParams{
+			Data:            &data,
+			Location:        location,
+			ContentEncoding: "",
+		})
 		if err != nil {
 			t.Fatalf("Failed to save beacon block: %v", err)
 		}
@@ -156,7 +173,11 @@ func testBeaconBadBlock(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		location, err = store.SaveBeaconBadBlock(ctx, &data, location)
+		location, err = store.SaveBeaconBadBlock(ctx, &SaveParams{
+			Data:            &data,
+			Location:        location,
+			ContentEncoding: "",
+		})
 		if err != nil {
 			t.Fatalf("Failed to save beacon bad block: %v", err)
 		}
@@ -207,7 +228,11 @@ func testExecutionBlockTrace(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		location, err = store.SaveExecutionBlockTrace(ctx, &data, location)
+		location, err = store.SaveExecutionBlockTrace(ctx, &SaveParams{
+			Data:            &data,
+			Location:        location,
+			ContentEncoding: "",
+		})
 		if err != nil {
 			t.Fatalf("Failed to save execution block trace: %v", err)
 		}
@@ -258,7 +283,11 @@ func testExecutionBadBlock(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		location, err = store.SaveExecutionBadBlock(ctx, &data, location)
+		location, err = store.SaveExecutionBadBlock(ctx, &SaveParams{
+			Data:            &data,
+			Location:        location,
+			ContentEncoding: "",
+		})
 		if err != nil {
 			t.Fatalf("Failed to save execution bad block: %v", err)
 		}
