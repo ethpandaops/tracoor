@@ -240,9 +240,8 @@ func (s *S3Store) GetBeaconStateURL(ctx context.Context, location string, expiry
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket:              aws.String(s.config.BucketName),
-		Key:                 aws.String(location),
-		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
 	}
 
 	extension := filepath.Ext(location)
@@ -547,9 +546,8 @@ func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, location string, expi
 	presignClient := s3.NewPresignClient(s.s3Client)
 
 	input := &s3.GetObjectInput{
-		Bucket:              aws.String(s.config.BucketName),
-		Key:                 aws.String(location),
-		ResponseContentType: aws.String(string(mime.GetContentTypeFromExtension(filepath.Ext(location)))),
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
 	}
 
 	extension := filepath.Ext(location)
