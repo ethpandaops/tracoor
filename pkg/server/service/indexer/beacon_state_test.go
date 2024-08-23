@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethpandaops/tracoor/pkg/compression"
 	pindexer "github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/ethpandaops/tracoor/pkg/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -77,7 +79,18 @@ func TestIndexerBeaconStateDownloading(t *testing.T) {
 	t.Run("Downloading", func(t *testing.T) {
 		data := []byte("{\"key\": \"value\"}")
 
-		location, err := index.Store().SaveBeaconState(ctx, &data, "data.json")
+		compressor := compression.NewCompressor()
+
+		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		if err != nil {
+			t.Fatalf("failed to compress data: %v", err)
+		}
+
+		location, err := index.Store().SaveBeaconState(ctx, &store.SaveParams{
+			Data:            &compressedData,
+			Location:        "data.json",
+			ContentEncoding: compression.Gzip.ContentEncoding,
+		})
 		if err != nil {
 			t.Fatalf("failed to save beacon state: %v", err)
 		}
@@ -96,7 +109,11 @@ func TestIndexerBeaconStateDownloading(t *testing.T) {
 			t.Fatalf("failed to get beacon state: %v", err)
 		}
 
-		url, err := index.Store().GetBeaconStateURL(ctx, rsp.BeaconStates[0].Location.GetValue(), 60)
+		url, err := index.Store().GetBeaconStateURL(ctx, &store.GetURLParams{
+			Location:        rsp.BeaconStates[0].Location.GetValue(),
+			Expiry:          60,
+			ContentEncoding: rsp.BeaconStates[0].ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			t.Fatalf("failed to get beacon state URL: %v", err)
 		}

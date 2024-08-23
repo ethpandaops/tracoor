@@ -29,7 +29,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveBeaconState", func(t *testing.T) {
 		location := "beacon_state/location.json"
 		data := []byte(`{"abc": "def"}`)
-		_, err := fsStore.SaveBeaconState(ctx, &data, location)
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetBeaconState(ctx, location)
@@ -40,7 +43,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteBeaconState", func(t *testing.T) {
 		location := "beacon_state/location.json"
 		data := []byte(`{"abc": "def"}`)
-		_, err := fsStore.SaveBeaconState(ctx, &data, location)
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteBeaconState(ctx, location)
@@ -54,7 +60,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveBeaconBlock", func(t *testing.T) {
 		location := "beacon_block/location.json"
 		data := []byte(`{"block": "data"}`)
-		_, err := fsStore.SaveBeaconBlock(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetBeaconBlock(ctx, location)
@@ -65,7 +74,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteBeaconBlock", func(t *testing.T) {
 		location := "beacon_block/location.json"
 		data := []byte(`{"block": "data"}`)
-		_, err := fsStore.SaveBeaconBlock(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteBeaconBlock(ctx, location)
@@ -79,7 +91,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveBeaconBadBlock", func(t *testing.T) {
 		location := "beacon_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
-		_, err := fsStore.SaveBeaconBadBlock(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetBeaconBadBlock(ctx, location)
@@ -90,7 +105,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteBeaconBadBlock", func(t *testing.T) {
 		location := "beacon_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
-		_, err := fsStore.SaveBeaconBadBlock(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteBeaconBadBlock(ctx, location)
@@ -104,7 +122,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveBeaconBadBlob", func(t *testing.T) {
 		location := "beacon_bad_blob/location.json"
 		data := []byte(`{"bad_blob": "data"}`)
-		_, err := fsStore.SaveBeaconBadBlob(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBadBlob(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetBeaconBadBlob(ctx, location)
@@ -115,7 +136,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteBeaconBadBlob", func(t *testing.T) {
 		location := "beacon_bad_blob/location.json"
 		data := []byte(`{"bad_blob": "data"}`)
-		_, err := fsStore.SaveBeaconBadBlob(ctx, &data, location)
+		_, err := fsStore.SaveBeaconBadBlob(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteBeaconBadBlob(ctx, location)
@@ -129,7 +153,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveExecutionBlockTrace", func(t *testing.T) {
 		location := "execution_block_trace/location.json"
 		data := []byte(`{"trace": "data"}`)
-		_, err := fsStore.SaveExecutionBlockTrace(ctx, &data, location)
+		_, err := fsStore.SaveExecutionBlockTrace(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetExecutionBlockTrace(ctx, location)
@@ -140,7 +167,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteExecutionBlockTrace", func(t *testing.T) {
 		location := "execution_block_trace/location.json"
 		data := []byte(`{"trace": "data"}`)
-		_, err := fsStore.SaveExecutionBlockTrace(ctx, &data, location)
+		_, err := fsStore.SaveExecutionBlockTrace(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteExecutionBlockTrace(ctx, location)
@@ -154,7 +184,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("SaveExecutionBadBlock", func(t *testing.T) {
 		location := "execution_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
-		_, err := fsStore.SaveExecutionBadBlock(ctx, &data, location)
+		_, err := fsStore.SaveExecutionBadBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		savedData, err := fsStore.GetExecutionBadBlock(ctx, location)
@@ -165,7 +198,10 @@ func TestFSStoreOperations(t *testing.T) {
 	t.Run("DeleteExecutionBadBlock", func(t *testing.T) {
 		location := "execution_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
-		_, err := fsStore.SaveExecutionBadBlock(ctx, &data, location)
+		_, err := fsStore.SaveExecutionBadBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
 		require.NoError(t, err)
 
 		err = fsStore.DeleteExecutionBadBlock(ctx, location)

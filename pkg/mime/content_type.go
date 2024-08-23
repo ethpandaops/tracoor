@@ -13,6 +13,14 @@ const (
 	ContentTypeOctet   ContentType = "application/octet-stream"
 )
 
+func ContentTypeFromString(s string) ContentType {
+	if s == "" {
+		return ContentTypeUnknown
+	}
+
+	return ContentType(s)
+}
+
 // GetContentTypeFromExtension returns the MIME type of a file based on its extension.
 func GetContentTypeFromExtension(extension string) ContentType {
 	if extension == "" {

@@ -99,15 +99,15 @@ func (s *FSStore) removeFile(path string) error {
 	return os.Remove(path)
 }
 
-func (s *FSStore) SaveBeaconState(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetBeaconState(ctx context.Context, location string) (*[]byte, error) {
@@ -116,7 +116,7 @@ func (s *FSStore) GetBeaconState(ctx context.Context, location string) (*[]byte,
 	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
-func (s *FSStore) GetBeaconStateURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetBeaconStateURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 
@@ -127,15 +127,15 @@ func (s *FSStore) DeleteBeaconState(ctx context.Context, location string) error 
 	return s.removeFile(path)
 }
 
-func (s *FSStore) SaveBeaconBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveBeaconBlock(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetBeaconBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -144,7 +144,7 @@ func (s *FSStore) GetBeaconBlock(ctx context.Context, location string) (*[]byte,
 	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
-func (s *FSStore) GetBeaconBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 
@@ -155,15 +155,15 @@ func (s *FSStore) DeleteBeaconBlock(ctx context.Context, location string) error 
 	return s.removeFile(path)
 }
 
-func (s *FSStore) SaveBeaconBadBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetBeaconBadBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -173,7 +173,7 @@ func (s *FSStore) GetBeaconBadBlock(ctx context.Context, location string) (*[]by
 	return s.getFile(path)
 }
 
-func (s *FSStore) GetBeaconBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetBeaconBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 
@@ -184,15 +184,15 @@ func (s *FSStore) DeleteBeaconBadBlock(ctx context.Context, location string) err
 	return s.removeFile(path)
 }
 
-func (s *FSStore) SaveBeaconBadBlob(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetBeaconBadBlob(ctx context.Context, location string) (*[]byte, error) {
@@ -201,7 +201,7 @@ func (s *FSStore) GetBeaconBadBlob(ctx context.Context, location string) (*[]byt
 	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
-func (s *FSStore) GetBeaconBadBlobURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 
@@ -212,15 +212,15 @@ func (s *FSStore) DeleteBeaconBadBlob(ctx context.Context, location string) erro
 	return s.removeFile(path)
 }
 
-func (s *FSStore) SaveExecutionBlockTrace(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveExecutionBlockTrace(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error) {
@@ -229,7 +229,7 @@ func (s *FSStore) GetExecutionBlockTrace(ctx context.Context, location string) (
 	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
-func (s *FSStore) GetExecutionBlockTraceURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetExecutionBlockTraceURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 
@@ -240,15 +240,15 @@ func (s *FSStore) DeleteExecutionBlockTrace(ctx context.Context, location string
 	return s.removeFile(path)
 }
 
-func (s *FSStore) SaveExecutionBadBlock(ctx context.Context, data *[]byte, location string) (string, error) {
-	parts := strings.Split(location, "/")
+func (s *FSStore) SaveExecutionBadBlock(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
 
 	path := filepath.Join(s.basePath, filepath.Join(parts...))
-	if err := s.saveFile(data, path); err != nil {
+	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
 
-	return location, nil
+	return params.Location, nil
 }
 
 func (s *FSStore) GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -257,7 +257,7 @@ func (s *FSStore) GetExecutionBadBlock(ctx context.Context, location string) (*[
 	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
-func (s *FSStore) GetExecutionBadBlockURL(ctx context.Context, location string, expiry int) (string, error) {
+func (s *FSStore) GetExecutionBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
 	return "", errors.New("not supported")
 }
 

@@ -21,6 +21,11 @@ var (
 		Extension:       ".gz",
 		ContentEncoding: "gzip",
 	}
+	None = &CompressionAlgorithm{
+		Name:            "none",
+		Extension:       "",
+		ContentEncoding: "identity",
+	}
 )
 
 // Compressor provides methods for compressing and decompressing data
@@ -48,6 +53,8 @@ func (c *Compressor) Compress(data *[]byte, algorithm *CompressionAlgorithm) ([]
 	switch algorithm.Name {
 	case Gzip.Name:
 		w = gzip.NewWriter(&buf)
+	case None.Name:
+		w = nopWriteCloser{&buf}
 	default:
 		return nil, ErrUnsupportedAlgorithm
 	}
@@ -82,6 +89,8 @@ func (c *Compressor) Decompress(data *[]byte, filename string) ([]byte, error) {
 	switch algo.Name {
 	case Gzip.Name:
 		r, err = gzip.NewReader(bytes.NewReader(*data))
+	case None.Name:
+		r = io.NopCloser(bytes.NewReader(*data))
 	default:
 		return nil, ErrUnsupportedAlgorithm
 	}
@@ -122,5 +131,23 @@ func GetCompressionAlgorithm(filename string) (*CompressionAlgorithm, error) {
 	return nil, errors.New("unsupported compression algorithm")
 }
 
+func GetCompressionAlgorithmFromContentEncoding(contentEncoding string) (*CompressionAlgorithm, error) {
+	if contentEncoding == Gzip.ContentEncoding {
+		return Gzip, nil
+	}
+
+	if contentEncoding == None.ContentEncoding {
+		return None, nil
+	}
+
+	return nil, errors.New("unsupported compression algorithm")
+}
+
 // ErrUnsupportedAlgorithm is returned when an unsupported compression algorithm is specified
 var ErrUnsupportedAlgorithm = errors.New("unsupported compression algorithm")
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error { return nil }

@@ -9,6 +9,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/ethpandaops/tracoor/pkg/store"
 	tStore "github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/sirupsen/logrus"
@@ -113,7 +114,11 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconStateURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetBeaconStateURL(ctx, &store.GetURLParams{
+			Location:        state.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: state.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for beacon state ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -135,20 +140,14 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	extension := filepath.Ext(state.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
-		withoutCompression := compression.RemoveExtension(state.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -197,7 +196,11 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBlockURL(ctx, block.Location.Value, 3600)
+		itemURL, err = d.store.GetBeaconBlockURL(ctx, &store.GetURLParams{
+			Location:        block.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: block.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for beacon block ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -219,20 +222,14 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	extension := filepath.Ext(block.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
 	if err == nil {
-		withoutCompression := compression.RemoveExtension(block.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(block.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -281,7 +278,11 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBadBlockURL(ctx, block.Location.Value, 3600)
+		itemURL, err = d.store.GetBeaconBadBlockURL(ctx, &store.GetURLParams{
+			Location:        block.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: block.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for beacon bad block ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -303,20 +304,14 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	extension := filepath.Ext(block.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(block.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
 	if err == nil {
-		withoutCompression := compression.RemoveExtension(block.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(block.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -365,7 +360,11 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBadBlobURL(ctx, blob.Location.Value, 3600)
+		itemURL, err = d.store.GetBeaconBadBlobURL(ctx, &store.GetURLParams{
+			Location:        blob.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: blob.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for beacon bad blob ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -387,20 +386,14 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	extension := filepath.Ext(blob.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(blob.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(blob.ContentEncoding.GetValue())
 	if err == nil {
-		withoutCompression := compression.RemoveExtension(blob.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(blob.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(blob.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -449,7 +442,11 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetExecutionBlockTraceURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetExecutionBlockTraceURL(ctx, &store.GetURLParams{
+			Location:        state.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: state.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for block trace ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -471,20 +468,14 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	extension := filepath.Ext(state.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
-		withoutCompression := compression.RemoveExtension(state.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -533,7 +524,11 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetExecutionBadBlockURL(ctx, state.Location.Value, 3600)
+		itemURL, err = d.store.GetExecutionBadBlockURL(ctx, &store.GetURLParams{
+			Location:        state.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: state.ContentEncoding.GetValue(),
+		})
 		if err != nil {
 			d.log.WithError(err).Errorf("Failed to get URL for bad block ID %s", id)
 			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
@@ -555,20 +550,14 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	extension := filepath.Ext(state.Location.Value)
-
-	algo, err := compression.GetCompressionAlgorithm(state.Location.Value)
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		withoutCompression := compression.RemoveExtension(state.Location.Value, algo)
-
-		extension = filepath.Ext(withoutCompression)
-
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(withoutCompression)))
 	}
 
-	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(extension)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(state.Location.Value)))
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {

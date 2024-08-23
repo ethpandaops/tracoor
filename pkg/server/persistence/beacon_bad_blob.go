@@ -23,6 +23,7 @@ type BeaconBadBlob struct {
 	BeaconImplementation string
 	NodeVersion          string `gorm:"not null;default:''"`
 	Location             string `gorm:"not null;default:''"`
+	ContentEncoding      string `gorm:"not null;default:'gzip'"` // Default to gzip for backwards compatibility. If the content is not compressed, the creator should set this to `identity`.
 	Network              string `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:4;index:idx_beacon_bad_blob_network,where:deleted_at IS NULL;index:idx_beacon_bad_blob_network,where:deleted_at IS NULL;index:idx_beacon_bad_blob_fetchedat_network,where:deleted_at IS NULL,priority:2"`
 	Index                int64  `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:6"`
 }
