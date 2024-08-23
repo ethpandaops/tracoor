@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/mime"
@@ -139,7 +140,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -215,7 +216,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -291,7 +292,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(block.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -367,7 +368,7 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeOctet))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(blob.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -443,7 +444,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeJSON))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
@@ -519,7 +520,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	}
 
-	w.Header().Set("Content-Type", string(mime.ContentTypeJSON))
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(state.Location.Value))))
 
 	_, err = w.Write(*data)
 	if err != nil {
