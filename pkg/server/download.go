@@ -9,7 +9,6 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
-	"github.com/ethpandaops/tracoor/pkg/store"
 	tStore "github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/sirupsen/logrus"
@@ -114,7 +113,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconStateURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetBeaconStateURL(ctx, &tStore.GetURLParams{
 			Location:        state.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: state.ContentEncoding.GetValue(),
@@ -149,6 +148,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
@@ -201,7 +201,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBlockURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetBeaconBlockURL(ctx, &tStore.GetURLParams{
 			Location:        block.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: block.ContentEncoding.GetValue(),
@@ -236,6 +236,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
@@ -288,7 +289,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBadBlockURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetBeaconBadBlockURL(ctx, &tStore.GetURLParams{
 			Location:        block.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: block.ContentEncoding.GetValue(),
@@ -323,6 +324,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
@@ -375,7 +377,7 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetBeaconBadBlobURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetBeaconBadBlobURL(ctx, &tStore.GetURLParams{
 			Location:        blob.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: blob.ContentEncoding.GetValue(),
@@ -410,6 +412,7 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(blob.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
@@ -462,7 +465,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetExecutionBlockTraceURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetExecutionBlockTraceURL(ctx, &tStore.GetURLParams{
 			Location:        state.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: state.ContentEncoding.GetValue(),
@@ -497,6 +500,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
@@ -549,7 +553,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 	if d.store.PreferURLs() {
 		var itemURL string
 
-		itemURL, err = d.store.GetExecutionBadBlockURL(ctx, &store.GetURLParams{
+		itemURL, err = d.store.GetExecutionBadBlockURL(ctx, &tStore.GetURLParams{
 			Location:        state.Location.Value,
 			Expiry:          3600,
 			ContentEncoding: state.ContentEncoding.GetValue(),
@@ -584,6 +588,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasAnyCompressionExtension(state.Location.Value) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
 		filename = compression.RemoveExtension(filename)
 	}
 
