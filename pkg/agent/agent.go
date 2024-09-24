@@ -125,7 +125,7 @@ func (s *agent) Start(ctx context.Context) error {
 				return nil
 			}
 
-			logCtx := logrus.WithFields(logrus.Fields{
+			logCtx := s.log.WithFields(logrus.Fields{
 				"event_slot": event.Slot,
 				"event_root": fmt.Sprintf("%#x", event.Block),
 				"purpose":    "execution_block_trace",
@@ -199,7 +199,7 @@ func (s *agent) Start(ctx context.Context) error {
 		})
 
 		s.node.Beacon().Node().OnChainReOrg(ctx, func(ctx context.Context, chainReorg *eth2v1.ChainReorgEvent) error {
-			logCtx := logrus.WithFields(
+			logCtx := s.log.WithFields(
 				logrus.Fields{
 					"event_old_head_block": rootAsString(chainReorg.OldHeadBlock),
 					"event_new_head_block": rootAsString(chainReorg.NewHeadBlock),
