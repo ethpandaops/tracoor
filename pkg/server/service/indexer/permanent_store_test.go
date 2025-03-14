@@ -306,3 +306,109 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, blockData, *data, "Block data should match")
 }
+
+func TestPermanentStoreStop(t *testing.T) {
+	ctx := context.Background()
+	permanentStore, mockStore, cleanup := setupPermanentStore(t)
+	defer cleanup()
+
+	// Create a test block
+	blockData := []byte("test block data")
+	blockLocation := "test/location/block1.ssz"
+
+	// Save the block to the mock store
+	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
+		Location: blockLocation,
+		Data:     &blockData,
+	})
+	require.NoError(t, err)
+
+	// Create a channel to track when processing is complete
+	processChan := make(chan struct{})
+
+	// Queue a block for processing with the channel
+	blockInfo := PermanentStoreBlock{
+		Location:      blockLocation,
+		BlockRoot:     "0xstop",
+		Network:       "mainnet",
+		ProcessedChan: processChan,
+	}
+
+	// Queue the block
+	permanentStore.QueueBlock(blockInfo)
+
+	// Wait for the block to be processed
+	select {
+	case <-processChan:
+		// Block was processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block processing timed out")
+	}
+
+	// Verify the block was copied to the permanent location
+	permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
+	exists, err := mockStore.Exists(ctx, permanentLocation)
+	require.NoError(t, err)
+	assert.True(t, exists, "Block should be copied to permanent location")
+
+	// Now test the stop procedure with a block in the queue
+	// Queue another block before stopping
+	processChan2 := make(chan struct{})
+	queuedBlock := PermanentStoreBlock{
+		Location:      blockLocation,
+		BlockRoot:     "0xqueued",
+		Network:       "mainnet",
+		ProcessedChan: processChan2,
+	}
+	permanentStore.QueueBlock(queuedBlock)
+
+	// Start a goroutine to stop the permanent store
+	stopDone := make(chan struct{})
+	go func() {
+		err := permanentStore.Stop(ctx)
+		require.NoError(t, err)
+		close(stopDone)
+	}()
+
+	// Wait for the queued block to be processed
+	select {
+	case <-processChan2:
+		// Block was processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Queued block processing timed out")
+	}
+
+	// Verify the queued block was copied to the permanent location
+	queuedLocation := filepath.Join("permanent", queuedBlock.Network, "blocks", queuedBlock.BlockRoot+filepath.Ext(blockLocation))
+	exists, err = mockStore.Exists(ctx, queuedLocation)
+	require.NoError(t, err)
+	assert.True(t, exists, "Queued block should be copied to permanent location before Stop completes")
+
+	// Wait for Stop to complete
+	select {
+	case <-stopDone:
+		// Stop completed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Stop did not complete in time")
+	}
+
+	// Try to queue a block after stopping
+	unprocessedBlock := PermanentStoreBlock{
+		Location:  blockLocation,
+		BlockRoot: "0xunprocessed",
+		Network:   "mainnet",
+	}
+	permanentStore.QueueBlock(unprocessedBlock)
+
+	// Wait a bit to ensure the block isn't processed
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify the unprocessed block was not copied to the permanent location
+	unprocessedLocation := filepath.Join("permanent", unprocessedBlock.Network, "blocks", unprocessedBlock.BlockRoot+filepath.Ext(blockLocation))
+	exists, err = mockStore.Exists(ctx, unprocessedLocation)
+	require.NoError(t, err)
+	assert.False(t, exists, "Block should not be copied after permanent store is stopped")
+
+	// Verify that the stopped flag is set
+	assert.True(t, permanentStore.stopped, "Stopped flag should be set")
+}

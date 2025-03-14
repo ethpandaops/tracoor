@@ -30,6 +30,7 @@ type PermanentStore struct {
 	queue   chan PermanentStoreBlock
 	cache   *lru.Cache[string, bool]
 	enabled bool
+	stopped bool
 	nodeID  string
 }
 
@@ -56,6 +57,7 @@ func NewPermanentStore(log logrus.FieldLogger, st store.Store, db *persistence.I
 		cache:   cache,
 		enabled: conf.Blocks.Enabled,
 		nodeID:  nodeID,
+		stopped: false,
 	}, nil
 }
 
@@ -63,7 +65,10 @@ func NewPermanentStore(log logrus.FieldLogger, st store.Store, db *persistence.I
 func (p *PermanentStore) Start(ctx context.Context) error {
 	p.log.Info("Starting permanent store")
 
-	go p.processQueue(ctx)
+	// Start multiple goroutines to process the queue
+	for i := 0; i < 10; i++ {
+		go p.processQueue(ctx)
+	}
 
 	return nil
 }
@@ -71,6 +76,22 @@ func (p *PermanentStore) Start(ctx context.Context) error {
 // Stop stops the permanent store.
 func (p *PermanentStore) Stop(ctx context.Context) error {
 	p.log.Info("Stopping permanent store")
+
+	// Set the stopped flag to prevent new blocks from being queued
+	p.stopped = true
+
+	// Wait until the queue is empty
+	for len(p.queue) > 0 {
+		p.log.WithField("remaining", len(p.queue)).Debug("Waiting for queue to empty")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+			// Continue waiting
+		}
+	}
+
+	p.log.Debug("Queue is empty, permanent store stopped")
 
 	return nil
 }
@@ -83,6 +104,10 @@ func (p *PermanentStore) IsEnabled() bool {
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	// Check if the permanent store is enabled
 	if !p.IsEnabled() {
+		return
+	}
+
+	if p.stopped {
 		return
 	}
 
@@ -108,7 +133,17 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case block := <-p.queue:
+		case block, ok := <-p.queue:
+			// Check if the channel was closed
+			if !ok {
+				return
+			}
+
+			// Skip empty blocks
+			if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
+				continue
+			}
+
 			if err := p.processBlock(ctx, block); err != nil {
 				p.log.WithError(err).WithFields(logrus.Fields{
 					"block_root": block.BlockRoot,
