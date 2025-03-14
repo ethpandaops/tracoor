@@ -81,13 +81,18 @@ func (p *PermanentStore) Stop(ctx context.Context) error {
 	p.stopped = true
 
 	// Wait until the queue is empty
+	attempts := 0
+
 	for len(p.queue) > 0 {
 		p.log.WithField("remaining", len(p.queue)).Debug("Waiting for queue to empty")
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-			// Continue waiting
+		// Continue waiting
+		case <-time.After(250 * time.Millisecond):
+			attempts++
+
+			p.log.WithField("attempts", attempts).Info("Waiting for queue to drain...")
 		}
 	}
 
@@ -180,10 +185,70 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Create a lock key for this block
 	lockKey := fmt.Sprintf("permanent_store:%s", cacheKey)
 
-	// Try to acquire a distributed lock
-	acquired, err := p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
-	if err != nil {
-		return fmt.Errorf("failed to acquire lock: %w", err)
+	// Try to acquire a distributed lock with retries
+	var acquired bool
+
+	var err error
+
+	retryInterval := 200 * time.Millisecond
+	maxRetryDuration := 35 * time.Second
+	startTime := time.Now()
+
+	for time.Since(startTime) < maxRetryDuration {
+		if acquired {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			acquired, err = p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
+			if err != nil {
+				// If the error indicates someone else has the lock, retry
+				if err.Error() != "" && time.Since(startTime) < maxRetryDuration {
+					p.log.WithFields(logrus.Fields{
+						"block_root": block.BlockRoot,
+						"network":    block.Network,
+						"lock_key":   lockKey,
+						"error":      err.Error(),
+						"elapsed":    time.Since(startTime).String(),
+					}).Debug("Failed to acquire lock, retrying...")
+
+					time.Sleep(retryInterval)
+
+					continue
+				}
+
+				return fmt.Errorf("failed to acquire lock: %w", err)
+			}
+
+			if acquired {
+				break
+			}
+
+			// If we couldn't acquire the lock but there's no error, retry
+			if time.Since(startTime) < maxRetryDuration {
+				p.log.WithFields(logrus.Fields{
+					"block_root": block.BlockRoot,
+					"network":    block.Network,
+					"lock_key":   lockKey,
+					"elapsed":    time.Since(startTime).String(),
+				}).Debug("Failed to acquire lock, retrying...")
+
+				time.Sleep(retryInterval)
+
+				continue
+			}
+
+			p.log.WithFields(logrus.Fields{
+				"block_root": block.BlockRoot,
+				"network":    block.Network,
+				"lock_key":   lockKey,
+			}).Debug("Failed to acquire lock after retries, another instance is processing this block")
+
+			return nil
+		}
 	}
 
 	if !acquired {
@@ -191,7 +256,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			"block_root": block.BlockRoot,
 			"network":    block.Network,
 			"lock_key":   lockKey,
-		}).Debug("Failed to acquire lock, another instance is processing this block")
+		}).Debug("Failed to acquire lock after maximum retry duration")
 
 		return nil
 	}

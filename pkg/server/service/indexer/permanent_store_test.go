@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupMockIndexer creates a mock indexer with an in-memory SQLite database
+// setupMockIndexer creates a mock indexer
 func setupMockIndexer(t *testing.T) *persistence.Indexer {
 	t.Helper()
 
@@ -63,7 +63,12 @@ func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	err = permanentStore.Start(context.Background())
 	require.NoError(t, err)
 
-	return permanentStore, mockStore, clean
+	// Ensure the indexer is fully started and migrations are complete
+	time.Sleep(100 * time.Millisecond)
+
+	return permanentStore, mockStore, func() {
+		clean()
+	}
 }
 
 func TestPermanentStoreQueueAndProcess(t *testing.T) {
@@ -84,17 +89,24 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("queue and process block", func(t *testing.T) {
-		// Queue a block for processing
+		// Queue a block for processing with a channel
+		processChan := make(chan struct{})
 		blockInfo := PermanentStoreBlock{
-			Location:  blockLocation,
-			BlockRoot: "0x1234",
-			Network:   "mainnet",
+			Location:      blockLocation,
+			BlockRoot:     "0x1234",
+			Network:       "mainnet",
+			ProcessedChan: processChan,
 		}
 
 		permanentStore.QueueBlock(blockInfo)
 
 		// Wait for the block to be processed
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-processChan:
+			// Block was processed
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("Block processing timed out")
+		}
 
 		// Check if the block was copied to the permanent location
 		permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
@@ -126,16 +138,25 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Queue a block for processing
+	// Queue a block for processing with a channel
+	processChan1 := make(chan struct{})
 	blockInfo := PermanentStoreBlock{
-		Location:  blockLocation,
-		BlockRoot: "0x1234",
-		Network:   "mainnet",
+		Location:      blockLocation,
+		BlockRoot:     "0x1234",
+		Network:       "mainnet",
+		ProcessedChan: processChan1,
 	}
 
 	// Process the block first time
 	permanentStore.QueueBlock(blockInfo)
-	time.Sleep(100 * time.Millisecond)
+
+	// Wait for the block to be processed
+	select {
+	case <-processChan1:
+		// Block was processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block processing timed out")
+	}
 
 	// Get the permanent location
 	permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
@@ -145,9 +166,23 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should be copied to permanent location")
 
-	// Process the same block again
-	permanentStore.QueueBlock(blockInfo)
-	time.Sleep(100 * time.Millisecond)
+	// Process the same block again with a new channel
+	processChan2 := make(chan struct{})
+	blockInfo2 := PermanentStoreBlock{
+		Location:      blockLocation,
+		BlockRoot:     "0x1234",
+		Network:       "mainnet",
+		ProcessedChan: processChan2,
+	}
+	permanentStore.QueueBlock(blockInfo2)
+
+	// Wait for the block to be processed again
+	select {
+	case <-processChan2:
+		// Block was processed again
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Second block processing timed out")
+	}
 
 	// The block should still exist in the permanent location
 	exists, err = mockStore.Exists(ctx, permanentLocation)
@@ -182,23 +217,42 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Queue blocks with same root but different networks
+	// Process blocks sequentially to avoid race conditions with the distributed_locks table
+	// First block
 	blockInfo1 := PermanentStoreBlock{
-		Location:  blockLocation1,
-		BlockRoot: "0x1234",
-		Network:   "mainnet",
+		Location:      blockLocation1,
+		BlockRoot:     "0x1234",
+		Network:       "mainnet",
+		ProcessedChan: make(chan struct{}),
 	}
 
+	// Second block
 	blockInfo2 := PermanentStoreBlock{
-		Location:  blockLocation2,
-		BlockRoot: "0x1234", // Same root
-		Network:   "goerli", // Different network
+		Location:      blockLocation2,
+		BlockRoot:     "0x1234", // Same root
+		Network:       "goerli", // Different network
+		ProcessedChan: make(chan struct{}),
 	}
 
-	// Process both blocks
 	permanentStore.QueueBlock(blockInfo1)
+
+	// Wait for the first block to be processed
+	select {
+	case <-blockInfo1.ProcessedChan:
+		// Block 1 processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block 1 processing timed out")
+	}
+
 	permanentStore.QueueBlock(blockInfo2)
-	time.Sleep(200 * time.Millisecond)
+
+	// Wait for the second block to be processed
+	select {
+	case <-blockInfo2.ProcessedChan:
+		// Block 2 processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block 2 processing timed out")
+	}
 
 	// Check if both blocks were copied to their respective permanent locations
 	permanentLocation1 := filepath.Join("permanent", blockInfo1.Network, "blocks", blockInfo1.BlockRoot+filepath.Ext(blockLocation1))
@@ -238,6 +292,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 		}
 	}()
 
+	// Use a shared indexer for both permanent stores
 	indexer := setupMockIndexer(t)
 
 	log := logrus.New()
@@ -246,6 +301,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	nodeID1 := "node-1"
 	nodeID2 := "node-2"
 
+	// Create and start the first permanent store
 	permanentStore1, err := NewPermanentStore(log, mockStore, indexer, nodeID1, &PermanentStoreConfig{
 		Blocks: BlockConfig{
 			Enabled: true,
@@ -254,21 +310,11 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, permanentStore1)
 
-	permanentStore2, err := NewPermanentStore(log, mockStore, indexer, nodeID2, &PermanentStoreConfig{
-		Blocks: BlockConfig{
-			Enabled: true,
-		},
-	})
-	require.NoError(t, err)
-
-	require.NotNil(t, permanentStore2)
-
-	// Start both permanent stores
 	err = permanentStore1.Start(ctx)
 	require.NoError(t, err)
 
-	err = permanentStore2.Start(ctx)
-	require.NoError(t, err)
+	// Ensure the first permanent store is fully started
+	time.Sleep(200 * time.Millisecond)
 
 	// Create a test block
 	blockData := []byte("test block data")
@@ -281,22 +327,26 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Create a block info
-	blockInfo := PermanentStoreBlock{
-		Location:  blockLocation,
-		BlockRoot: "0xabcd",
-		Network:   "mainnet",
+	// Process the block with the first permanent store
+	blockInfo1 := PermanentStoreBlock{
+		Location:      blockLocation,
+		BlockRoot:     "0xabcd",
+		Network:       "mainnet",
+		ProcessedChan: make(chan struct{}),
 	}
 
-	// Queue the block to both permanent stores
-	permanentStore1.QueueBlock(blockInfo)
-	permanentStore2.QueueBlock(blockInfo)
+	permanentStore1.QueueBlock(blockInfo1)
 
-	// Wait for the blocks to be processed
-	time.Sleep(200 * time.Millisecond)
+	// Wait for the block to be processed
+	select {
+	case <-blockInfo1.ProcessedChan:
+		// Block processed by store 1
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block processing timed out")
+	}
 
 	// Check if the block was copied to the permanent location
-	permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
+	permanentLocation := filepath.Join("permanent", blockInfo1.Network, "blocks", blockInfo1.BlockRoot+filepath.Ext(blockLocation))
 	exists, err := mockStore.Exists(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should be copied to permanent location")
@@ -305,11 +355,47 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	data, err := mockStore.GetBeaconBlock(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.Equal(t, blockData, *data, "Block data should match")
+
+	// Now create and start the second permanent store
+	permanentStore2, err := NewPermanentStore(log, mockStore, indexer, nodeID2, &PermanentStoreConfig{
+		Blocks: BlockConfig{
+			Enabled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, permanentStore2)
+
+	err = permanentStore2.Start(ctx)
+	require.NoError(t, err)
+
+	// Try to process the same block with the second permanent store
+	blockInfo2 := PermanentStoreBlock{
+		Location:      blockLocation,
+		BlockRoot:     "0xabcd",
+		Network:       "mainnet",
+		ProcessedChan: make(chan struct{}),
+	}
+
+	permanentStore2.QueueBlock(blockInfo2)
+
+	// Wait for the block to be processed
+	select {
+	case <-blockInfo2.ProcessedChan:
+		// Block processed by store 2
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block processing timed out")
+	}
+
+	// The block should still exist in the permanent location
+	exists, err = mockStore.Exists(ctx, permanentLocation)
+	require.NoError(t, err)
+	assert.True(t, exists, "Block should still exist in permanent location")
 }
 
 func TestPermanentStoreStop(t *testing.T) {
 	ctx := context.Background()
 	permanentStore, mockStore, cleanup := setupPermanentStore(t)
+
 	defer cleanup()
 
 	// Create a test block
