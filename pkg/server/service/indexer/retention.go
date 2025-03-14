@@ -114,6 +114,19 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 	i.log.WithField("before", before).Debugf("Purging %d old beacon blocks", len(blocks))
 
 	for _, block := range blocks {
+		// Check if the block needs to be processed by the permanent store
+		b := PermanentStoreBlock{
+			Location:      block.Location,
+			BlockRoot:     block.BlockRoot,
+			Network:       block.Network,
+			ProcessedChan: make(chan struct{}),
+		}
+
+		i.permanentStore.QueueBlock(b)
+
+		// Wait for the block to be processed
+		<-b.ProcessedChan
+
 		// Delete from the store first
 		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {
 			if errors.Is(err, store.ErrNotFound) {

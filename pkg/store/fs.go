@@ -307,3 +307,29 @@ func (s *FSStore) GetStorageHandshakeToken(ctx context.Context, node string) (st
 
 	return string(*data), nil
 }
+
+func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
+	if params.Source == "" || params.Destination == "" {
+		return errors.New("source and destination are required")
+	}
+
+	source := filepath.Join(s.basePath, params.Source)
+	destination := filepath.Join(s.basePath, params.Destination)
+
+	if err := s.ensureDir(destination); err != nil {
+		return err
+	}
+
+	// Read the source file
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	// Write to the destination file
+	if err := os.WriteFile(destination, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write destination file: %w", err)
+	}
+
+	return nil
+}

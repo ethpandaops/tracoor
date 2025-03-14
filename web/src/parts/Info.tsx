@@ -1,8 +1,8 @@
 import BeaconBadBlobInfo from '@components/BeaconBadBlobInfo';
-import BeaconBadBlockInfo from '@components/BeaconBadBlockInfo';
-import BeaconBlockInfo from '@components/BeaconBlockInfo';
+import BeaconBadPermanentStoreBlock from '@components/BeaconBadPermanentStoreBlock';
+import BeaconPermanentStoreBlock from '@components/BeaconPermanentStoreBlock';
 import BeaconStateInfo from '@components/BeaconStateInfo';
-import ExecutionBadBlockInfo from '@components/ExecutionBadBlockInfo';
+import ExecutionBadPermanentStoreBlock from '@components/ExecutionBadPermanentStoreBlock';
 import ExecutionBlockTraceInfo from '@components/ExecutionBlockTraceInfo';
 import GoEVMLabInfo from '@components/GoEVMLabInfo';
 import LCLIInfo from '@components/LCLIInfo';
@@ -19,10 +19,10 @@ export default function Info() {
       info = <BeaconStateInfo />;
       break;
     case Selection.beacon_block:
-      info = <BeaconBlockInfo />;
+      info = <BeaconPermanentStoreBlock />;
       break;
     case Selection.beacon_bad_block:
-      info = <BeaconBadBlockInfo />;
+      info = <BeaconBadPermanentStoreBlock />;
       break;
     case Selection.beacon_bad_blob:
       info = <BeaconBadBlobInfo />;
@@ -31,7 +31,7 @@ export default function Info() {
       info = <ExecutionBlockTraceInfo />;
       break;
     case Selection.execution_bad_block:
-      info = <ExecutionBadBlockInfo />;
+      info = <ExecutionBadPermanentStoreBlock />;
       break;
     case Selection.ncli_state_transition:
       info = <NCLIInfo />;

@@ -1,4 +1,4 @@
-export default function BeaconBlockInfo() {
+export default function BeaconPermanentStoreBlock() {
   return (
     <div className="mx-2 mt-8 rounded-xl my-5 p-3 bg-sky-600 text-gray-100 font-bold border-4 border-gray-400/50">
       <h3 className="text-base font-semibold leading-6">

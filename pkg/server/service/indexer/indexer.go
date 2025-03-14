@@ -32,15 +32,26 @@ type Indexer struct {
 	config *Config
 
 	ethereumConfig *ethereum.Config
+
+	permanentStore *PermanentStore
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
+	// Generate a unique node ID for this instance
+	nodeID := uuid.New().String()
+
+	permanentStore, err := NewPermanentStore(log, st, db, nodeID, &conf.PermanentStore)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create permanent store")
+	}
+
 	i := &Indexer{
 		log:            log.WithField("server/module", ServiceType),
 		db:             db,
 		store:          st,
 		config:         conf,
 		ethereumConfig: ethereumConfig,
+		permanentStore: permanentStore,
 	}
 
 	return i, nil
@@ -53,6 +64,10 @@ func (i *Indexer) Start(ctx context.Context, grpcServer *grpc.Server) error {
 		return errors.Wrap(err, "failed to connect to store")
 	}
 
+	if err := i.permanentStore.Start(ctx); err != nil {
+		return errors.Wrap(err, "failed to start permanent store")
+	}
+
 	indexer.RegisterIndexerServer(grpcServer, i)
 
 	go i.startRetentionWatchers(ctx)
@@ -62,6 +77,10 @@ func (i *Indexer) Start(ctx context.Context, grpcServer *grpc.Server) error {
 
 func (i *Indexer) Stop(ctx context.Context) error {
 	i.log.Info("Stopping module")
+
+	if err := i.permanentStore.Stop(ctx); err != nil {
+		i.log.WithError(err).Error("Failed to stop permanent store")
+	}
 
 	// Wait for all requests to finish?
 
@@ -458,6 +477,13 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed beacon block")
+
+	// Queue the block for permanent storage
+	i.permanentStore.QueueBlock(PermanentStoreBlock{
+		Location:  req.GetLocation().GetValue(),
+		BlockRoot: req.GetBlockRoot().GetValue(),
+		Network:   req.GetNetwork().GetValue(),
+	})
 
 	return &indexer.CreateBeaconBlockResponse{
 		Id: block.GetId(),

@@ -247,4 +247,24 @@ func TestFSStoreOperations(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, data, savedData)
 	})
+
+	t.Run("Copy", func(t *testing.T) {
+		location := "beacon_block/location.json"
+		data := []byte(`{"block": "data"}`)
+		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		err = fsStore.Copy(ctx, &store.CopyParams{
+			Source:      location,
+			Destination: "beacon_block/location_copy.json",
+		})
+		require.NoError(t, err)
+
+		exists, err := fsStore.Exists(ctx, "beacon_block/location_copy.json")
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
 }
