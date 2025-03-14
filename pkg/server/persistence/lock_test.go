@@ -13,6 +13,8 @@ import (
 )
 
 func setupTestDB(t *testing.T) *Indexer {
+	t.Helper()
+
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
@@ -54,8 +56,10 @@ func TestAcquireLock(t *testing.T) {
 
 		// Get the original expiry time
 		var lock1 DistributedLock
+
 		result := indexer.db.Where("key = ?", "test-key-2").First(&lock1)
 		require.NoError(t, result.Error)
+
 		originalExpiry := lock1.ExpiresAt
 
 		// Wait a bit to ensure the new expiry will be different
@@ -68,8 +72,10 @@ func TestAcquireLock(t *testing.T) {
 
 		// Verify lock was extended
 		var lock2 DistributedLock
+
 		result = indexer.db.Where("key = ?", "test-key-2").First(&lock2)
 		require.NoError(t, result.Error)
+
 		assert.Equal(t, "owner-2", lock2.Owner)
 		assert.True(t, lock2.ExpiresAt.After(originalExpiry))
 	})
@@ -166,7 +172,7 @@ func TestCleanupExpiredLocks(t *testing.T) {
 	indexer := setupTestDB(t)
 
 	// Create some expired locks
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		expiredLock := &DistributedLock{
 			Key:       "expired-key-" + string(rune(i+'0')),
 			Owner:     "owner-expired",
@@ -177,7 +183,7 @@ func TestCleanupExpiredLocks(t *testing.T) {
 	}
 
 	// Create some valid locks
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		validLock := &DistributedLock{
 			Key:       "valid-key-" + string(rune(i+'0')),
 			Owner:     "owner-valid",
@@ -189,7 +195,9 @@ func TestCleanupExpiredLocks(t *testing.T) {
 
 	// Count total locks before cleanup
 	var countBefore int64
+
 	indexer.db.Model(&DistributedLock{}).Count(&countBefore)
+
 	assert.Equal(t, int64(8), countBefore)
 
 	// Run cleanup
@@ -198,7 +206,9 @@ func TestCleanupExpiredLocks(t *testing.T) {
 
 	// Count remaining locks after cleanup
 	var countAfter int64
+
 	indexer.db.Model(&DistributedLock{}).Count(&countAfter)
+
 	assert.Equal(t, int64(3), countAfter)
 
 	// Verify only valid locks remain

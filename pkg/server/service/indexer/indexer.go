@@ -351,6 +351,7 @@ func (i *Indexer) CountBeaconState(ctx context.Context, req *indexer.CountBeacon
 	}
 
 	return &indexer.CountBeaconStateResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(beaconStates)),
 	}, nil
 }
@@ -615,6 +616,7 @@ func (i *Indexer) CountBeaconBlock(ctx context.Context, req *indexer.CountBeacon
 	}
 
 	return &indexer.CountBeaconBlockResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(beaconBlocks)),
 	}, nil
 }
@@ -872,6 +874,7 @@ func (i *Indexer) CountBeaconBadBlock(ctx context.Context, req *indexer.CountBea
 	}
 
 	return &indexer.CountBeaconBadBlockResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(beaconBlocks)),
 	}, nil
 }
@@ -1140,6 +1143,7 @@ func (i *Indexer) CountBeaconBadBlob(ctx context.Context, req *indexer.CountBeac
 	}
 
 	return &indexer.CountBeaconBadBlobResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(beaconBlobs)),
 	}, nil
 }
@@ -1348,6 +1352,7 @@ func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.Cou
 	}
 
 	return &indexer.CountExecutionBlockTraceResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(executionBlockTraces)),
 	}, nil
 }
@@ -1561,6 +1566,7 @@ func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.Count
 	}
 
 	return &indexer.CountExecutionBadBlockResponse{
+		//nolint:gosec // not worried about int64 overflow here
 		Count: wrapperspb.UInt64(uint64(executionBadBlocks)),
 	}, nil
 }
