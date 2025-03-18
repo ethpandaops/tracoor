@@ -148,7 +148,7 @@ func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, n
 	result := query.Where("block_root = ? AND network = ?", blockRoot, network).First(&permanentBlock)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, errors.New("permanent block not found")
 		}
 
 		i.metrics.ObserveOperationError(operation)
@@ -204,7 +204,6 @@ func (i *Indexer) DistinctPermanentBlockValues(ctx context.Context, fields []str
 	values := make([]interface{}, len(fields))
 
 	for rows.Next() {
-		values = make([]interface{}, len(fields))
 		valuePtrs := make([]interface{}, len(fields))
 
 		for i := range values {
