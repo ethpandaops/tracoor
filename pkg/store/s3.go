@@ -781,22 +781,27 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 		return errors.New("source and destination are required")
 	}
 
-	// For S3, the source needs to be formatted properly with URL escaping
-	// This is necessary for R2 compatibility while maintaining MinIO support
-	source := fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)
+	// AWS SDK v2 expects the CopySource to be in the format:
+	// bucketName + "/" + objectKey with proper URL encoding
+	// For R2 and S3-compatible services like MinIO, the format needs to be precise
 
-	// URL escape the source path for proper S3 API compatibility
-	escapedSource := aws.String(url.PathEscape(source))
+	// First create the unencoded version for logging
+	rawSource := fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)
+
+	// Now create the properly encoded version using standard URL encoding
+	// but preserving the forward slashes, which is what AWS S3 API expects
+	copySource := url.QueryEscape(s.config.BucketName) + "/" + strings.ReplaceAll(url.QueryEscape(params.Source), "%2F", "/")
 
 	s.log.WithFields(logrus.Fields{
-		"source":           params.Source,
-		"destination":      params.Destination,
-		"calculatedSource": source,
+		"source":        params.Source,
+		"destination":   params.Destination,
+		"rawSource":     rawSource,
+		"encodedSource": copySource,
 	}).Debug("Performing server side copy")
 
 	_, err := s.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(s.config.BucketName),
-		CopySource: escapedSource,
+		CopySource: aws.String(copySource),
 		Key:        aws.String(params.Destination),
 	})
 

@@ -2,7 +2,9 @@ package ethereum
 
 import (
 	"context"
+	"errors"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 	"github.com/sirupsen/logrus"
@@ -19,13 +21,16 @@ type Node struct {
 
 	executionReady bool
 	beaconReady    bool
+
+	syncToleranceSlots phase0.Slot
 }
 
-func NewNode(ctx context.Context, log logrus.FieldLogger, config *Config, node string) *Node {
+func NewNode(ctx context.Context, log logrus.FieldLogger, config *Config, node string, syncToleranceSlots phase0.Slot) *Node {
 	return &Node{
-		log:       log.WithField("module", "agent/ethereum/node"),
-		beacon:    beacon.NewNode(ctx, log, node, config.OverrideNetworkName, config.Beacon),
-		execution: execution.NewNode(log, config.Execution),
+		log:                log.WithField("module", "agent/ethereum/node"),
+		beacon:             beacon.NewNode(ctx, log, node, config.OverrideNetworkName, config.Beacon),
+		execution:          execution.NewNode(log, config.Execution),
+		syncToleranceSlots: syncToleranceSlots,
 	}
 }
 
@@ -79,4 +84,19 @@ func (n *Node) checkReadyPublish(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (n *Node) ShouldIgnoreEventFromSlot(slot phase0.Slot) (bool, error) {
+	wallclock := n.beacon.Metadata().Wallclock()
+	if wallclock == nil {
+		return false, errors.New("missing wallclock")
+	}
+
+	currentSlot := wallclock.Slots().Current()
+
+	if phase0.Slot(currentSlot.Number())-slot > n.syncToleranceSlots {
+		return true, nil
+	}
+
+	return false, nil
 }
