@@ -284,7 +284,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}
 
 	// Determine the permanent location for this block
-	permanentLocation := p.getPermanentLocation(block)
+	permanentLocation := p.GetPermanentLocation(block)
 
 	// Check if the block already exists in the permanent location
 	exists, err := p.store.Exists(ctx, permanentLocation)
@@ -301,6 +301,15 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 		// Add to cache to avoid future checks
 		p.cache.Add(cacheKey, true)
+
+		// Ensure the block is recorded in the database even if it already exists in storage
+		if err := p.recordPermanentBlock(ctx, block); err != nil {
+			p.log.WithError(err).WithFields(logrus.Fields{
+				"block_root": block.BlockRoot,
+				"network":    block.Network,
+				"slot":       block.Slot,
+			}).Error("Failed to record permanent block in database")
+		}
 
 		return nil
 	}
@@ -321,16 +330,46 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		"to":         permanentLocation,
 	}).Info("Copied block to permanent location")
 
+	// Record the block in the database
+	if err := p.recordPermanentBlock(ctx, block); err != nil {
+		p.log.WithError(err).WithFields(logrus.Fields{
+			"block_root": block.BlockRoot,
+			"network":    block.Network,
+			"slot":       block.Slot,
+		}).Error("Failed to record permanent block in database")
+	}
+
 	// Add to cache to avoid future checks
 	p.cache.Add(cacheKey, true)
 
 	return nil
 }
 
-// getPermanentLocation returns the permanent location for a block.
-func (p *PermanentStore) getPermanentLocation(block PermanentStoreBlock) string {
+// recordPermanentBlock records the block in the PermanentBlock table
+func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block PermanentStoreBlock) error {
+	// Check if the block is already recorded
+	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
+	if err != nil {
+		return fmt.Errorf("failed to check if block is already recorded: %w", err)
+	}
+
+	// If the block is already recorded, we're done
+	if permanentBlock != nil {
+		return nil
+	}
+
+	// Record the block
+	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
+		Slot:      int64(block.Slot),
+		BlockRoot: block.BlockRoot,
+		Network:   block.Network,
+	})
+}
+
+// GetPermanentLocation returns the permanent location for a block.
+func (p *PermanentStore) GetPermanentLocation(block PermanentStoreBlock) string {
 	// Extract the file extension from the source location
 	extension := filepath.Ext(block.Location)
 
-	return filepath.Join("permanent", block.Network, "slots", fmt.Sprintf("%d", block.Slot), block.BlockRoot+extension)
+	return filepath.Join("permanent", block.Network, block.BlockRoot+extension)
 }

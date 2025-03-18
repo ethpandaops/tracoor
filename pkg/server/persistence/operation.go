@@ -40,4 +40,9 @@ const (
 	OperationCountExecutionBadBlock  Operation = "count_execution_bad_block"
 	OperationListExecutionBadBlock   Operation = "list_execution_bad_block"
 	OperationUpdateExecutionBadBlock Operation = "update_execution_bad_block"
+
+	OperationInsertPermanentBlock Operation = "insert_permanent_block"
+	OperationGetPermanentBlock    Operation = "get_permanent_block"
+	OperationCountPermanentBlock  Operation = "count_permanent_block"
+	OperationListPermanentBlock   Operation = "list_permanent_block"
 )

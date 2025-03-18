@@ -105,6 +105,11 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate distributed lock")
 	}
 
+	err = i.db.AutoMigrate(&PermanentBlock{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate permanent block")
+	}
+
 	return nil
 }
 
