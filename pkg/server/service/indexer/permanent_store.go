@@ -360,6 +360,7 @@ func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block Permane
 
 	// Record the block
 	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
+		//nolint:gosec // At the mercy of the database
 		Slot:      int64(block.Slot),
 		BlockRoot: block.BlockRoot,
 		Network:   block.Network,
