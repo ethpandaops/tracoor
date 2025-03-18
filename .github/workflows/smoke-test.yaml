@@ -75,7 +75,7 @@ jobs:
         all_participants=($(kurtosis enclave inspect tracoor-net | grep cl- | grep http | awk '{ print $2 }' | grep -v validator | sed 's/^cl-//'))
     - name: Collect docker logs on failure
       if: failure()
-      uses: jwalton/gh-docker-logs@eb53a99ccbbb34d4243439c2c3dac3ed78a926ed # eb53a99
+      uses: jwalton/gh-docker-logs@2741064ab9d7af54b0b1ffb6076cf64c16f0220e # v2.2.2
       with:
         dest: './logs'
     - name: Tar logs
