@@ -283,6 +283,25 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		return nil
 	}
 
+	// Check if block is already recorded in database before checking the store
+	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
+	if err != nil {
+		p.log.WithError(err).WithFields(logrus.Fields{
+			"block_root": block.BlockRoot,
+			"network":    block.Network,
+		}).Error("Failed to check if block is already recorded in database")
+	} else if permanentBlock != nil {
+		p.log.WithFields(logrus.Fields{
+			"block_root": block.BlockRoot,
+			"network":    block.Network,
+		}).Debug("Block already recorded in database")
+
+		// Add to cache to avoid future checks
+		p.cache.Add(cacheKey, true)
+
+		return nil
+	}
+
 	// Determine the permanent location for this block
 	permanentLocation := p.GetPermanentLocation(block)
 
@@ -347,18 +366,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 // recordPermanentBlock records the block in the PermanentBlock table
 func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block PermanentStoreBlock) error {
-	// Check if the block is already recorded
-	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
-	if err != nil {
-		return fmt.Errorf("failed to check if block is already recorded: %w", err)
-	}
-
-	// If the block is already recorded, we're done
-	if permanentBlock != nil {
-		return nil
-	}
-
-	// Record the block
+	// Record the block directly since we already checked earlier if it exists
 	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
 		//nolint:gosec // At the mercy of the database
 		Slot:      int64(block.Slot),
