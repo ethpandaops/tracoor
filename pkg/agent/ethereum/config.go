@@ -3,6 +3,7 @@ package ethereum
 import (
 	"fmt"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 )
@@ -17,6 +18,9 @@ type Config struct {
 	OverrideNetworkName string `yaml:"overrideNetworkName"  default:""`
 	// Features configuration
 	Features Features `yaml:"features"`
+	// SyncToleranceSlots is the age of the block in slots that is tolerated before it is not fetched.
+	// This is to prevent fetching blocks that are too far behind the head.
+	SyncToleranceSlots phase0.Slot `yaml:"syncToleranceSlots" default:"64"`
 }
 
 func (c *Config) Validate() error {

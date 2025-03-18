@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -95,6 +94,7 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 			Location:      blockLocation,
 			BlockRoot:     "0x1234",
 			Network:       "mainnet",
+			Slot:          123,
 			ProcessedChan: processChan,
 		}
 
@@ -109,7 +109,7 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 		}
 
 		// Check if the block was copied to the permanent location
-		permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
+		permanentLocation := permanentStore.GetPermanentLocation(blockInfo)
 		exists, err := mockStore.Exists(ctx, permanentLocation)
 		require.NoError(t, err)
 		assert.True(t, exists, "Block should be copied to permanent location")
@@ -118,6 +118,19 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 		data, err := mockStore.GetBeaconBlock(ctx, permanentLocation)
 		require.NoError(t, err)
 		assert.Equal(t, blockData, *data, "Block data should match")
+
+		// Check that the permanent block was recorded in the database
+		filter := &persistence.PermanentBlockFilter{}
+		filter.AddBlockRoot(blockInfo.BlockRoot)
+		filter.AddNetwork(blockInfo.Network)
+
+		permanentBlocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1})
+		require.NoError(t, err)
+		assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
+		//nolint:gosec // slot is an int64
+		assert.Equal(t, int64(blockInfo.Slot), permanentBlocks[0].Slot, "Slot should match")
+		assert.Equal(t, blockInfo.BlockRoot, permanentBlocks[0].BlockRoot, "Block root should match")
+		assert.Equal(t, blockInfo.Network, permanentBlocks[0].Network, "Network should match")
 	})
 }
 
@@ -144,6 +157,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
+		Slot:          123,
 		ProcessedChan: processChan1,
 	}
 
@@ -159,12 +173,21 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	}
 
 	// Get the permanent location
-	permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
+	permanentLocation := permanentStore.GetPermanentLocation(blockInfo)
 
 	// Verify it exists
 	exists, err := mockStore.Exists(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should be copied to permanent location")
+
+	// Check that the permanent block was recorded in the database
+	filter := &persistence.PermanentBlockFilter{}
+	filter.AddBlockRoot(blockInfo.BlockRoot)
+	filter.AddNetwork(blockInfo.Network)
+
+	permanentBlocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
 
 	// Process the same block again with a new channel
 	processChan2 := make(chan struct{})
@@ -172,6 +195,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
+		Slot:          123,
 		ProcessedChan: processChan2,
 	}
 	permanentStore.QueueBlock(blockInfo2)
@@ -188,6 +212,11 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	exists, err = mockStore.Exists(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should still exist in permanent location")
+
+	// Check that there is still only one permanent block record
+	permanentBlocks, err = permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, permanentBlocks, 1, "There should still be only one permanent block record")
 }
 
 func TestPermanentStoreDifferentNetworks(t *testing.T) {
@@ -223,6 +252,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		Location:      blockLocation1,
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
+		Slot:          123,
 		ProcessedChan: make(chan struct{}),
 	}
 
@@ -231,6 +261,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		Location:      blockLocation2,
 		BlockRoot:     "0x1234", // Same root
 		Network:       "goerli", // Different network
+		Slot:          123,
 		ProcessedChan: make(chan struct{}),
 	}
 
@@ -255,8 +286,8 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	}
 
 	// Check if both blocks were copied to their respective permanent locations
-	permanentLocation1 := filepath.Join("permanent", blockInfo1.Network, "blocks", blockInfo1.BlockRoot+filepath.Ext(blockLocation1))
-	permanentLocation2 := filepath.Join("permanent", blockInfo2.Network, "blocks", blockInfo2.BlockRoot+filepath.Ext(blockLocation2))
+	permanentLocation1 := permanentStore.GetPermanentLocation(blockInfo1)
+	permanentLocation2 := permanentStore.GetPermanentLocation(blockInfo2)
 
 	// Verify both exist
 	exists1, err := mockStore.Exists(ctx, permanentLocation1)
@@ -275,6 +306,23 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	data2, err := mockStore.GetBeaconBlock(ctx, permanentLocation2)
 	require.NoError(t, err)
 	assert.Equal(t, blockData2, *data2, "Block data for goerli should match")
+
+	// Check that both permanent blocks were recorded in the database
+	filter1 := &persistence.PermanentBlockFilter{}
+	filter1.AddBlockRoot(blockInfo1.BlockRoot)
+	filter1.AddNetwork(blockInfo1.Network)
+
+	permanentBlocks1, err := permanentStore.db.ListPermanentBlock(ctx, filter1, &persistence.PaginationCursor{Limit: 1})
+	require.NoError(t, err)
+	assert.Len(t, permanentBlocks1, 1, "Permanent block should be recorded for mainnet")
+
+	filter2 := &persistence.PermanentBlockFilter{}
+	filter2.AddBlockRoot(blockInfo2.BlockRoot)
+	filter2.AddNetwork(blockInfo2.Network)
+
+	permanentBlocks2, err := permanentStore.db.ListPermanentBlock(ctx, filter2, &persistence.PaginationCursor{Limit: 1})
+	require.NoError(t, err)
+	assert.Len(t, permanentBlocks2, 1, "Permanent block should be recorded for goerli")
 }
 
 func TestPermanentStoreDistributedLock(t *testing.T) {
@@ -346,7 +394,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	}
 
 	// Check if the block was copied to the permanent location
-	permanentLocation := filepath.Join("permanent", blockInfo1.Network, "blocks", blockInfo1.BlockRoot+filepath.Ext(blockLocation))
+	permanentLocation := permanentStore1.GetPermanentLocation(blockInfo1)
 	exists, err := mockStore.Exists(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should be copied to permanent location")
@@ -418,6 +466,7 @@ func TestPermanentStoreStop(t *testing.T) {
 		BlockRoot:     "0xstop",
 		Network:       "mainnet",
 		ProcessedChan: processChan,
+		Slot:          1,
 	}
 
 	// Queue the block
@@ -432,7 +481,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	}
 
 	// Verify the block was copied to the permanent location
-	permanentLocation := filepath.Join("permanent", blockInfo.Network, "blocks", blockInfo.BlockRoot+filepath.Ext(blockLocation))
+	permanentLocation := permanentStore.GetPermanentLocation(blockInfo)
 	exists, err := mockStore.Exists(ctx, permanentLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Block should be copied to permanent location")
@@ -445,6 +494,7 @@ func TestPermanentStoreStop(t *testing.T) {
 		BlockRoot:     "0xqueued",
 		Network:       "mainnet",
 		ProcessedChan: processChan2,
+		Slot:          2,
 	}
 	permanentStore.QueueBlock(queuedBlock)
 
@@ -465,7 +515,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	}
 
 	// Verify the queued block was copied to the permanent location
-	queuedLocation := filepath.Join("permanent", queuedBlock.Network, "blocks", queuedBlock.BlockRoot+filepath.Ext(blockLocation))
+	queuedLocation := permanentStore.GetPermanentLocation(queuedBlock)
 	exists, err = mockStore.Exists(ctx, queuedLocation)
 	require.NoError(t, err)
 	assert.True(t, exists, "Queued block should be copied to permanent location before Stop completes")
@@ -480,9 +530,11 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Try to queue a block after stopping
 	unprocessedBlock := PermanentStoreBlock{
-		Location:  blockLocation,
-		BlockRoot: "0xunprocessed",
-		Network:   "mainnet",
+		Location:      blockLocation,
+		BlockRoot:     "0xunprocessed",
+		Network:       "mainnet",
+		ProcessedChan: make(chan struct{}),
+		Slot:          3,
 	}
 	permanentStore.QueueBlock(unprocessedBlock)
 
@@ -490,11 +542,73 @@ func TestPermanentStoreStop(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify the unprocessed block was not copied to the permanent location
-	unprocessedLocation := filepath.Join("permanent", unprocessedBlock.Network, "blocks", unprocessedBlock.BlockRoot+filepath.Ext(blockLocation))
+	unprocessedLocation := permanentStore.GetPermanentLocation(unprocessedBlock)
 	exists, err = mockStore.Exists(ctx, unprocessedLocation)
 	require.NoError(t, err)
 	assert.False(t, exists, "Block should not be copied after permanent store is stopped")
 
 	// Verify that the stopped flag is set
 	assert.True(t, permanentStore.stopped, "Stopped flag should be set")
+}
+
+func TestPermanentStoreLocation(t *testing.T) {
+	ctx := context.Background()
+	permanentStore, mockStore, cleanup := setupPermanentStore(t)
+
+	defer cleanup()
+
+	// Create a block with known values
+	blockInfo := PermanentStoreBlock{
+		Location:  "test/location/block.ssz",
+		BlockRoot: "0xabcd1234",
+		Network:   "mainnet",
+		Slot:      123456,
+	}
+
+	// Get the permanent location
+	permanentLocation := permanentStore.GetPermanentLocation(blockInfo)
+
+	// Verify the location format
+	expectedLocation := "permanent/mainnet/0xabcd1234.ssz"
+	assert.Equal(t, expectedLocation, permanentLocation, "Permanent location should not include slot in the path")
+
+	// Create a test file at the source location
+	data := []byte("test data")
+	params := &store.SaveParams{
+		Location: blockInfo.Location,
+		Data:     &data,
+	}
+	_, err := mockStore.SaveBeaconBlock(ctx, params)
+	require.NoError(t, err)
+
+	// Verify we can find blocks by querying the permanent block table
+	processChan := make(chan struct{})
+	blockInfo.ProcessedChan = processChan
+
+	// Queue the block for processing
+	permanentStore.QueueBlock(blockInfo)
+
+	// Wait for processing to complete
+	select {
+	case <-processChan:
+		// Block processed
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Block processing timed out")
+	}
+
+	// Search for blocks by slot
+	filter := &persistence.PermanentBlockFilter{}
+	//nolint:gosec // slot is an int64
+	filter.AddSlot(int64(blockInfo.Slot))
+
+	blocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, blocks, 1, "Should find one permanent block with the specified slot")
+
+	if len(blocks) > 0 {
+		assert.Equal(t, blockInfo.BlockRoot, blocks[0].BlockRoot)
+		assert.Equal(t, blockInfo.Network, blocks[0].Network)
+		//nolint:gosec // slot is an int64
+		assert.Equal(t, int64(blockInfo.Slot), blocks[0].Slot)
+	}
 }

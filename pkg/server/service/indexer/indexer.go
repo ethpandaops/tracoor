@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
@@ -484,6 +485,7 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		Location:  req.GetLocation().GetValue(),
 		BlockRoot: req.GetBlockRoot().GetValue(),
 		Network:   req.GetNetwork().GetValue(),
+		Slot:      phase0.Slot(req.GetSlot().GetValue()),
 	})
 
 	return &indexer.CreateBeaconBlockResponse{

@@ -780,16 +780,77 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 		return errors.New("source and destination are required")
 	}
 
-	// For S3, the source needs to be formatted as "bucketName/sourcePath"
-	source := fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)
+	// Log the copy operation attempt
+	s.log.WithFields(logrus.Fields{
+		"source":      params.Source,
+		"destination": params.Destination,
+	}).Debug("Performing object copy")
 
+	// First try to do a regular server-side copy (works with MinIO and S3)
 	_, err := s.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(s.config.BucketName),
-		CopySource: aws.String(source),
+		CopySource: aws.String(fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)),
 		Key:        aws.String(params.Destination),
 	})
 
-	return err
+	// If the server-side copy was successful, return
+	if err == nil {
+		return nil
+	}
+
+	// If we got an error, check if it's a specific R2 error or a general error
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		// For R2, we need to use GetObject + PutObject as a workaround
+		// But we only do this for specific errors that indicate a compatibility issue
+		// Log that we're falling back to the manual copy method
+		s.log.WithFields(logrus.Fields{
+			"source":      params.Source,
+			"destination": params.Destination,
+			"error":       apiErr.Error(),
+			"errorCode":   apiErr.ErrorCode(),
+		}).Debug("Server-side copy failed, falling back to GetObject + PutObject method")
+
+		// Get the source object
+		getResult, getErr := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(s.config.BucketName),
+			Key:    aws.String(params.Source),
+		})
+		if getErr != nil {
+			return fmt.Errorf("failed to get source object for manual copy: %w", getErr)
+		}
+		defer getResult.Body.Close()
+
+		// Read the source object content
+		buf := new(bytes.Buffer)
+		if _, readErr := buf.ReadFrom(getResult.Body); readErr != nil {
+			return fmt.Errorf("failed to read source object content: %w", readErr)
+		}
+
+		// Create the put input with the same metadata as the source
+		putInput := &s3.PutObjectInput{
+			Bucket:             aws.String(s.config.BucketName),
+			Key:                aws.String(params.Destination),
+			Body:               bytes.NewReader(buf.Bytes()),
+			ContentType:        getResult.ContentType,
+			ContentDisposition: getResult.ContentDisposition,
+			ContentEncoding:    getResult.ContentEncoding,
+			ContentLanguage:    getResult.ContentLanguage,
+			CacheControl:       getResult.CacheControl,
+			Expires:            getResult.Expires,
+		}
+
+		// Put the object
+		_, putErr := s.s3Client.PutObject(ctx, putInput)
+		if putErr != nil {
+			return fmt.Errorf("failed to put object in manual copy: %w", putErr)
+		}
+
+		return nil
+	}
+
+	// If not an API error, return the original error
+	return fmt.Errorf("failed to copy object: %w", err)
 }
 
 func (s *S3Store) PreferURLs() bool {

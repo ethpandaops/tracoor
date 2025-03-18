@@ -156,38 +156,3 @@ func (b *Node) Metadata() *services.MetadataService {
 func (b *Node) OnReady(_ context.Context, callback func(ctx context.Context) error) {
 	b.onReadyCallbacks = append(b.onReadyCallbacks, callback)
 }
-
-func (b *Node) Synced(ctx context.Context) error {
-	status := b.beacon.Status()
-	if status == nil {
-		return errors.New("missing beacon status")
-	}
-
-	syncState := status.SyncState()
-	if syncState == nil {
-		return errors.New("missing beacon node status sync state")
-	}
-
-	if syncState.SyncDistance > 3 {
-		return errors.New("beacon node is not synced")
-	}
-
-	wallclock := b.Metadata().Wallclock()
-	if wallclock == nil {
-		return errors.New("missing wallclock")
-	}
-
-	currentSlot := wallclock.Slots().Current()
-
-	if currentSlot.Number()-uint64(syncState.HeadSlot) > 64 {
-		return fmt.Errorf("beacon node is too far behind head, head slot is %d, current slot is %d", syncState.HeadSlot, currentSlot.Number())
-	}
-
-	for _, service := range b.services {
-		if err := service.Ready(ctx); err != nil {
-			return errors.Wrapf(err, "service %s is not ready", service.Name())
-		}
-	}
-
-	return nil
-}

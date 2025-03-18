@@ -66,7 +66,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		return nil, err
 	}
 
-	node := ethereum.NewNode(ctx, log, &config.Ethereum, config.Name)
+	node := ethereum.NewNode(ctx, log, &config.Ethereum, config.Name, config.Ethereum.SyncToleranceSlots)
 
 	indexerClient, err := indexer.NewClient(config.Indexer, log)
 	if err != nil {
@@ -96,6 +96,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
+//nolint:gocyclo // this is a complex function but most of it is event callbacks
 func (s *agent) Start(ctx context.Context) error {
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
@@ -131,8 +132,16 @@ func (s *agent) Start(ctx context.Context) error {
 				"purpose":    "execution_block_trace",
 			})
 
-			if !s.node.Execution().Metadata().IsSynced() {
-				logCtx.Debug("Skipping queueing execution block trace as the execution node is not yet synced")
+			// Check if the block is too old to bother fetching.
+			ignore, err := s.node.ShouldIgnoreEventFromSlot(event.Slot)
+			if err != nil {
+				logCtx.WithError(err).Error("Failed to check if the block is too old to fetch")
+
+				return err
+			}
+
+			if ignore {
+				logCtx.Debug("Skipping queueing execution block trace as the block is too old to fetch")
 
 				return nil
 			}
@@ -184,8 +193,19 @@ func (s *agent) Start(ctx context.Context) error {
 		}
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
-			if !s.node.Beacon().Metadata().Synced() {
-				s.log.Debug("Skipping queueing beacon state from block event as the beacon node is not yet synced")
+			logCtx := s.log.WithFields(logrus.Fields{
+				"event_topic": "block",
+				"slot":        event.Slot,
+				"root":        fmt.Sprintf("%#x", event.Block),
+				"purpose":     "beacon_state_and_block",
+			})
+
+			if ignore, err := s.node.ShouldIgnoreEventFromSlot(event.Slot); err != nil {
+				logCtx.WithError(err).Error("Failed to check if the block is too old to fetch")
+
+				return err
+			} else if ignore {
+				logCtx.Debug("Skipping queueing beacon state and block as the block is too old to fetch")
 
 				return nil
 			}
