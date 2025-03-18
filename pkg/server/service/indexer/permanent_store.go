@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 
@@ -18,6 +19,7 @@ type PermanentStoreBlock struct {
 	Location      string
 	BlockRoot     string
 	Network       string
+	Slot          phase0.Slot
 	ProcessedChan chan struct{}
 }
 
@@ -330,5 +332,5 @@ func (p *PermanentStore) getPermanentLocation(block PermanentStoreBlock) string 
 	// Extract the file extension from the source location
 	extension := filepath.Ext(block.Location)
 
-	return filepath.Join("permanent", block.Network, "blocks", block.BlockRoot+extension)
+	return filepath.Join("permanent", block.Network, "slots", fmt.Sprintf("%d", block.Slot), block.BlockRoot+extension)
 }

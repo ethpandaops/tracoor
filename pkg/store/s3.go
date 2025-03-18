@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -780,12 +781,22 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 		return errors.New("source and destination are required")
 	}
 
-	// For S3, the source needs to be formatted as "bucketName/sourcePath"
+	// For S3, the source needs to be formatted properly with URL escaping
+	// This is necessary for R2 compatibility while maintaining MinIO support
 	source := fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)
+
+	// URL escape the source path for proper S3 API compatibility
+	escapedSource := aws.String(url.PathEscape(source))
+
+	s.log.WithFields(logrus.Fields{
+		"source":           params.Source,
+		"destination":      params.Destination,
+		"calculatedSource": source,
+	}).Debug("Performing server side copy")
 
 	_, err := s.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(s.config.BucketName),
-		CopySource: aws.String(source),
+		CopySource: escapedSource,
 		Key:        aws.String(params.Destination),
 	})
 

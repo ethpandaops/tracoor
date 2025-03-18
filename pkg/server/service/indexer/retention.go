@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/sirupsen/logrus"
@@ -120,6 +121,8 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 			BlockRoot:     block.BlockRoot,
 			Network:       block.Network,
 			ProcessedChan: make(chan struct{}),
+			//nolint:gosec // This is a valid conversion
+			Slot: phase0.Slot(block.Slot),
 		}
 
 		i.permanentStore.QueueBlock(b)
