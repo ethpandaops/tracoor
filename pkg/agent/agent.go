@@ -96,6 +96,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
+//nolint:gocyclo // this is a complex function but most of it is event callbacks
 func (s *agent) Start(ctx context.Context) error {
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)

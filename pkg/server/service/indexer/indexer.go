@@ -485,8 +485,7 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		Location:  req.GetLocation().GetValue(),
 		BlockRoot: req.GetBlockRoot().GetValue(),
 		Network:   req.GetNetwork().GetValue(),
-		//nolint:gosec // This is a valid conversion
-		Slot: phase0.Slot(req.GetSlot().GetValue()),
+		Slot:      phase0.Slot(req.GetSlot().GetValue()),
 	})
 
 	return &indexer.CreateBeaconBlockResponse{
