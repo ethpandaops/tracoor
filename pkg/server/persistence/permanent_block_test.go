@@ -107,7 +107,7 @@ func TestGetPermanentBlockByBlockRoot(t *testing.T) {
 
 	// Try to get a non-existent block
 	result, err = indexer.GetPermanentBlockByBlockRoot(ctx, "non-existent", "test-network")
-	assert.NoError(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, result)
 }
 
