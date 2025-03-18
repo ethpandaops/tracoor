@@ -11,9 +11,11 @@ import (
 
 func ProtoBeaconStateToDBBeaconState(bs *indexer.BeaconState) *persistence.BeaconState {
 	return &persistence.BeaconState{
-		ID:                   bs.GetId().GetValue(),
-		Node:                 bs.GetNode().GetValue(),
-		Slot:                 int64(bs.GetSlot().GetValue()),
+		ID:   bs.GetId().GetValue(),
+		Node: bs.GetNode().GetValue(),
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: int64(bs.GetSlot().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                int64(bs.GetEpoch().GetValue()),
 		StateRoot:            bs.GetStateRoot().GetValue(),
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
@@ -27,9 +29,11 @@ func ProtoBeaconStateToDBBeaconState(bs *indexer.BeaconState) *persistence.Beaco
 
 func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.BeaconState {
 	return &indexer.BeaconState{
-		Id:                   &wrapperspb.StringValue{Value: bs.ID},
-		Node:                 &wrapperspb.StringValue{Value: bs.Node},
-		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Id:   &wrapperspb.StringValue{Value: bs.ID},
+		Node: &wrapperspb.StringValue{Value: bs.Node},
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
 		StateRoot:            &wrapperspb.StringValue{Value: bs.StateRoot},
 		FetchedAt:            timestamppb.New(bs.FetchedAt),
@@ -43,9 +47,11 @@ func DBBeaconStateToProtoBeaconState(bs *persistence.BeaconState) *indexer.Beaco
 
 func ProtoBeaconBlockToDBBeaconBlock(bs *indexer.BeaconBlock) *persistence.BeaconBlock {
 	return &persistence.BeaconBlock{
-		ID:                   bs.GetId().GetValue(),
-		Node:                 bs.GetNode().GetValue(),
-		Slot:                 int64(bs.GetSlot().GetValue()),
+		ID:   bs.GetId().GetValue(),
+		Node: bs.GetNode().GetValue(),
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: int64(bs.GetSlot().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                int64(bs.GetEpoch().GetValue()),
 		BlockRoot:            bs.GetBlockRoot().GetValue(),
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
@@ -59,9 +65,11 @@ func ProtoBeaconBlockToDBBeaconBlock(bs *indexer.BeaconBlock) *persistence.Beaco
 
 func DBBeaconBlockToProtoBeaconBlock(bs *persistence.BeaconBlock) *indexer.BeaconBlock {
 	return &indexer.BeaconBlock{
-		Id:                   &wrapperspb.StringValue{Value: bs.ID},
-		Node:                 &wrapperspb.StringValue{Value: bs.Node},
-		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Id:   &wrapperspb.StringValue{Value: bs.ID},
+		Node: &wrapperspb.StringValue{Value: bs.Node},
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
 		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
 		FetchedAt:            timestamppb.New(bs.FetchedAt),
@@ -75,9 +83,11 @@ func DBBeaconBlockToProtoBeaconBlock(bs *persistence.BeaconBlock) *indexer.Beaco
 
 func ProtoBeaconBadBlockToDBBeaconBadBlock(bs *indexer.BeaconBadBlock) *persistence.BeaconBadBlock {
 	return &persistence.BeaconBadBlock{
-		ID:                   bs.GetId().GetValue(),
-		Node:                 bs.GetNode().GetValue(),
-		Slot:                 int64(bs.GetSlot().GetValue()),
+		ID:   bs.GetId().GetValue(),
+		Node: bs.GetNode().GetValue(),
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: int64(bs.GetSlot().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                int64(bs.GetEpoch().GetValue()),
 		BlockRoot:            bs.GetBlockRoot().GetValue(),
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
@@ -91,9 +101,11 @@ func ProtoBeaconBadBlockToDBBeaconBadBlock(bs *indexer.BeaconBadBlock) *persiste
 
 func DBBeaconBadBlockToProtoBeaconBadBlock(bs *persistence.BeaconBadBlock) *indexer.BeaconBadBlock {
 	return &indexer.BeaconBadBlock{
-		Id:                   &wrapperspb.StringValue{Value: bs.ID},
-		Node:                 &wrapperspb.StringValue{Value: bs.Node},
-		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Id:   &wrapperspb.StringValue{Value: bs.ID},
+		Node: &wrapperspb.StringValue{Value: bs.Node},
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
 		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
 		FetchedAt:            timestamppb.New(bs.FetchedAt),
@@ -107,9 +119,11 @@ func DBBeaconBadBlockToProtoBeaconBadBlock(bs *persistence.BeaconBadBlock) *inde
 
 func ProtoBeaconBadBlobToDBBeaconBadBlob(bs *indexer.BeaconBadBlob) *persistence.BeaconBadBlob {
 	return &persistence.BeaconBadBlob{
-		ID:                   bs.GetId().GetValue(),
-		Node:                 bs.GetNode().GetValue(),
-		Slot:                 int64(bs.GetSlot().GetValue()),
+		ID:   bs.GetId().GetValue(),
+		Node: bs.GetNode().GetValue(),
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: int64(bs.GetSlot().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                int64(bs.GetEpoch().GetValue()),
 		BlockRoot:            bs.GetBlockRoot().GetValue(),
 		FetchedAt:            bs.GetFetchedAt().AsTime(),
@@ -118,15 +132,18 @@ func ProtoBeaconBadBlobToDBBeaconBadBlob(bs *indexer.BeaconBadBlob) *persistence
 		Network:              bs.GetNetwork().GetValue(),
 		ContentEncoding:      bs.GetContentEncoding().GetValue(),
 		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
-		Index:                int64(bs.GetIndex().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
+		Index: int64(bs.GetIndex().GetValue()),
 	}
 }
 
 func DBBeaconBadBlobToProtoBeaconBadBlob(bs *persistence.BeaconBadBlob) *indexer.BeaconBadBlob {
 	return &indexer.BeaconBadBlob{
-		Id:                   &wrapperspb.StringValue{Value: bs.ID},
-		Node:                 &wrapperspb.StringValue{Value: bs.Node},
-		Slot:                 &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		Id:   &wrapperspb.StringValue{Value: bs.ID},
+		Node: &wrapperspb.StringValue{Value: bs.Node},
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		//nolint:gosec // not worried about int64 overflow here
 		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
 		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
 		FetchedAt:            timestamppb.New(bs.FetchedAt),
@@ -135,7 +152,8 @@ func DBBeaconBadBlobToProtoBeaconBadBlob(bs *persistence.BeaconBadBlob) *indexer
 		Network:              &wrapperspb.StringValue{Value: bs.Network},
 		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
 		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
-		Index:                &wrapperspb.UInt64Value{Value: uint64(bs.Index)},
+		//nolint:gosec // not worried about int64 overflow here
+		Index: &wrapperspb.UInt64Value{Value: uint64(bs.Index)},
 	}
 }
 
@@ -211,7 +229,9 @@ func ProtoPaginationCursorToDBPaginationCursor(pc *indexer.PaginationCursor) *pe
 
 func DBPaginationCursorToProtoPaginationCursor(pc *persistence.PaginationCursor) *indexer.PaginationCursor {
 	return &indexer.PaginationCursor{
-		Offset:  int32(pc.Offset),
+		//nolint:gosec // not worried about int32 overflow here
+		Offset: int32(pc.Offset),
+		//nolint:gosec // not worried about int32 overflow here
 		Limit:   int32(pc.Limit),
 		OrderBy: pc.OrderBy,
 	}

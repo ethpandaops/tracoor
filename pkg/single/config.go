@@ -35,7 +35,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("indexer configuration is required")
 	}
 
-	if c.Agents == nil || len(c.Agents) == 0 {
+	if len(c.Agents) == 0 {
 		return fmt.Errorf("at least one agent configuration is required. If you just want to run the server, use the `server` subcommand instead")
 	}
 

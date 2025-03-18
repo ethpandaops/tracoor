@@ -17,8 +17,10 @@ import (
 
 func createRandomBeaconBadBlockRequest() *pindexer.CreateBeaconBadBlockRequest {
 	return &pindexer.CreateBeaconBadBlockRequest{
-		Node:                 wrapperspb.String(generateRandomString(5)),
-		Slot:                 wrapperspb.UInt64(uint64(generateRandomInt64())),
+		Node: wrapperspb.String(generateRandomString(5)),
+		//nolint:gosec // not worried
+		Slot: wrapperspb.UInt64(uint64(generateRandomInt64())),
+		//nolint:gosec // not worried
 		Epoch:                wrapperspb.UInt64(uint64(generateRandomInt64())),
 		BlockRoot:            wrapperspb.String(generateRandomString(32)),
 		FetchedAt:            timestamppb.Now(),

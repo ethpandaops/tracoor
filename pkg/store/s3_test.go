@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"bytes"
+
 	"github.com/ethpandaops/tracoor/pkg/compression"
 )
 
@@ -40,6 +42,10 @@ func TestS3StoreOperations(t *testing.T) {
 
 	t.Run("ExecutionBadBlock", func(t *testing.T) {
 		testExecutionBadBlock(ctx, t, store)
+	})
+
+	t.Run("Copy", func(t *testing.T) {
+		testCopy(ctx, t, store)
 	})
 }
 
@@ -321,6 +327,70 @@ func testExecutionBadBlock(ctx context.Context, t *testing.T, store Store) {
 
 		if exists {
 			t.Fatal("Expected file to not exist after deletion")
+		}
+	})
+}
+
+func testCopy(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	t.Run("Copy", func(t *testing.T) {
+		if err := store.Healthy(ctx); err != nil {
+			t.Fatalf("Store is not healthy: %v", err)
+		}
+
+		// Create a source file first
+		sourceLocation := "beacon_block/location.json"
+		sourceData := []byte(`{"test": "data"}`)
+
+		_, err := store.SaveBeaconBlock(ctx, &SaveParams{
+			Data:            &sourceData,
+			Location:        sourceLocation,
+			ContentEncoding: "",
+		})
+		if err != nil {
+			t.Fatalf("Failed to save source file: %v", err)
+		}
+
+		// Test copying the file
+		destLocation := "beacon_block/location_copy.json"
+
+		err = store.Copy(ctx, &CopyParams{
+			Source:      sourceLocation,
+			Destination: destLocation,
+		})
+		if err != nil {
+			t.Fatalf("Failed to copy file: %v", err)
+		}
+
+		// Verify source still exists
+		sourceExists, err := store.Exists(ctx, sourceLocation)
+		if err != nil {
+			t.Fatalf("Failed to check source existence: %v", err)
+		}
+
+		if !sourceExists {
+			t.Fatal("Source file should still exist after copy")
+		}
+
+		// Verify destination exists
+		destExists, err := store.Exists(ctx, destLocation)
+		if err != nil {
+			t.Fatalf("Failed to check destination existence: %v", err)
+		}
+
+		if !destExists {
+			t.Fatal("Destination file should exist after copy")
+		}
+
+		// Verify content is the same
+		destData, err := store.GetBeaconBlock(ctx, destLocation)
+		if err != nil {
+			t.Fatalf("Failed to get destination data: %v", err)
+		}
+
+		if !bytes.Equal(*destData, sourceData) {
+			t.Fatalf("Destination data doesn't match source")
 		}
 	})
 }

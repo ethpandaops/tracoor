@@ -12,7 +12,8 @@ type RetentionConfig struct {
 }
 
 type Config struct {
-	Retention RetentionConfig `yaml:"retention"`
+	Retention      RetentionConfig      `yaml:"retention"`
+	PermanentStore PermanentStoreConfig `yaml:"permanentStore"`
 }
 
 func (c *Config) Validate() error {

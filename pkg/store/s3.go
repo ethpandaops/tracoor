@@ -775,6 +775,23 @@ func (s *S3Store) DeleteExecutionBadBlock(ctx context.Context, location string) 
 	return err
 }
 
+func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
+	if params.Source == "" || params.Destination == "" {
+		return errors.New("source and destination are required")
+	}
+
+	// For S3, the source needs to be formatted as "bucketName/sourcePath"
+	source := fmt.Sprintf("%s/%s", s.config.BucketName, params.Source)
+
+	_, err := s.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket:     aws.String(s.config.BucketName),
+		CopySource: aws.String(source),
+		Key:        aws.String(params.Destination),
+	})
+
+	return err
+}
+
 func (s *S3Store) PreferURLs() bool {
 	return s.config.PreferURLs
 }

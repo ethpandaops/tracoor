@@ -100,6 +100,11 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate execution bad block")
 	}
 
+	err = i.db.AutoMigrate(&DistributedLock{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate distributed lock")
+	}
+
 	return nil
 }
 

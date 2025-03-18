@@ -20,12 +20,20 @@ type GetURLParams struct {
 	ContentEncoding string
 }
 
+type CopyParams struct {
+	Source      string
+	Destination string
+}
+
 // Store is an interface for different persistence implementations.
 type Store interface {
 	// Healthy checks if the store is healthy
 	Healthy(ctx context.Context) error
 	// Exists checks if the file exists in the store
 	Exists(ctx context.Context, location string) (bool, error)
+
+	// Copy copies a file from one location to another
+	Copy(ctx context.Context, params *CopyParams) error
 
 	// StorageHandshakeTokenExists checks if a storage handshake token exists in the store
 	StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error)
