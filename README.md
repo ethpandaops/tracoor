@@ -14,6 +14,9 @@ Tracoor captures, stores and makes available beacon states, beacon blocks, execu
   <a href="https://tracoor.mainnet.ethpandaops.io" target="_blank">Mainnet</a>
 </p>
 <p align="center">
+  <a href="https://tracoor.hoodi.ethpandaops.io" target="_blank">Hoodi</a>
+</p>
+<p align="center">
   <a href="https://tracoor.holesky.ethpandaops.io" target="_blank">Holesky</a>
 </p>
 <p align="center">
