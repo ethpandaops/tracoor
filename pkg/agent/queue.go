@@ -36,23 +36,6 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
-	if err != nil {
-		s.log.WithError(err).Error("Failed to get current time")
-
-		return
-	}
-
-	targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(slot))
-	targetEpochNumber := targetEpoch.Number()
-
-	// If the slot is older than the allowed number of epochs we'll skip it.
-	if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.BeaconStateAgeThresholdEpochs {
-		s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
-
-		return
-	}
-
 	s.beaconStateQueue <- &BeaconStateRequest{
 		Slot: slot,
 	}
@@ -117,13 +100,26 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 
 		start := time.Now()
 
-		if err := s.fetchAndIndexBeaconState(ctx, stateRequest.Slot); err != nil {
-			s.log.
-				WithError(err).
-				WithField("slot", stateRequest.Slot).
-				Error("Failed to fetch and index beacon state")
+		_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
+		if err != nil {
+			s.log.WithError(err).Error("Failed to get current time")
 
-			continue
+			return
+		}
+
+		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(stateRequest.Slot))
+		targetEpochNumber := targetEpoch.Number()
+
+		// If the slot is older than the allowed number of epochs we'll skip it.
+		if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.BeaconStateAgeThresholdEpochs {
+			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
+		} else {
+			if err := s.fetchAndIndexBeaconState(ctx, stateRequest.Slot); err != nil {
+				s.log.
+					WithError(err).
+					WithField("slot", stateRequest.Slot).
+					Error("Failed to fetch and index beacon state")
+			}
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
