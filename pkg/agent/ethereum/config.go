@@ -25,7 +25,7 @@ type Config struct {
 	// FetchOldBeaconStates is a flag to fetch beacon states that are more then
 	// a certain number of epochs old.
 	// This is to prevent fetching states that are too far behind the head.
-	FetchOldBeaconStates FetchOldBeaconStates `yaml:"fetchOldBeaconStates" default:"{enabled: false, epochs: 1}"`
+	FetchOldBeaconStates *FetchOldBeaconStates `yaml:"fetchOldBeaconStates" default:"{\"enabled\": false}"`
 }
 
 type FetchOldBeaconStates struct {
