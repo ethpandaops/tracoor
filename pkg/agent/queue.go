@@ -43,14 +43,13 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	if s.Config.Ethereum.FetchOldBeaconStates.Enabled != nil &&
-		*s.Config.Ethereum.FetchOldBeaconStates.Enabled {
+	targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(slot))
+	targetEpochNumber := targetEpoch.Number()
 
-		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(slot))
-		targetEpochNumber := targetEpoch.Number()
-
-		// If the slot is more than the allowed number of epochs old we'll skip it.
-		if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.FetchOldBeaconStates.Epochs {
+	// If the slot is more than the allowed number of epochs old we'll skip it.
+	if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.FetchOldBeaconStates.Epochs {
+		if s.Config.Ethereum.FetchOldBeaconStates.Enabled == nil ||
+			!*s.Config.Ethereum.FetchOldBeaconStates.Enabled {
 			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
 
 			return
