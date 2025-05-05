@@ -13,6 +13,7 @@ type Metrics struct {
 	queueSize               *prometheus.GaugeVec
 	queueItemProcessingTime *prometheus.HistogramVec
 	itemExported            *prometheus.CounterVec
+	queueItemSkipped        *prometheus.CounterVec
 }
 
 type Queue string
@@ -50,11 +51,17 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Name:      "item_exported",
 				Help:      "The number of items exported",
 			}, []string{"queue", "agent"}),
+			queueItemSkipped: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "queue_item_skipped",
+				Help:      "The number of items skipped",
+			}, []string{"queue", "agent"}),
 		}
 
 		prometheus.MustRegister(metricsInstance.queueSize)
 		prometheus.MustRegister(metricsInstance.queueItemProcessingTime)
 		prometheus.MustRegister(metricsInstance.itemExported)
+		prometheus.MustRegister(metricsInstance.queueItemSkipped)
 	})
 
 	return metricsInstance
@@ -70,6 +77,10 @@ func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Dura
 
 func (m *Metrics) IncrementItemExported(queue Queue, agentName string) {
 	m.itemExported.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementItemSkipped(queue Queue, agentName string) {
+	m.queueItemSkipped.WithLabelValues(string(queue), agentName).Inc()
 }
 
 func (m *Metrics) ServeMetrics(ctx context.Context, addr string) {
