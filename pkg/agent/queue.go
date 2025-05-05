@@ -36,6 +36,27 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
+	_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
+	if err != nil {
+		s.log.WithError(err).Error("Failed to get current time")
+
+		return
+	}
+
+	if s.Config.Ethereum.FetchOldBeaconStates.Enabled != nil &&
+		*s.Config.Ethereum.FetchOldBeaconStates.Enabled {
+
+		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(slot))
+		targetEpochNumber := targetEpoch.Number()
+
+		// If the slot is more than the allowed number of epochs old we'll skip it.
+		if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.FetchOldBeaconStates.Epochs {
+			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
+
+			return
+		}
+	}
+
 	s.beaconStateQueue <- &BeaconStateRequest{
 		Slot: slot,
 	}

@@ -21,6 +21,16 @@ type Config struct {
 	// SyncToleranceSlots is the age of the block in slots that is tolerated before it is not fetched.
 	// This is to prevent fetching blocks that are too far behind the head.
 	SyncToleranceSlots phase0.Slot `yaml:"syncToleranceSlots" default:"64"`
+
+	// FetchOldBeaconStates is a flag to fetch beacon states that are more then
+	// a certain number of epochs old.
+	// This is to prevent fetching states that are too far behind the head.
+	FetchOldBeaconStates FetchOldBeaconStates `yaml:"fetchOldBeaconStates" default:"{enabled: false, epochs: 1}"`
+}
+
+type FetchOldBeaconStates struct {
+	Enabled *bool  `yaml:"enabled" default:"false"`
+	Epochs  uint64 `yaml:"epochs" default:"1"`
 }
 
 func (c *Config) Validate() error {
