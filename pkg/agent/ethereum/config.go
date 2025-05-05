@@ -22,15 +22,11 @@ type Config struct {
 	// This is to prevent fetching blocks that are too far behind the head.
 	SyncToleranceSlots phase0.Slot `yaml:"syncToleranceSlots" default:"64"`
 
-	// FetchOldBeaconStates is a flag to fetch beacon states that are more then
-	// a certain number of epochs old.
-	// This is to prevent fetching states that are too far behind the head.
-	FetchOldBeaconStates *FetchOldBeaconStates `yaml:"fetchOldBeaconStates" default:"{\"enabled\": false}"`
-}
-
-type FetchOldBeaconStates struct {
-	Enabled *bool  `yaml:"enabled" default:"false"`
-	Epochs  uint64 `yaml:"epochs" default:"1"`
+	// BeaconStateAgeThresholdEpochs is the number of epochs that a beacon state is allowed to be old.
+	// This should be used to prevent fetching states that are too far behind the head,
+	// which can cause the agent to get stuck as old states might not be available in
+	// the beacon node cache.
+	BeaconStateAgeThresholdEpochs uint64 `yaml:"beaconStateAgeThresholdEpochs" default:"1"`
 }
 
 func (c *Config) Validate() error {
