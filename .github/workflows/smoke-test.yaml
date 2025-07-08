@@ -111,7 +111,7 @@ jobs:
             - el_type: ethereumjs
               cl_type: nimbus
           additional_services: []
-          network_parans:
+          network_params:
             genesis_delay: 180
           docker_cache_params:
             enabled: true
