@@ -124,7 +124,7 @@ jobs:
       shell: bash
       run: |
         echo "Starting Kurtosis..."
-        kurtosis run --enclave tracoor-net github.com/kurtosis-tech/ethereum-package --args-file network_params.yaml &
+        kurtosis run --enclave tracoor-net github.com/ethpandaops/ethereum-package --args-file network_params.yaml &
         KURTOSIS_PID=$!
 
         echo "Starting Tracoor stack..."
