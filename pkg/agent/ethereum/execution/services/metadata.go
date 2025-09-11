@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -66,13 +67,21 @@ func (m *MetadataService) Start(ctx context.Context) error {
 	s := gocron.NewScheduler(time.Local)
 
 	if _, err := s.Every("5m").Do(func() {
-		_ = m.RefreshAll(ctx)
+		// Create a new context with timeout for each execution
+		refreshCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		_ = m.RefreshAll(refreshCtx)
 	}); err != nil {
 		return err
 	}
 
 	if _, err := s.Every("15s").Do(func() {
-		if err := m.updateSyncStatus(ctx); err != nil {
+		// Create a new context with timeout for each execution
+		syncCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := m.updateSyncStatus(syncCtx); err != nil {
 			m.log.WithError(err).Warn("Failed to update sync status")
 		}
 	}); err != nil {
@@ -139,16 +148,23 @@ func (m *MetadataService) ClientVersion() string {
 func (m *MetadataService) updateSyncStatus(ctx context.Context) error {
 	status, err := m.rpc.SyncProgress(ctx)
 	if err != nil {
-		return err
+		// Check for context cancellation first
+		if ctx.Err() != nil {
+			// Context was canceled, this is expected during shutdown
+			return fmt.Errorf("context canceled: %w", err)
+		}
+
+		// Log other errors
+		m.log.WithError(err).Debug("Failed to get sync status")
+		return fmt.Errorf("failed to get sync status: %w", err)
 	}
 
+	// Update sync status based on response
 	if status == nil {
 		m.synced = true
-
-		return nil
+	} else {
+		m.synced = false
 	}
-
-	m.synced = false
 
 	return nil
 }
