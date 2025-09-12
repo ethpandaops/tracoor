@@ -17,10 +17,8 @@ import (
 
 func createRandomBeaconBadBlockRequest() *pindexer.CreateBeaconBadBlockRequest {
 	return &pindexer.CreateBeaconBadBlockRequest{
-		Node: wrapperspb.String(generateRandomString(5)),
-		//nolint:gosec // not worried
-		Slot: wrapperspb.UInt64(uint64(generateRandomInt64())),
-		//nolint:gosec // not worried
+		Node:                 wrapperspb.String(generateRandomString(5)),
+		Slot:                 wrapperspb.UInt64(uint64(generateRandomInt64())),
 		Epoch:                wrapperspb.UInt64(uint64(generateRandomInt64())),
 		BlockRoot:            wrapperspb.String(generateRandomString(32)),
 		FetchedAt:            timestamppb.Now(),
@@ -125,7 +123,6 @@ func TestIndexerBeaconBadBlockDownloading(t *testing.T) {
 		}
 
 		// Download it via http
-		//nolint:gosec // This is a test
 		if resp, err := http.Get(url); err != nil {
 			t.Fatalf("failed to download beacon state: %v", err)
 		} else {
@@ -194,7 +191,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 		}
 
 		_, err = index.CreateBeaconBadBlock(ctx, req)
-		if err != nil && err.Error() != "beacon state already exists" {
+		if err != nil && err.Error() != beaconStateExistsStr {
 			t.Fatal("expected error to be 'beacon state already exists'")
 		}
 	})

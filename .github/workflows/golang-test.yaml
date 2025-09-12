@@ -10,7 +10,7 @@ jobs:
   full_ci:
     strategy:
       matrix:
-        go_version: [ 1.22.x ]
+        go_version: [ 1.24.x ]
 
     runs-on: ubuntu-24.04
 
@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
         with:
           go-version: ${{ matrix.go_version }}
-        
+
       - name: run tests
         run: go test -json ./... > test.json
 
@@ -31,4 +31,3 @@ jobs:
         uses: guyarb/golang-test-annotations@9ab2ea84a399d03ffd114bf49dd23ffadc794541 # v0.6.0
         with:
           test-results: test.json
-         

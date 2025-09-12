@@ -5,12 +5,12 @@ import (
 	"fmt"
 )
 
-// MarshalJSON for Field enum
+// MarshalJSON for Field enum.
 func (f ListUniqueBeaconStateValuesRequest_Field) MarshalJSON() ([]byte, error) {
 	return json.Marshal(f.String())
 }
 
-// UnmarshalJSON for Field enum
+// UnmarshalJSON for Field enum.
 func (f *ListUniqueBeaconStateValuesRequest_Field) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {

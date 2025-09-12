@@ -30,8 +30,8 @@ func TestIndexerStarts(t *testing.T) {
 	}
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("failed to cleanup: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("failed to cleanup: %v", cerr)
 		}
 	}()
 
@@ -50,8 +50,8 @@ func TestIndexerStops(t *testing.T) {
 	}
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("failed to cleanup: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("failed to cleanup: %v", cerr)
 		}
 	}()
 
@@ -106,8 +106,8 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 	}
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("failed to cleanup: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("failed to cleanup: %v", cerr)
 		}
 	}()
 
@@ -125,8 +125,8 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 		BeaconImplementation: wrapperspb.String("test-implementation"),
 	}
 
-	if err := index.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
-		t.Fatalf("failed to insert beacon block: %v", err)
+	if ierr := index.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); ierr != nil {
+		t.Fatalf("failed to insert beacon block: %v", ierr)
 	}
 
 	// Check that the beacon block exists
@@ -141,9 +141,10 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 	if len(blocks) == 0 {
 		t.Fatalf("beacon block was deleted during cleanup")
 	}
+
 	// Run the cleanup process
-	if err := index.purgeOldBeaconBlocks(ctx); err != nil {
-		t.Fatalf("failed to purge old beacon blocks: %v", err)
+	if perr := index.purgeOldBeaconBlocks(ctx); perr != nil {
+		t.Fatalf("failed to purge old beacon blocks: %v", perr)
 	}
 
 	// Check that the beacon block hasn't been deleted

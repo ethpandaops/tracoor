@@ -13,7 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupMockIndexer creates a mock indexer
+const (
+	blockLocation = "test/location/block1.ssz"
+)
+
+// setupMockIndexer creates a mock indexer.
 func setupMockIndexer(t *testing.T) *persistence.Indexer {
 	t.Helper()
 
@@ -27,7 +31,7 @@ func setupMockIndexer(t *testing.T) *persistence.Indexer {
 	return indexer
 }
 
-// setupPermanentStore creates a new permanent store with mock dependencies
+// setupPermanentStore creates a new permanent store with mock dependencies.
 func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	t.Helper()
 
@@ -38,8 +42,8 @@ func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	require.NoError(t, err)
 
 	clean := func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("Failed to clean up: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("Failed to clean up: %v", cerr)
 		}
 	}
 
@@ -78,7 +82,6 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -127,7 +130,6 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 		permanentBlocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1})
 		require.NoError(t, err)
 		assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
-		//nolint:gosec // slot is an int64
 		assert.Equal(t, int64(blockInfo.Slot), permanentBlocks[0].Slot, "Slot should match")
 		assert.Equal(t, blockInfo.BlockRoot, permanentBlocks[0].BlockRoot, "Block root should match")
 		assert.Equal(t, blockInfo.Network, permanentBlocks[0].Network, "Network should match")
@@ -142,7 +144,6 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -227,11 +228,10 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 
 	// Create test blocks
 	blockData1 := []byte("test block data 1")
-	blockLocation1 := "test/location/block1.ssz"
 
 	// Save the first block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
-		Location: blockLocation1,
+		Location: blockLocation,
 		Data:     &blockData1,
 	})
 	require.NoError(t, err)
@@ -249,7 +249,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Process blocks sequentially to avoid race conditions with the distributed_locks table
 	// First block
 	blockInfo1 := PermanentStoreBlock{
-		Location:      blockLocation1,
+		Location:      blockLocation,
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
 		Slot:          123,
@@ -335,8 +335,8 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("Failed to clean up: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("Failed to clean up: %v", cerr)
 		}
 	}()
 
@@ -366,7 +366,6 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -448,7 +447,6 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -500,9 +498,12 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Start a goroutine to stop the permanent store
 	stopDone := make(chan struct{})
+
 	go func() {
-		err := permanentStore.Stop(ctx)
-		require.NoError(t, err)
+		serr := permanentStore.Stop(ctx)
+
+		require.NoError(t, serr)
+
 		close(stopDone)
 	}()
 
@@ -598,7 +599,6 @@ func TestPermanentStoreLocation(t *testing.T) {
 
 	// Search for blocks by slot
 	filter := &persistence.PermanentBlockFilter{}
-	//nolint:gosec // slot is an int64
 	filter.AddSlot(int64(blockInfo.Slot))
 
 	blocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
@@ -608,7 +608,6 @@ func TestPermanentStoreLocation(t *testing.T) {
 	if len(blocks) > 0 {
 		assert.Equal(t, blockInfo.BlockRoot, blocks[0].BlockRoot)
 		assert.Equal(t, blockInfo.Network, blocks[0].Network)
-		//nolint:gosec // slot is an int64
 		assert.Equal(t, int64(blockInfo.Slot), blocks[0].Slot)
 	}
 }

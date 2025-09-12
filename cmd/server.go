@@ -7,14 +7,14 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/server"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 var (
 	serverCfgFile string
 )
 
-// serverCmd represents the server command
+// serverCmd represents the server command.
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Runs tracoor in Server mode.",
@@ -70,7 +70,6 @@ func loadServerConfigFromFile(file string) (*server.Config, error) {
 	}
 
 	yamlFile, err := os.ReadFile(file)
-
 	if err != nil {
 		return nil, err
 	}

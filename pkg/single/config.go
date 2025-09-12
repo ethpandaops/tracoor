@@ -42,7 +42,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// ApplyShared sets the shared config in to the server and all agents
+// ApplyShared sets the shared config in to the server and all agents.
 func (c *Config) ApplyShared() error {
 	c.Server.Store = *c.Shared.Store
 	c.Server.LoggingLevel = c.Shared.LoggingLevel

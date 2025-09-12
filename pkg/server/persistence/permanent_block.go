@@ -53,7 +53,7 @@ func (f *PermanentBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	return query, nil
 }
 
-// InsertPermanentBlock inserts a permanent block record
+// InsertPermanentBlock inserts a permanent block record.
 func (i *Indexer) InsertPermanentBlock(ctx context.Context, block *PermanentBlock) error {
 	operation := OperationInsertPermanentBlock
 	i.metrics.ObserveOperation(operation)
@@ -70,7 +70,7 @@ func (i *Indexer) InsertPermanentBlock(ctx context.Context, block *PermanentBloc
 	return nil
 }
 
-// ListPermanentBlock lists permanent blocks based on the filter
+// ListPermanentBlock lists permanent blocks based on the filter.
 func (i *Indexer) ListPermanentBlock(ctx context.Context, filter *PermanentBlockFilter, pagination *PaginationCursor) ([]*PermanentBlock, error) {
 	operation := OperationListPermanentBlock
 	i.metrics.ObserveOperation(operation)
@@ -110,7 +110,7 @@ func (i *Indexer) ListPermanentBlock(ctx context.Context, filter *PermanentBlock
 	return permanentBlocks, nil
 }
 
-// CountPermanentBlock counts permanent blocks based on the filter
+// CountPermanentBlock counts permanent blocks based on the filter.
 func (i *Indexer) CountPermanentBlock(ctx context.Context, filter *PermanentBlockFilter) (int64, error) {
 	operation := OperationCountPermanentBlock
 	i.metrics.ObserveOperation(operation)
@@ -136,7 +136,7 @@ func (i *Indexer) CountPermanentBlock(ctx context.Context, filter *PermanentBloc
 	return count, nil
 }
 
-// GetPermanentBlockByBlockRoot retrieves a permanent block by block root and network
+// GetPermanentBlockByBlockRoot retrieves a permanent block by block root and network.
 func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, network string) (*PermanentBlock, error) {
 	operation := OperationGetPermanentBlock
 	i.metrics.ObserveOperation(operation)
@@ -159,14 +159,16 @@ func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, n
 	return &permanentBlock, nil
 }
 
-// DistinctPermanentBlockValues returns distinct values for permanent blocks
+// DistinctPermanentBlockValues returns distinct values for permanent blocks.
 type DistinctPermanentBlockValues struct {
 	Slot      []uint64
 	BlockRoot []string
 	Network   []string
 }
 
-// DistinctPermanentBlockValues gets distinct values for permanent blocks
+// DistinctPermanentBlockValues gets distinct values for permanent blocks.
+//
+//nolint:errcheck // casting fine here.
 func (i *Indexer) DistinctPermanentBlockValues(ctx context.Context, fields []string) (*DistinctPermanentBlockValues, error) {
 	operation := OperationDistinctValues
 	i.metrics.ObserveOperation(operation)
@@ -220,12 +222,12 @@ func (i *Indexer) DistinctPermanentBlockValues(ctx context.Context, fields []str
 		for i, field := range fields {
 			if !valueSets[field][values[i]] {
 				switch field {
-				case "slot":
+				case KeySlot:
 					//nolint:gosec // not worried about int64
 					results.Slot = append(results.Slot, uint64(values[i].(int64)))
-				case "block_root":
+				case KeyBlockRoot:
 					results.BlockRoot = append(results.BlockRoot, values[i].(string))
-				case "network":
+				case KeyNetwork:
 					results.Network = append(results.Network, values[i].(string))
 				}
 

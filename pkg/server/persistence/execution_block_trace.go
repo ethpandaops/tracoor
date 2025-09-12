@@ -231,6 +231,7 @@ type DistinctExecutionBlockTraceValueResults struct {
 	NodeVersion             []string
 }
 
+//nolint:errcheck // casting fine here.
 func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields []string) (*DistinctExecutionBlockTraceValueResults, error) {
 	operation := OperationDistinctValues
 
@@ -279,19 +280,19 @@ func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields 
 		for i, field := range fields {
 			if !valueSets[field][values[i]] {
 				switch field {
-				case "node":
+				case KeyNode:
 					results.Node = append(results.Node, values[i].(string))
-				case "block_hash":
+				case KeyBlockHash:
 					results.BlockHash = append(results.BlockHash, values[i].(string))
-				case "block_number":
+				case KeyBlockNumber:
 					results.BlockNumber = append(results.BlockNumber, values[i].(int64))
-				case "location":
+				case KeyLocation:
 					results.Location = append(results.Location, values[i].(string))
-				case "network":
+				case KeyNetwork:
 					results.Network = append(results.Network, values[i].(string))
-				case "execution_implementation":
+				case KeyExecutionImplementation:
 					results.ExecutionImplementation = append(results.ExecutionImplementation, values[i].(string))
-				case "node_version":
+				case KeyNodeVersion:
 					results.NodeVersion = append(results.NodeVersion, values[i].(string))
 				}
 

@@ -2,6 +2,8 @@ package beacon
 
 // VersionImmuneBlock is a block that is immune to version changes.
 // If this structure changes, good luck with your upgrade.
+//
+//nolint:tagliatelle // requires snake.
 type VersionImmuneBlock struct {
 	Data struct {
 		Message struct {

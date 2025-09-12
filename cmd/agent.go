@@ -8,14 +8,14 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/agent"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 var (
 	agentCfgFile string
 )
 
-// agentCmd represents the agent command
+// agentCmd represents the agent command.
 var agentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Runs tracoor in agent mode.",
@@ -71,7 +71,6 @@ func loadagentConfigFromFile(file string) (*agent.Config, error) {
 	}
 
 	yamlFile, err := os.ReadFile(file)
-
 	if err != nil {
 		return nil, err
 	}

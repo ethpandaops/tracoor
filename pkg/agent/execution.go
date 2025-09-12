@@ -73,7 +73,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	// Index the execution block trace.
 	rrsp, err := s.indexer.CreateExecutionBlockTrace(ctx, &indexer.CreateExecutionBlockTraceRequest{
 		Node:                    wrapperspb.String(s.Config.Name),
-		BlockNumber:             wrapperspb.Int64(int64(blockNumber)),
+		BlockNumber:             wrapperspb.Int64(int64(blockNumber)), //nolint:gosec // safe.
 		BlockHash:               wrapperspb.String(blockHash),
 		FetchedAt:               timestamppb.New(now),
 		ContentEncoding:         wrapperspb.String(compression.Gzip.ContentEncoding),

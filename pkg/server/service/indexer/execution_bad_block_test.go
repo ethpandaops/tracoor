@@ -305,7 +305,6 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 		}
 
 		// Download it via http
-		//nolint:gosec // This is a test
 		if resp, err := http.Get(url); err != nil {
 			t.Fatalf("failed to download execution bad block: %v", err)
 		} else {

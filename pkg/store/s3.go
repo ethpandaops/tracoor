@@ -31,6 +31,7 @@ type S3Store struct {
 	basicMetrics *BasicMetrics
 }
 
+//nolint:tagliatelle // required snake.
 type S3StoreConfig struct {
 	Endpoint     string `yaml:"endpoint"`
 	Region       string `yaml:"region"`
