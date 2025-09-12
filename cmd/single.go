@@ -14,7 +14,7 @@ var (
 	singleCfgFile string
 )
 
-// singleCmd represents the single command
+// singleCmd represents the single command.
 var singleCmd = &cobra.Command{
 	Use:   "single",
 	Short: "Runs tracoor in Single mode, with one server and multiple agents.",

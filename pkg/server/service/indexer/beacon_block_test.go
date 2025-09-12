@@ -15,6 +15,8 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
+const beaconStateExistsStr = "beacon state already exists"
+
 func createRandomBeaconBlockRequest() *pindexer.CreateBeaconBlockRequest {
 	return &pindexer.CreateBeaconBlockRequest{
 		Node:                 wrapperspb.String(generateRandomString(5)),
@@ -191,7 +193,7 @@ func TestIndexerBeaconBlock(t *testing.T) {
 		}
 
 		_, err = index.CreateBeaconBlock(ctx, req)
-		if err != nil && err.Error() != "beacon state already exists" {
+		if err != nil && err.Error() != beaconStateExistsStr {
 			t.Fatal("expected error to be 'beacon state already exists'")
 		}
 	})

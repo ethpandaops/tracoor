@@ -14,7 +14,7 @@ var (
 	serverCfgFile string
 )
 
-// serverCmd represents the server command
+// serverCmd represents the server command.
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Runs tracoor in Server mode.",

@@ -28,15 +28,15 @@ var (
 	}
 )
 
-// Compressor provides methods for compressing and decompressing data
+// Compressor provides methods for compressing and decompressing data.
 type Compressor struct{}
 
-// NewCompressor creates a new Compressor instance
+// NewCompressor creates a new Compressor instance.
 func NewCompressor() *Compressor {
 	return &Compressor{}
 }
 
-// Compress compresses the input data using the specified algorithm
+// Compress compresses the input data using the specified algorithm.
 func (c *Compressor) Compress(data *[]byte, algorithm *CompressionAlgorithm) ([]byte, error) {
 	if data == nil {
 		return nil, errors.New("data is nil")
@@ -71,7 +71,7 @@ func (c *Compressor) Compress(data *[]byte, algorithm *CompressionAlgorithm) ([]
 	return buf.Bytes(), nil
 }
 
-// Decompress decompresses the input data using the specified algorithm
+// Decompress decompresses the input data using the specified algorithm.
 func (c *Compressor) Decompress(data *[]byte, filename string) ([]byte, error) {
 	if data == nil {
 		return nil, errors.New("data is nil")
@@ -104,7 +104,7 @@ func (c *Compressor) Decompress(data *[]byte, filename string) ([]byte, error) {
 	return io.ReadAll(r)
 }
 
-// AddExtension adds the compression extension to the filename if it's not already present
+// AddExtension adds the compression extension to the filename if it's not already present.
 func AddExtension(filename string, algorithm *CompressionAlgorithm) string {
 	if !strings.HasSuffix(filename, algorithm.Extension) {
 		return filename + algorithm.Extension
@@ -113,7 +113,7 @@ func AddExtension(filename string, algorithm *CompressionAlgorithm) string {
 	return filename
 }
 
-// RemoveExtension removes the compression extension from the filename if it's present
+// RemoveExtension removes the compression extension from the filename if it's present.
 func RemoveExtension(filename string) string {
 	filename = strings.TrimSuffix(filename, Gzip.Extension)
 	filename = strings.TrimSuffix(filename, None.Extension)
@@ -121,12 +121,12 @@ func RemoveExtension(filename string) string {
 	return filename
 }
 
-// HasCompressionExtension checks if the filename has the compression extension
+// HasCompressionExtension checks if the filename has the compression extension.
 func HasCompressionExtension(filename string, algorithm *CompressionAlgorithm) bool {
 	return strings.HasSuffix(filename, algorithm.Extension)
 }
 
-// HasCompressionExtension checks if the filename has the compression extension
+// HasCompressionExtension checks if the filename has the compression extension.
 func HasAnyCompressionExtension(filename string) bool {
 	return strings.HasSuffix(filename, Gzip.Extension) || strings.HasSuffix(filename, None.Extension)
 }
@@ -151,7 +151,7 @@ func GetCompressionAlgorithmFromContentEncoding(contentEncoding string) (*Compre
 	return nil, errors.New("unsupported compression algorithm")
 }
 
-// ErrUnsupportedAlgorithm is returned when an unsupported compression algorithm is specified
+// ErrUnsupportedAlgorithm is returned when an unsupported compression algorithm is specified.
 var ErrUnsupportedAlgorithm = errors.New("unsupported compression algorithm")
 
 type nopWriteCloser struct {

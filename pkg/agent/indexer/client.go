@@ -45,7 +45,7 @@ func NewClient(config *Config, log logrus.FieldLogger) (*Client, error) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	conn, err := grpc.Dial(config.Address, opts...)
+	conn, err := grpc.NewClient(config.Address, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("fail to dial: %v", err)
 	}

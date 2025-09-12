@@ -106,8 +106,8 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 	}
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("failed to cleanup: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("failed to cleanup: %v", cerr)
 		}
 	}()
 

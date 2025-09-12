@@ -15,7 +15,7 @@ var (
 	agentCfgFile string
 )
 
-// agentCmd represents the agent command
+// agentCmd represents the agent command.
 var agentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Runs tracoor in agent mode.",

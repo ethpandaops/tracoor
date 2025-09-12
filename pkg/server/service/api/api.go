@@ -46,7 +46,7 @@ func (i *API) Start(ctx context.Context, grpcServer *grpc.Server) error {
 	i.log.Info("Starting module")
 
 	// Connect to the indexer
-	conn, err := grpc.Dial(i.grpcConn, i.grpcOpts...)
+	conn, err := grpc.NewClient(i.grpcConn, i.grpcOpts...)
 	if err != nil {
 		return fmt.Errorf("fail to dial: %v", err)
 	}

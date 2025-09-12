@@ -191,7 +191,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 		}
 
 		_, err = index.CreateBeaconBadBlock(ctx, req)
-		if err != nil && err.Error() != "beacon state already exists" {
+		if err != nil && err.Error() != beaconStateExistsStr {
 			t.Fatal("expected error to be 'beacon state already exists'")
 		}
 	})

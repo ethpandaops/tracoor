@@ -13,7 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupMockIndexer creates a mock indexer
+const (
+	blockLocation = "test/location/block1.ssz"
+)
+
+// setupMockIndexer creates a mock indexer.
 func setupMockIndexer(t *testing.T) *persistence.Indexer {
 	t.Helper()
 
@@ -27,7 +31,7 @@ func setupMockIndexer(t *testing.T) *persistence.Indexer {
 	return indexer
 }
 
-// setupPermanentStore creates a new permanent store with mock dependencies
+// setupPermanentStore creates a new permanent store with mock dependencies.
 func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	t.Helper()
 
@@ -78,7 +82,6 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -141,7 +144,6 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -226,11 +228,10 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 
 	// Create test blocks
 	blockData1 := []byte("test block data 1")
-	blockLocation1 := "test/location/block1.ssz"
 
 	// Save the first block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
-		Location: blockLocation1,
+		Location: blockLocation,
 		Data:     &blockData1,
 	})
 	require.NoError(t, err)
@@ -248,7 +249,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Process blocks sequentially to avoid race conditions with the distributed_locks table
 	// First block
 	blockInfo1 := PermanentStoreBlock{
-		Location:      blockLocation1,
+		Location:      blockLocation,
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
 		Slot:          123,
@@ -365,7 +366,6 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
@@ -447,7 +447,6 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Create a test block
 	blockData := []byte("test block data")
-	blockLocation := "test/location/block1.ssz"
 
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{

@@ -38,7 +38,7 @@ func NewObjectDownloader(log logrus.FieldLogger, store tStore.Store, mux *runtim
 
 func (d *ObjectDownloader) Start() error {
 	// Connect to the indexer
-	conn, err := grpc.Dial(d.grpcConn, d.grpcOpts...)
+	conn, err := grpc.NewClient(d.grpcConn, d.grpcOpts...)
 	if err != nil {
 		return fmt.Errorf("fail to dial: %v", err)
 	}

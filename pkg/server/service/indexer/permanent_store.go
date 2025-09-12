@@ -14,7 +14,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/store"
 )
 
-// PermanentStoreBlock contains the minimal information needed to identify a block
+// PermanentStoreBlock contains the minimal information needed to identify a block.
 type PermanentStoreBlock struct {
 	Location      string
 	BlockRoot     string
@@ -365,7 +365,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	return nil
 }
 
-// recordPermanentBlock records the block in the PermanentBlock table
+// recordPermanentBlock records the block in the PermanentBlock table.
 func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block PermanentStoreBlock) error {
 	// Record the block directly since we already checked earlier if it exists
 	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{

@@ -12,6 +12,8 @@ import (
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
+const testID = "test-id"
+
 func generateRandomBeaconBlock() *BeaconBlock {
 	return &BeaconBlock{
 		ID:                   generateRandomString(10),
@@ -50,7 +52,7 @@ func TestRemoveBeaconBlock(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := context.Background()
-	id := "test-id"
+	id := testID
 
 	mock.ExpectBegin()
 	mock.ExpectExec("DELETE FROM").WithArgs(id).WillReturnResult(sqlmock.NewResult(1, 1))
@@ -95,7 +97,7 @@ func TestListBeaconBlock(t *testing.T) {
 	}
 	page := &PaginationCursor{}
 
-	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow("test-id", "test-node"))
+	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow(testID, "test-node"))
 
 	blocks, err := indexer.ListBeaconBlock(ctx, filter, page)
 	assert.NoError(t, err)

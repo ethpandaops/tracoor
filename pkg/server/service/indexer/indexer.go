@@ -18,7 +18,21 @@ import (
 )
 
 const (
-	ServiceType = "tracoor.indexer"
+	ServiceType                = "tracoor.indexer"
+	KeyNode                    = "node"
+	KeyBlockRoot               = "block_root"
+	KeyBlockHash               = "block_hash"
+	KeyBlockNumber             = "block_number"
+	KeyExecutionImplementation = "execution_implementation"
+	KeyNetwork                 = "network"
+	KeySlot                    = "slot"
+	KeyEpoch                   = "epoch"
+	KeyStateRoot               = "state_root"
+	KeyContentEncoding         = "content_encoding"
+	KeyNodeVersion             = "node_version"
+	KeyLocation                = "location"
+	KeyFetchedAt               = "fetched_at"
+	KeyBeaconImplementation    = "beacon_implementation"
 )
 
 type Indexer struct {
@@ -126,7 +140,7 @@ func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.Get
 
 	token, err := i.store.GetStorageHandshakeToken(ctx, req.Node)
 	if err != nil {
-		i.log.WithError(err).WithField("node", req.GetNode()).Debug("Failed to get storage handshake")
+		i.log.WithError(err).WithField(KeyNode, req.GetNode()).Debug("Failed to get storage handshake")
 
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -135,7 +149,7 @@ func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.Get
 		i.log.
 			WithField("agent", req.GetNode()).
 			Warn(`Storage handshake token mismatch.
-			It's highly likely that the node is not pointed at the same storage backend as the indexer. 
+			It's highly likely that the node is not pointed at the same storage backend as the indexer.
 			Check the storage backend configuration for both the indexer and the agent instance.`)
 
 		return nil, status.Error(codes.Unauthenticated, "storage handshake token mismatch")
@@ -156,8 +170,8 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	if err != nil {
 		i.log.
 			WithError(err).
-			WithField("location", req.GetLocation().GetValue()).
-			WithField("node", req.GetNode().GetValue()).
+			WithField(KeyLocation, req.GetLocation().GetValue()).
+			WithField(KeyNode, req.GetNode().GetValue()).
 			Error("Failed to index a beacon state because the state could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
@@ -202,16 +216,16 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	logFields := logrus.Fields{
-		"node":                  req.GetNode().GetValue(),
-		"network":               req.GetNetwork().GetValue(),
-		"slot":                  req.GetSlot().GetValue(),
-		"epoch":                 req.GetEpoch().GetValue(),
-		"state_root":            req.GetStateRoot().GetValue(),
-		"content_encoding":      req.GetContentEncoding().GetValue(),
-		"node_version":          req.GetNodeVersion().GetValue(),
-		"location":              req.GetLocation().GetValue(),
-		"fetched_at":            req.GetFetchedAt().AsTime(),
-		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+		KeyNode:                 req.GetNode().GetValue(),
+		KeyNetwork:              req.GetNetwork().GetValue(),
+		KeySlot:                 req.GetSlot().GetValue(),
+		KeyEpoch:                req.GetEpoch().GetValue(),
+		KeyStateRoot:            req.GetStateRoot().GetValue(),
+		KeyContentEncoding:      req.GetContentEncoding().GetValue(),
+		KeyNodeVersion:          req.GetNodeVersion().GetValue(),
+		KeyLocation:             req.GetLocation().GetValue(),
+		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
+		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
 	if err := i.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
@@ -367,21 +381,21 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueBeaconStateValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueBeaconStateValuesRequest_SLOT:
-			fields[idx] = "slot"
+			fields[idx] = KeySlot
 		case indexer.ListUniqueBeaconStateValuesRequest_EPOCH:
-			fields[idx] = "epoch"
+			fields[idx] = KeyEpoch
 		case indexer.ListUniqueBeaconStateValuesRequest_STATE_ROOT:
-			fields[idx] = "state_root"
+			fields[idx] = KeyStateRoot
 		case indexer.ListUniqueBeaconStateValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		case indexer.ListUniqueBeaconStateValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueBeaconStateValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueBeaconStateValuesRequest_BEACON_IMPLEMENTATION:
-			fields[idx] = "beacon_implementation"
+			fields[idx] = KeyBeaconImplementation
 		}
 	}
 
@@ -414,8 +428,8 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 	if err != nil {
 		i.log.
 			WithError(err).
-			WithField("location", req.GetLocation().GetValue()).
-			WithField("node", req.GetNode().GetValue()).
+			WithField(KeyLocation, req.GetLocation().GetValue()).
+			WithField(KeyNode, req.GetNode().GetValue()).
 			Error("Failed to index a beacon block because the block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
@@ -460,16 +474,16 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	logFields := logrus.Fields{
-		"node":                  req.GetNode().GetValue(),
-		"network":               req.GetNetwork().GetValue(),
-		"slot":                  req.GetSlot().GetValue(),
-		"epoch":                 req.GetEpoch().GetValue(),
-		"block_root":            req.GetBlockRoot().GetValue(),
-		"node_version":          req.GetNodeVersion().GetValue(),
-		"content_encoding":      req.GetContentEncoding().GetValue(),
-		"location":              req.GetLocation().GetValue(),
-		"fetched_at":            req.GetFetchedAt().AsTime(),
-		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+		KeyNode:                 req.GetNode().GetValue(),
+		KeyNetwork:              req.GetNetwork().GetValue(),
+		KeySlot:                 req.GetSlot().GetValue(),
+		KeyEpoch:                req.GetEpoch().GetValue(),
+		KeyBlockRoot:            req.GetBlockRoot().GetValue(),
+		KeyNodeVersion:          req.GetNodeVersion().GetValue(),
+		KeyContentEncoding:      req.GetContentEncoding().GetValue(),
+		KeyLocation:             req.GetLocation().GetValue(),
+		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
+		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
 	if err := i.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
@@ -633,21 +647,21 @@ func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueBeaconBlockValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueBeaconBlockValuesRequest_SLOT:
-			fields[idx] = "slot"
+			fields[idx] = KeySlot
 		case indexer.ListUniqueBeaconBlockValuesRequest_EPOCH:
-			fields[idx] = "epoch"
+			fields[idx] = KeyEpoch
 		case indexer.ListUniqueBeaconBlockValuesRequest_BLOCK_ROOT:
-			fields[idx] = "block_root"
+			fields[idx] = KeyBlockRoot
 		case indexer.ListUniqueBeaconBlockValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		case indexer.ListUniqueBeaconBlockValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueBeaconBlockValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueBeaconBlockValuesRequest_BEACON_IMPLEMENTATION:
-			fields[idx] = "beacon_implementation"
+			fields[idx] = KeyBeaconImplementation
 		}
 	}
 
@@ -680,8 +694,8 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 	if err != nil {
 		i.log.
 			WithError(err).
-			WithField("location", req.GetLocation().GetValue()).
-			WithField("node", req.GetNode().GetValue()).
+			WithField(KeyLocation, req.GetLocation().GetValue()).
+			WithField(KeyNode, req.GetNode().GetValue()).
 			Error("Failed to index a beacon block because the bad block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
@@ -726,16 +740,16 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 	}
 
 	logFields := logrus.Fields{
-		"node":                  req.GetNode().GetValue(),
-		"network":               req.GetNetwork().GetValue(),
-		"slot":                  req.GetSlot().GetValue(),
-		"epoch":                 req.GetEpoch().GetValue(),
-		"block_root":            req.GetBlockRoot().GetValue(),
-		"node_version":          req.GetNodeVersion().GetValue(),
-		"content_encoding":      req.GetContentEncoding().GetValue(),
-		"location":              req.GetLocation().GetValue(),
-		"fetched_at":            req.GetFetchedAt().AsTime(),
-		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+		KeyNode:                 req.GetNode().GetValue(),
+		KeyNetwork:              req.GetNetwork().GetValue(),
+		KeySlot:                 req.GetSlot().GetValue(),
+		KeyEpoch:                req.GetEpoch().GetValue(),
+		KeyBlockRoot:            req.GetBlockRoot().GetValue(),
+		KeyNodeVersion:          req.GetNodeVersion().GetValue(),
+		KeyContentEncoding:      req.GetContentEncoding().GetValue(),
+		KeyLocation:             req.GetLocation().GetValue(),
+		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
+		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
 	if err := i.db.InsertBeaconBadBlock(ctx, ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock)); err != nil {
@@ -891,21 +905,21 @@ func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *index
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_SLOT:
-			fields[idx] = "slot"
+			fields[idx] = KeySlot
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_EPOCH:
-			fields[idx] = "epoch"
+			fields[idx] = KeyEpoch
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_BLOCK_ROOT:
-			fields[idx] = "block_root"
+			fields[idx] = KeyBlockRoot
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueBeaconBadBlockValuesRequest_BEACON_IMPLEMENTATION:
-			fields[idx] = "beacon_implementation"
+			fields[idx] = KeyBeaconImplementation
 		}
 	}
 
@@ -938,8 +952,8 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 	if err != nil {
 		i.log.
 			WithError(err).
-			WithField("location", req.GetLocation().GetValue()).
-			WithField("node", req.GetNode().GetValue()).
+			WithField(KeyLocation, req.GetLocation().GetValue()).
+			WithField(KeyNode, req.GetNode().GetValue()).
 			Error("Failed to index a beacon blob because the bad blob could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
@@ -986,16 +1000,16 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 	}
 
 	logFields := logrus.Fields{
-		"node":                  req.GetNode().GetValue(),
-		"network":               req.GetNetwork().GetValue(),
-		"slot":                  req.GetSlot().GetValue(),
-		"epoch":                 req.GetEpoch().GetValue(),
-		"block_root":            req.GetBlockRoot().GetValue(),
-		"node_version":          req.GetNodeVersion().GetValue(),
-		"content_encoding":      req.GetContentEncoding().GetValue(),
-		"location":              req.GetLocation().GetValue(),
-		"fetched_at":            req.GetFetchedAt().AsTime(),
-		"beacon_implementation": req.GetBeaconImplementation().GetValue(),
+		KeyNode:                 req.GetNode().GetValue(),
+		KeyNetwork:              req.GetNetwork().GetValue(),
+		KeySlot:                 req.GetSlot().GetValue(),
+		KeyEpoch:                req.GetEpoch().GetValue(),
+		KeyBlockRoot:            req.GetBlockRoot().GetValue(),
+		KeyNodeVersion:          req.GetNodeVersion().GetValue(),
+		KeyContentEncoding:      req.GetContentEncoding().GetValue(),
+		KeyLocation:             req.GetLocation().GetValue(),
+		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
+		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 		"index":                 req.GetIndex().GetValue(),
 	}
 
@@ -1160,21 +1174,21 @@ func (i *Indexer) ListUniqueBeaconBadBlobValues(ctx context.Context, req *indexe
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_SLOT:
-			fields[idx] = "slot"
+			fields[idx] = KeySlot
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_EPOCH:
-			fields[idx] = "epoch"
+			fields[idx] = KeyEpoch
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_BLOCK_ROOT:
-			fields[idx] = "block_root"
+			fields[idx] = KeyBlockRoot
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_BEACON_IMPLEMENTATION:
-			fields[idx] = "beacon_implementation"
+			fields[idx] = KeyBeaconImplementation
 		case indexer.ListUniqueBeaconBadBlobValuesRequest_INDEX:
 			fields[idx] = "index"
 		}
@@ -1227,11 +1241,11 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 	}
 
 	logFields := logrus.Fields{
-		"node":         req.GetNode().GetValue(),
-		"network":      req.GetNetwork().GetValue(),
-		"node_version": req.GetNodeVersion().GetValue(),
-		"location":     req.GetLocation().GetValue(),
-		"fetched_at":   req.GetFetchedAt().AsTime(),
+		KeyNode:        req.GetNode().GetValue(),
+		KeyNetwork:     req.GetNetwork().GetValue(),
+		KeyNodeVersion: req.GetNodeVersion().GetValue(),
+		KeyLocation:    req.GetLocation().GetValue(),
+		KeyFetchedAt:   req.GetFetchedAt().AsTime(),
 	}
 
 	i.log.WithFields(logFields).WithField("id", trace.GetId().GetValue()).Debug("Indexed execution block trace")
@@ -1369,19 +1383,19 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_HASH:
-			fields[idx] = "block_hash"
+			fields[idx] = KeyBlockHash
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_BLOCK_NUMBER:
-			fields[idx] = "block_number"
+			fields[idx] = KeyBlockNumber
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_EXECUTION_IMPLEMENTATION:
-			fields[idx] = "execution_implementation"
+			fields[idx] = KeyExecutionImplementation
 		case indexer.ListUniqueExecutionBlockTraceValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		}
 	}
 
@@ -1432,12 +1446,12 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 	}
 
 	logFields := logrus.Fields{
-		"node":             req.GetNode().GetValue(),
-		"network":          req.GetNetwork().GetValue(),
-		"node_version":     req.GetNodeVersion().GetValue(),
-		"content_encoding": req.GetContentEncoding().GetValue(),
-		"location":         req.GetLocation().GetValue(),
-		"fetched_at":       req.GetFetchedAt().AsTime(),
+		KeyNode:            req.GetNode().GetValue(),
+		KeyNetwork:         req.GetNetwork().GetValue(),
+		KeyNodeVersion:     req.GetNodeVersion().GetValue(),
+		KeyContentEncoding: req.GetContentEncoding().GetValue(),
+		KeyLocation:        req.GetLocation().GetValue(),
+		KeyFetchedAt:       req.GetFetchedAt().AsTime(),
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed execution bad block")
@@ -1583,19 +1597,19 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 	for idx, field := range req.Fields {
 		switch field {
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_NODE:
-			fields[idx] = "node"
+			fields[idx] = KeyNode
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_HASH:
-			fields[idx] = "block_hash"
+			fields[idx] = KeyBlockHash
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_NUMBER:
-			fields[idx] = "block_number"
+			fields[idx] = KeyBlockNumber
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_LOCATION:
-			fields[idx] = "location"
+			fields[idx] = KeyLocation
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_NETWORK:
-			fields[idx] = "network"
+			fields[idx] = KeyNetwork
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_EXECUTION_IMPLEMENTATION:
 			fields[idx] = "execution_implementation"
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_NODE_VERSION:
-			fields[idx] = "node_version"
+			fields[idx] = KeyNodeVersion
 		case indexer.ListUniqueExecutionBadBlockValuesRequest_BLOCK_EXTRA_DATA:
 			fields[idx] = "block_extra_data"
 		}

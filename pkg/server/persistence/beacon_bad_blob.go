@@ -258,6 +258,7 @@ type DistinctBeaconBadBlobValueResults struct {
 	Index                []uint64
 }
 
+//nolint:errcheck // casting fine here.
 func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []string) (*DistinctBeaconBadBlobValueResults, error) {
 	operation := OperationDistinctValues
 
@@ -308,24 +309,23 @@ func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []stri
 		for i, field := range fields {
 			if !valueSets[field][values[i]] {
 				switch field {
-				case "node":
+				case KeyNode:
 					results.Node = append(results.Node, values[i].(string))
-				case "slot":
+				case KeySlot:
 					//nolint:gosec // not worried about int64 overflow here
 					results.Slot = append(results.Slot, uint64(values[i].(int64)))
-				case "epoch":
+				case KeyEpoch:
 					//nolint:gosec // not worried about int64 overflow here
 					results.Epoch = append(results.Epoch, uint64(values[i].(int64)))
-
-				case "block_root":
+				case KeyBlockRoot:
 					results.BlockRoot = append(results.BlockRoot, values[i].(string))
-				case "node_version":
+				case KeyNodeVersion:
 					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case "location":
+				case KeyLocation:
 					results.Location = append(results.Location, values[i].(string))
-				case "network":
+				case KeyNetwork:
 					results.Network = append(results.Network, values[i].(string))
-				case "beacon_implementation":
+				case KeyBeaconImplementation:
 					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
 				case "index":
 					//nolint:gosec // not worried about int64 overflow here

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	backoff "github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/state"
 	"github.com/ethpandaops/ethwallclock"
@@ -202,13 +202,16 @@ func (m *MetadataService) DeriveNetwork(_ context.Context) error {
 
 func (m *MetadataService) fetchSpec(_ context.Context) error {
 	m.log.Debug("Fetching spec from beacon node")
+
 	spec, err := m.beacon.Spec()
 	if err != nil {
 		m.log.WithError(err).Error("Failed to fetch spec from beacon node")
+
 		return err
 	}
 
 	m.Spec = spec
+
 	m.log.Debug("Successfully fetched spec from beacon node")
 
 	return nil
@@ -216,13 +219,16 @@ func (m *MetadataService) fetchSpec(_ context.Context) error {
 
 func (m *MetadataService) fetchGenesis(_ context.Context) error {
 	m.log.Debug("Fetching genesis from beacon node")
+
 	genesis, err := m.beacon.Genesis()
 	if err != nil {
 		m.log.WithError(err).Error("Failed to fetch genesis from beacon node")
+
 		return err
 	}
 
 	m.Genesis = genesis
+
 	m.log.Debug("Successfully fetched genesis from beacon node")
 
 	return nil

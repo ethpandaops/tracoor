@@ -109,6 +109,7 @@ func (n *Node) Metadata() *services.MetadataService {
 		return nil
 	}
 
+	//nolint:errcheck // casting fine.
 	return service.(*services.MetadataService)
 }
 

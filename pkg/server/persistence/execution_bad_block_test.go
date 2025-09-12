@@ -51,7 +51,7 @@ func TestRemoveExecutionBadBlock(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := context.Background()
-	id := "test-id"
+	id := testID
 
 	mock.ExpectBegin()
 	mock.ExpectExec("DELETE FROM").WithArgs(id).WillReturnResult(sqlmock.NewResult(1, 1))
