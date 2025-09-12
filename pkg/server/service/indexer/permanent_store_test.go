@@ -38,8 +38,8 @@ func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	require.NoError(t, err)
 
 	clean := func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("Failed to clean up: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("Failed to clean up: %v", cerr)
 		}
 	}
 
@@ -127,7 +127,6 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 		permanentBlocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1})
 		require.NoError(t, err)
 		assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
-		//nolint:gosec // slot is an int64
 		assert.Equal(t, int64(blockInfo.Slot), permanentBlocks[0].Slot, "Slot should match")
 		assert.Equal(t, blockInfo.BlockRoot, permanentBlocks[0].BlockRoot, "Block root should match")
 		assert.Equal(t, blockInfo.Network, permanentBlocks[0].Network, "Network should match")
@@ -335,8 +334,8 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		if err := cleanup(); err != nil {
-			t.Fatalf("Failed to clean up: %v", err)
+		if cerr := cleanup(); cerr != nil {
+			t.Fatalf("Failed to clean up: %v", cerr)
 		}
 	}()
 
@@ -500,9 +499,12 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Start a goroutine to stop the permanent store
 	stopDone := make(chan struct{})
+
 	go func() {
-		err := permanentStore.Stop(ctx)
-		require.NoError(t, err)
+		serr := permanentStore.Stop(ctx)
+
+		require.NoError(t, serr)
+
 		close(stopDone)
 	}()
 
@@ -598,7 +600,6 @@ func TestPermanentStoreLocation(t *testing.T) {
 
 	// Search for blocks by slot
 	filter := &persistence.PermanentBlockFilter{}
-	//nolint:gosec // slot is an int64
 	filter.AddSlot(int64(blockInfo.Slot))
 
 	blocks, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
@@ -608,7 +609,6 @@ func TestPermanentStoreLocation(t *testing.T) {
 	if len(blocks) > 0 {
 		assert.Equal(t, blockInfo.BlockRoot, blocks[0].BlockRoot)
 		assert.Equal(t, blockInfo.Network, blocks[0].Network)
-		//nolint:gosec // slot is an int64
 		assert.Equal(t, int64(blockInfo.Slot), blocks[0].Slot)
 	}
 }

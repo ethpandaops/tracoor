@@ -144,11 +144,11 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 
 func (m *MetadataService) RefreshAll(ctx context.Context) error {
 	if err := m.fetchSpec(ctx); err != nil {
-		m.log.WithError(err).Warn("Failed to fetch spec for refresh")
+		m.log.WithError(err).Error("Failed to fetch spec for refresh")
 	}
 
 	if err := m.fetchGenesis(ctx); err != nil {
-		m.log.WithError(err).Warn("Failed to fetch genesis for refresh")
+		m.log.WithError(err).Error("Failed to fetch genesis for refresh")
 	}
 
 	if m.Genesis != nil && m.Spec != nil && m.wallclock == nil {
@@ -201,23 +201,29 @@ func (m *MetadataService) DeriveNetwork(_ context.Context) error {
 }
 
 func (m *MetadataService) fetchSpec(_ context.Context) error {
+	m.log.Debug("Fetching spec from beacon node")
 	spec, err := m.beacon.Spec()
 	if err != nil {
+		m.log.WithError(err).Error("Failed to fetch spec from beacon node")
 		return err
 	}
 
 	m.Spec = spec
+	m.log.Debug("Successfully fetched spec from beacon node")
 
 	return nil
 }
 
 func (m *MetadataService) fetchGenesis(_ context.Context) error {
+	m.log.Debug("Fetching genesis from beacon node")
 	genesis, err := m.beacon.Genesis()
 	if err != nil {
+		m.log.WithError(err).Error("Failed to fetch genesis from beacon node")
 		return err
 	}
 
 	m.Genesis = genesis
+	m.log.Debug("Successfully fetched genesis from beacon node")
 
 	return nil
 }

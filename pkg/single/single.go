@@ -38,6 +38,7 @@ func (s *Single) Start(ctx context.Context) error {
 
 	go func() {
 		defer wg.Done()
+
 		s.log.Info("Starting server")
 
 		if err := sserver.Start(ctx); err != nil {

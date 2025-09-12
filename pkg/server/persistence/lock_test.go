@@ -41,8 +41,10 @@ func TestAcquireLock(t *testing.T) {
 
 		// Verify lock exists in DB
 		var lock DistributedLock
+
 		result := indexer.db.Where("key = ?", "test-key-1").First(&lock)
 		require.NoError(t, result.Error)
+
 		assert.Equal(t, "test-key-1", lock.Key)
 		assert.Equal(t, "owner-1", lock.Owner)
 		assert.True(t, lock.ExpiresAt.After(time.Now()))
@@ -93,8 +95,10 @@ func TestAcquireLock(t *testing.T) {
 
 		// Verify lock still belongs to original owner
 		var lock DistributedLock
+
 		result := indexer.db.Where("key = ?", "test-key-3").First(&lock)
 		require.NoError(t, result.Error)
+
 		assert.Equal(t, "owner-3", lock.Owner)
 	})
 
@@ -115,8 +119,10 @@ func TestAcquireLock(t *testing.T) {
 
 		// Verify lock now belongs to new owner
 		var lock DistributedLock
+
 		result = indexer.db.Where("key = ?", "test-key-4").First(&lock)
 		require.NoError(t, result.Error)
+
 		assert.Equal(t, "owner-6", lock.Owner)
 		assert.True(t, lock.ExpiresAt.After(time.Now()))
 	})
@@ -138,7 +144,9 @@ func TestReleaseLock(t *testing.T) {
 
 		// Verify lock no longer exists
 		var lock DistributedLock
+
 		result := indexer.db.Where("key = ?", "test-key-5").First(&lock)
+
 		assert.Error(t, result.Error)
 		assert.True(t, result.Error == gorm.ErrRecordNotFound)
 	})
@@ -161,7 +169,9 @@ func TestReleaseLock(t *testing.T) {
 
 		// Verify lock still exists
 		var lock DistributedLock
+
 		result := indexer.db.Where("key = ?", "test-key-6").First(&lock)
+
 		require.NoError(t, result.Error)
 		assert.Equal(t, "owner-9", lock.Owner)
 	})
@@ -213,8 +223,10 @@ func TestCleanupExpiredLocks(t *testing.T) {
 
 	// Verify only valid locks remain
 	var locks []DistributedLock
+
 	result := indexer.db.Find(&locks)
 	require.NoError(t, result.Error)
+
 	assert.Len(t, locks, 3)
 
 	for _, lock := range locks {

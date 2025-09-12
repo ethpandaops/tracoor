@@ -1,4 +1,4 @@
-//nolint:gosec // Only used in tests
+//nolnt:gosec // Only used in tests
 package persistence
 
 import (

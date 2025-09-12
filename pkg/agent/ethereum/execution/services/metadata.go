@@ -156,6 +156,7 @@ func (m *MetadataService) updateSyncStatus(ctx context.Context) error {
 
 		// Log other errors
 		m.log.WithError(err).Debug("Failed to get sync status")
+
 		return fmt.Errorf("failed to get sync status: %w", err)
 	}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/server"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -70,7 +70,6 @@ func loadServerConfigFromFile(file string) (*server.Config, error) {
 	}
 
 	yamlFile, err := os.ReadFile(file)
-
 	if err != nil {
 		return nil, err
 	}

@@ -87,6 +87,7 @@ func (p *PermanentStore) Stop(ctx context.Context) error {
 
 	for len(p.queue) > 0 {
 		p.log.WithField("remaining", len(p.queue)).Debug("Waiting for queue to empty")
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -264,8 +265,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}
 
 	defer func() {
-		if err := p.db.ReleaseLock(ctx, lockKey, p.nodeID); err != nil {
-			p.log.WithError(err).WithFields(logrus.Fields{
+		if lerr := p.db.ReleaseLock(ctx, lockKey, p.nodeID); lerr != nil {
+			p.log.WithError(lerr).WithFields(logrus.Fields{
 				"block_root": block.BlockRoot,
 				"network":    block.Network,
 				"lock_key":   lockKey,
@@ -322,8 +323,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		p.cache.Add(cacheKey, true)
 
 		// Ensure the block is recorded in the database even if it already exists in storage
-		if err := p.recordPermanentBlock(ctx, block); err != nil {
-			p.log.WithError(err).WithFields(logrus.Fields{
+		if perr := p.recordPermanentBlock(ctx, block); perr != nil {
+			p.log.WithError(perr).WithFields(logrus.Fields{
 				"block_root": block.BlockRoot,
 				"network":    block.Network,
 				"slot":       block.Slot,
@@ -350,8 +351,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}).Info("Copied block to permanent location")
 
 	// Record the block in the database
-	if err := p.recordPermanentBlock(ctx, block); err != nil {
-		p.log.WithError(err).WithFields(logrus.Fields{
+	if perr := p.recordPermanentBlock(ctx, block); perr != nil {
+		p.log.WithError(perr).WithFields(logrus.Fields{
 			"block_root": block.BlockRoot,
 			"network":    block.Network,
 			"slot":       block.Slot,

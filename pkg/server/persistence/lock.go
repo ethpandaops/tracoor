@@ -93,7 +93,6 @@ func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.D
 		// Lock is owned by someone else
 		return fmt.Errorf("lock is owned by %s until %s", existingLock.Owner, existingLock.ExpiresAt)
 	})
-
 	if err != nil {
 		i.log.WithFields(logrus.Fields{
 			"key":   key,

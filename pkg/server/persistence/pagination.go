@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//nolint:tagliatelle // requires snake.
 type PaginationCursor struct {
 	// The cursor to start from.
 	Offset int `json:"offset"`

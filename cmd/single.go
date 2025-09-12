@@ -7,7 +7,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/single"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -73,7 +73,6 @@ func loadSingleConfigFromFile(file string) (*single.Config, error) {
 	}
 
 	yamlFile, err := os.ReadFile(file)
-
 	if err != nil {
 		return nil, err
 	}

@@ -17,10 +17,8 @@ import (
 
 func createRandomBeaconStateRequest() *pindexer.CreateBeaconStateRequest {
 	return &pindexer.CreateBeaconStateRequest{
-		Node: wrapperspb.String(generateRandomString(5)),
-		//nolint:gosec // not worried
-		Slot: wrapperspb.UInt64(uint64(generateRandomInt64())),
-		//nolint:gosec // not worried
+		Node:                 wrapperspb.String(generateRandomString(5)),
+		Slot:                 wrapperspb.UInt64(uint64(generateRandomInt64())),
 		Epoch:                wrapperspb.UInt64(uint64(generateRandomInt64())),
 		StateRoot:            wrapperspb.String(generateRandomString(32)),
 		FetchedAt:            timestamppb.Now(),
@@ -125,7 +123,6 @@ func TestIndexerBeaconStateDownloading(t *testing.T) {
 		}
 
 		// Download it via http
-		//nolint:gosec // This is a test
 		if resp, err := http.Get(url); err != nil {
 			t.Fatalf("failed to download beacon state: %v", err)
 		} else {

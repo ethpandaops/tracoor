@@ -10,9 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	locationBadBeaconBlock = "beacon_bad_block/location.json"
+	locationBeaconBlock    = "beacon_block/location.json"
+)
+
 func TestFSStoreOperations(t *testing.T) {
 	basePath, err := os.MkdirTemp("", "fsstore_test")
 	require.NoError(t, err)
+
 	defer os.RemoveAll(basePath)
 
 	log := logrus.New()
@@ -58,7 +64,7 @@ func TestFSStoreOperations(t *testing.T) {
 	})
 
 	t.Run("SaveBeaconBlock", func(t *testing.T) {
-		location := "beacon_block/location.json"
+		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
 			Data:     &data,
@@ -72,7 +78,7 @@ func TestFSStoreOperations(t *testing.T) {
 	})
 
 	t.Run("DeleteBeaconBlock", func(t *testing.T) {
-		location := "beacon_block/location.json"
+		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
 			Data:     &data,
@@ -89,7 +95,7 @@ func TestFSStoreOperations(t *testing.T) {
 	})
 
 	t.Run("SaveBeaconBadBlock", func(t *testing.T) {
-		location := "beacon_bad_block/location.json"
+		location := locationBadBeaconBlock
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
 			Data:     &data,
@@ -103,7 +109,7 @@ func TestFSStoreOperations(t *testing.T) {
 	})
 
 	t.Run("DeleteBeaconBadBlock", func(t *testing.T) {
-		location := "beacon_bad_block/location.json"
+		location := locationBadBeaconBlock
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
 			Data:     &data,
@@ -249,7 +255,7 @@ func TestFSStoreOperations(t *testing.T) {
 	})
 
 	t.Run("Copy", func(t *testing.T) {
-		location := "beacon_block/location.json"
+		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
 			Data:     &data,

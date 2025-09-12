@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//nolint:tagliatelle // requires snake.
 type FSStoreConfig struct {
 	BasePath string `yaml:"base_path"`
 }

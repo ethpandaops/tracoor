@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// CompressionAlgorithm represents the type of compression algorithm
+// CompressionAlgorithm represents the type of compression algorithm.
 type CompressionAlgorithm struct {
 	Name            string
 	Extension       string
