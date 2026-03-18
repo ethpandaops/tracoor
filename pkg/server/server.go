@@ -74,7 +74,7 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 		return nil, err
 	}
 
-	var opts []grpc.DialOption
+	opts := make([]grpc.DialOption, 0, 1)
 
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
