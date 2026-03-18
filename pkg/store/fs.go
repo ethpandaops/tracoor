@@ -328,7 +328,7 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 	}
 
 	// Write to the destination file
-	if err := os.WriteFile(destination, data, 0o600); err != nil {
+	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // path is constructed from validated basePath
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 
