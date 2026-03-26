@@ -30,23 +30,23 @@ jobs:
         echo "Fetching tool versions from Kurtosis source..."
         echo "Tool versions extracted:"
 
-        TRAEFIK_VERSION=$(curl -sf https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/reverse_proxy_functions/implementations/traefik/consts.go | grep 'containerImage.*=.*"traefik:' | sed 's/.*traefik:\([^"]*\)".*/\1/')
+        TRAEFIK_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/reverse_proxy_functions/implementations/traefik/consts.go | grep 'containerImage.*=.*"traefik:' | sed 's/.*traefik:\([^"]*\)".*/\1/')
         echo "TRAEFIK_VERSION=$TRAEFIK_VERSION" >> $GITHUB_ENV
         echo "  Traefik: $TRAEFIK_VERSION"
 
-        VECTOR_VERSION=$(curl -sf https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_aggregator_functions/implementations/vector/consts.go | grep 'containerImage.*=.*"timberio/vector:' | sed 's/.*timberio\/vector:\([^"]*\)".*/\1/')
+        VECTOR_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_aggregator_functions/implementations/vector/consts.go | grep 'containerImage.*=.*"timberio/vector:' | sed 's/.*timberio\/vector:\([^"]*\)".*/\1/')
         echo "VECTOR_VERSION=$VECTOR_VERSION" >> $GITHUB_ENV
         echo "  Vector: $VECTOR_VERSION"
 
-        FLUENTBIT_VERSION=$(curl -sf https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_collector_functions/implementations/fluentbit/consts.go | grep 'containerImage.*=.*"fluent/fluent-bit:' | sed 's/.*fluent\/fluent-bit:\([^"]*\)".*/\1/')
+        FLUENTBIT_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_collector_functions/implementations/fluentbit/consts.go | grep 'containerImage.*=.*"fluent/fluent-bit:' | sed 's/.*fluent\/fluent-bit:\([^"]*\)".*/\1/')
         echo "FLUENTBIT_VERSION=$FLUENTBIT_VERSION" >> $GITHUB_ENV
         echo "  Fluent-bit: $FLUENTBIT_VERSION"
 
-        ALPINE_VERSION=$(curl -sf https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_collector_functions/implementations/fluentbit/fluentbit_configuration_creator.go | grep 'configuratorContainerImage.*=.*"alpine:' | sed 's/.*alpine:\([^"]*\)".*/\1/')
+        ALPINE_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/container-engine-lib/lib/backend_impls/docker/docker_kurtosis_backend/logs_collector_functions/implementations/fluentbit/fluentbit_configuration_creator.go | grep 'configuratorContainerImage.*=.*"alpine:' | sed 's/.*alpine:\([^"]*\)".*/\1/')
         echo "ALPINE_VERSION=$ALPINE_VERSION" >> $GITHUB_ENV
         echo "  Alpine: $ALPINE_VERSION"
 
-        BLACK_VERSION=$(curl -sf https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/cli/cli/commands/lint/lint.go | grep 'pyBlackDockerImage.*=.*"pyfound/black:' | sed 's/.*pyfound\/black:\([^"]*\)".*/\1/')
+        BLACK_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/kurtosis-tech/kurtosis/main/cli/cli/commands/lint/lint.go | grep 'pyBlackDockerImage.*=.*"pyfound/black:' | sed 's/.*pyfound\/black:\([^"]*\)".*/\1/')
         echo "BLACK_VERSION=$BLACK_VERSION" >> $GITHUB_ENV
         echo "  Black: $BLACK_VERSION"
 
@@ -54,13 +54,25 @@ jobs:
         echo "CURL_JQ_VERSION=$CURL_JQ_VERSION" >> $GITHUB_ENV
         echo "  Curl-jq: $CURL_JQ_VERSION"
 
-        EGG_VERSION=$(curl -sf https://raw.githubusercontent.com/ethpandaops/ethereum-package/master/src/package_io/constants.star | grep 'ethpandaops/ethereum-genesis-generator:' | sed 's/.*ethpandaops\/ethereum-genesis-generator:\([^"]*\)".*/\1/')
+        EGG_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/ethpandaops/ethereum-package/master/src/package_io/constants.star | grep 'ethpandaops/ethereum-genesis-generator:' | sed 's/.*ethpandaops\/ethereum-genesis-generator:\([^"]*\)".*/\1/')
         echo "EGG_VERSION=$EGG_VERSION" >> $GITHUB_ENV
         echo "  EGG: $EGG_VERSION"
 
-        VAL_TOOLS_VERSION=$(curl -sf https://raw.githubusercontent.com/ethpandaops/ethereum-package/master/src/prelaunch_data_generator/validator_keystores/validator_keystore_generator.star | grep 'ETH_VAL_TOOLS_IMAGE = "protolambda/eth2-val-tools:' | sed 's/.*protolambda\/eth2-val-tools:\([^"]*\)".*/\1/')
+        VAL_TOOLS_VERSION=$(curl -sfL --retry 3 https://raw.githubusercontent.com/ethpandaops/ethereum-package/master/src/prelaunch_data_generator/validator_keystores/validator_keystore_generator.star | grep 'ETH_VAL_TOOLS_IMAGE = "protolambda/eth2-val-tools:' | sed 's/.*protolambda\/eth2-val-tools:\([^"]*\)".*/\1/')
         echo "VAL_TOOLS_VERSION=$VAL_TOOLS_VERSION" >> $GITHUB_ENV
         echo "  Val-tools: $VAL_TOOLS_VERSION"
+
+        # Fail fast if any version could not be determined
+        MISSING=""
+        for var in TRAEFIK_VERSION VECTOR_VERSION FLUENTBIT_VERSION ALPINE_VERSION BLACK_VERSION EGG_VERSION VAL_TOOLS_VERSION; do
+          if [ -z "${!var}" ]; then
+            MISSING="$MISSING $var"
+          fi
+        done
+        if [ -n "$MISSING" ]; then
+          echo "::error::Failed to determine versions for:$MISSING"
+          exit 1
+        fi
     - name: Pull images
       shell: bash
       run: |
