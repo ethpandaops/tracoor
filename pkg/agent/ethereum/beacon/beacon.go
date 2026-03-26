@@ -37,7 +37,10 @@ func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkN
 			Topics:  *config.BeaconSubscriptions,
 		}
 	} else {
-		opts.EnableDefaultBeaconSubscription()
+		opts.BeaconSubscription = bn.BeaconSubscriptionOptions{
+			Enabled: true,
+			Topics:  []string{"block", "chain_reorg"},
+		}
 	}
 
 	opts.HealthCheck.Interval.Duration = time.Second * 3
