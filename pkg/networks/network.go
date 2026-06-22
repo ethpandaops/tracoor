@@ -8,13 +8,14 @@ type Network struct {
 }
 
 var (
-	NetworkNameNone    NetworkName = "none"
-	NetworkNameUnknown NetworkName = "unknown"
-	NetworkNameMainnet NetworkName = "mainnet"
-	NetworkNameGoerli  NetworkName = "goerli"
-	NetworkNameSepolia NetworkName = "sepolia"
-	NetworkNameHolesky NetworkName = "holesky"
-	NetworkNameHoodi   NetworkName = "hoodi"
+	NetworkNameNone               NetworkName = "none"
+	NetworkNameUnknown            NetworkName = "unknown"
+	NetworkNameMainnet            NetworkName = "mainnet"
+	NetworkNameGoerli             NetworkName = "goerli"
+	NetworkNameSepolia            NetworkName = "sepolia"
+	NetworkNameHolesky            NetworkName = "holesky"
+	NetworkNameHoodi              NetworkName = "hoodi"
+	NetworkNameGlamsterdamDevnet6 NetworkName = "glamsterdam-devnet-6"
 )
 
 var NetworkGenesisRoots = map[string]uint64{
@@ -26,11 +27,12 @@ var NetworkGenesisRoots = map[string]uint64{
 }
 
 var NetworkIds = map[uint64]NetworkName{
-	1:        NetworkNameMainnet,
-	5:        NetworkNameGoerli,
-	11155111: NetworkNameSepolia,
-	17000:    NetworkNameHolesky,
-	560048:   NetworkNameHoodi,
+	1:          NetworkNameMainnet,
+	5:          NetworkNameGoerli,
+	11155111:   NetworkNameSepolia,
+	17000:      NetworkNameHolesky,
+	560048:     NetworkNameHoodi,
+	7052886157: NetworkNameGlamsterdamDevnet6,
 }
 
 func DeriveFromGenesisRoot(genesisRoot string) *Network {
