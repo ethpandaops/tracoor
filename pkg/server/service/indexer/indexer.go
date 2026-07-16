@@ -684,6 +684,264 @@ func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.
 	return response, nil
 }
 
+func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *indexer.CreateExecutionPayloadEnvelopeRequest) (*indexer.CreateExecutionPayloadEnvelopeResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Check the store for the envelope
+	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField(KeyLocation, req.GetLocation().GetValue()).
+			WithField(KeyNode, req.GetNode().GetValue()).
+			Error("Failed to index an execution payload envelope because it could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if exists {
+		// Check if the envelope is already indexed
+		filter := &persistence.ExecutionPayloadEnvelopeFilter{}
+
+		filter.AddNetwork(req.GetNetwork().GetValue())
+		filter.AddSlot(req.GetSlot().GetValue())
+		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
+		filter.AddNode(req.GetNode().GetValue())
+
+		existing, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		if len(existing) > 0 {
+			return nil, status.Error(codes.AlreadyExists, "execution payload envelope already indexed")
+		}
+	}
+
+	// Create the envelope
+	envelope := &indexer.ExecutionPayloadEnvelope{
+		Id:                   wrapperspb.String(uuid.New().String()),
+		Node:                 req.GetNode(),
+		Network:              req.GetNetwork(),
+		Slot:                 req.GetSlot(),
+		Epoch:                req.GetEpoch(),
+		BlockRoot:            req.GetBlockRoot(),
+		NodeVersion:          req.GetNodeVersion(),
+		ContentEncoding:      req.GetContentEncoding(),
+		Location:             req.GetLocation(),
+		FetchedAt:            req.GetFetchedAt(),
+		BeaconImplementation: req.GetBeaconImplementation(),
+	}
+
+	if err := envelope.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	logFields := logrus.Fields{
+		KeyNode:                 req.GetNode().GetValue(),
+		KeyNetwork:              req.GetNetwork().GetValue(),
+		KeySlot:                 req.GetSlot().GetValue(),
+		KeyEpoch:                req.GetEpoch().GetValue(),
+		KeyBlockRoot:            req.GetBlockRoot().GetValue(),
+		KeyNodeVersion:          req.GetNodeVersion().GetValue(),
+		KeyContentEncoding:      req.GetContentEncoding().GetValue(),
+		KeyLocation:             req.GetLocation().GetValue(),
+		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
+		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
+	}
+
+	if err := i.db.InsertExecutionPayloadEnvelope(ctx, ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(envelope)); err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index execution payload envelope")
+
+		return nil, status.Error(codes.Internal, "failed to index execution payload envelope")
+	}
+
+	i.log.WithFields(logFields).WithField("id", envelope.GetId().GetValue()).Debug("Indexed execution payload envelope")
+
+	return &indexer.CreateExecutionPayloadEnvelopeResponse{
+		Id: envelope.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer.ListExecutionPayloadEnvelopeRequest) (*indexer.ListExecutionPayloadEnvelopeResponse, error) {
+	filter := &persistence.ExecutionPayloadEnvelopeFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:   1000,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+	}
+
+	envelopes, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	protoEnvelopes := make([]*indexer.ExecutionPayloadEnvelope, len(envelopes))
+	for i, envelope := range envelopes {
+		protoEnvelopes[i] = DBExecutionPayloadEnvelopeToProtoExecutionPayloadEnvelope(envelope)
+	}
+
+	return &indexer.ListExecutionPayloadEnvelopeResponse{
+		ExecutionPayloadEnvelopes: protoEnvelopes,
+	}, nil
+}
+
+func (i *Indexer) CountExecutionPayloadEnvelope(ctx context.Context, req *indexer.CountExecutionPayloadEnvelopeRequest) (*indexer.CountExecutionPayloadEnvelopeResponse, error) {
+	filter := &persistence.ExecutionPayloadEnvelopeFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
+
+	if req.Node != "" {
+		filter.AddNode(req.Node)
+	}
+
+	if req.Slot != 0 {
+		filter.AddSlot(req.Slot)
+	}
+
+	if req.Epoch != 0 {
+		filter.AddEpoch(req.Epoch)
+	}
+
+	if req.BlockRoot != "" {
+		filter.AddBlockRoot(req.BlockRoot)
+	}
+
+	if req.NodeVersion != "" {
+		filter.AddNodeVersion(req.NodeVersion)
+	}
+
+	if req.Location != "" {
+		filter.AddLocation(req.Location)
+	}
+
+	if req.Network != "" {
+		filter.AddNetwork(req.Network)
+	}
+
+	if req.Before != nil {
+		filter.AddBefore(req.Before.AsTime())
+	}
+
+	if req.After != nil {
+		filter.AddAfter(req.After.AsTime())
+	}
+
+	if req.BeaconImplementation != "" {
+		filter.AddBeaconImplementation(req.BeaconImplementation)
+	}
+
+	envelopes, err := i.db.CountExecutionPayloadEnvelope(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexer.CountExecutionPayloadEnvelopeResponse{
+		//nolint:gosec // not worried about int64 overflow here
+		Count: wrapperspb.UInt64(uint64(envelopes)),
+	}, nil
+}
+
+func (i *Indexer) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req *indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest) (*indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	fields := make([]string, len(req.Fields))
+
+	for idx, field := range req.Fields {
+		switch field {
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE:
+			fields[idx] = KeyNode
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_SLOT:
+			fields[idx] = KeySlot
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_EPOCH:
+			fields[idx] = KeyEpoch
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BLOCK_ROOT:
+			fields[idx] = KeyBlockRoot
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE_VERSION:
+			fields[idx] = KeyNodeVersion
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_LOCATION:
+			fields[idx] = KeyLocation
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NETWORK:
+			fields[idx] = KeyNetwork
+		case indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BEACON_IMPLEMENTATION:
+			fields[idx] = KeyBeaconImplementation
+		}
+	}
+
+	distinctValues, err := i.db.DistinctExecutionPayloadEnvelopeValues(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse{
+		Node:                 distinctValues.Node,
+		Slot:                 distinctValues.Slot,
+		Epoch:                distinctValues.Epoch,
+		BlockRoot:            distinctValues.BlockRoot,
+		NodeVersion:          distinctValues.NodeVersion,
+		Location:             distinctValues.Location,
+		Network:              distinctValues.Network,
+		BeaconImplementation: distinctValues.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
 func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateBeaconBadBlockRequest) (*indexer.CreateBeaconBadBlockResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

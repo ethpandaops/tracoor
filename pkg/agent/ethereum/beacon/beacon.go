@@ -81,6 +81,12 @@ func (b *Node) GetVersionImmuneBlock(ctx context.Context, blockID string) (*Vers
 	return block, nil
 }
 
+// FetchRawExecutionPayloadEnvelope fetches the raw signed execution payload
+// envelope for the given block id (gloas onwards).
+func (b *Node) FetchRawExecutionPayloadEnvelope(ctx context.Context, blockID, contentType string) ([]byte, error) {
+	return b.beacon.FetchRawExecutionPayloadEnvelope(ctx, blockID, contentType)
+}
+
 func (b *Node) Start(ctx context.Context) error {
 	s := gocron.NewScheduler(time.Local)
 

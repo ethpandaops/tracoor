@@ -4,6 +4,7 @@ import BeaconBlockInfo from '@components/BeaconBlockInfo';
 import BeaconStateInfo from '@components/BeaconStateInfo';
 import ExecutionBadBlockInfo from '@components/ExecutionBadBlockInfo';
 import ExecutionBlockTraceInfo from '@components/ExecutionBlockTraceInfo';
+import ExecutionPayloadEnvelopeInfo from '@components/ExecutionPayloadEnvelopeInfo';
 import GoEVMLabInfo from '@components/GoEVMLabInfo';
 import LCLIInfo from '@components/LCLIInfo';
 import NCLIInfo from '@components/NCLIInfo';
@@ -20,6 +21,9 @@ export default function Info() {
       break;
     case Selection.beacon_block:
       info = <BeaconBlockInfo />;
+      break;
+    case Selection.execution_payload_envelope:
+      info = <ExecutionPayloadEnvelopeInfo />;
       break;
     case Selection.beacon_bad_block:
       info = <BeaconBadBlockInfo />;

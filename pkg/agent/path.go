@@ -39,6 +39,22 @@ func CreateBeaconBlockFileName(
 	)
 }
 
+func CreateExecutionPayloadEnvelopeFileName(
+	node string,
+	network string,
+	slot phase0.Slot,
+	blockRoot string,
+) string {
+	return path.Join(
+		"execution_payload_envelopes",
+		network,
+		"slots",
+		fmt.Sprintf("%d", slot),
+		node,
+		blockRoot,
+	)
+}
+
 func CreateBeaconBadBlockFileName(
 	node string,
 	network string,

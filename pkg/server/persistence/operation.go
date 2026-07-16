@@ -17,6 +17,12 @@ const (
 	OperationListBeaconBlock   Operation = "list_beacon_block_metadata"
 	OperationUpdateBeaconBlock Operation = "update_beacon_block_metadata"
 
+	OperationInsertExecutionPayloadEnvelope Operation = "insert_execution_payload_envelope_metadata"
+	OperationDeleteExecutionPayloadEnvelope Operation = "delete_execution_payload_envelope_metadata"
+	OperationCountExecutionPayloadEnvelope  Operation = "count_execution_payload_envelope_metadata"
+	OperationListExecutionPayloadEnvelope   Operation = "list_execution_payload_envelope_metadata"
+	OperationUpdateExecutionPayloadEnvelope Operation = "update_execution_payload_envelope_metadata"
+
 	OperationInsertBeaconBadBlock Operation = "insert_beacon_bad_block_metadata"
 	OperationDeleteBeaconBadBlock Operation = "delete_beacon_bad_block_metadata"
 	OperationCountBeaconBadBlock  Operation = "count_beacon_bad_block_metadata"

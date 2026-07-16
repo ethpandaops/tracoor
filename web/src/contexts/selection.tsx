@@ -13,6 +13,7 @@ export default function useContext() {
 export enum Selection {
   beacon_state = 'beacon_state',
   beacon_block = 'beacon_block',
+  execution_payload_envelope = 'execution_payload_envelope',
   beacon_bad_block = 'beacon_bad_block',
   beacon_bad_blob = 'beacon_bad_blob',
   execution_block_trace = 'execution_block_trace',

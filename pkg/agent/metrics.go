@@ -19,12 +19,13 @@ type Metrics struct {
 type Queue string
 
 var (
-	BeaconStateQueue         Queue = "beacon_state"
-	BeaconBlockQueue         Queue = "beacon_block"
-	BeaconBadBlockQueue      Queue = "beacon_bad_block"
-	BeaconBadBlobQueue       Queue = "beacon_bad_blob"
-	ExecutionBlockTraceQueue Queue = "execution_block_trace"
-	ExecutionBadBlockQueue   Queue = "execution_bad_block"
+	BeaconStateQueue              Queue = "beacon_state"
+	BeaconBlockQueue              Queue = "beacon_block"
+	ExecutionPayloadEnvelopeQueue Queue = "execution_payload_envelope"
+	BeaconBadBlockQueue           Queue = "beacon_bad_block"
+	BeaconBadBlobQueue            Queue = "beacon_bad_blob"
+	ExecutionBlockTraceQueue      Queue = "execution_block_trace"
+	ExecutionBadBlockQueue        Queue = "execution_bad_block"
 )
 
 var (

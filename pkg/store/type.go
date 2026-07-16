@@ -22,11 +22,12 @@ func IsValidStoreType(st Type) bool {
 type DataType string
 
 const (
-	UnknownDataType        DataType = "unknown"
-	BeaconStateDataType    DataType = "beacon_state"
-	BeaconBlockDataType    DataType = "beacon_block"
-	BeaconBadBlockDataType DataType = "beacon_bad_block"
-	BeaconBadBlobDataType  DataType = "beacon_bad_blob"
-	BlockTraceDataType     DataType = "execution_block_trace"
-	BadBlockDataType       DataType = "execution_bad_block"
+	UnknownDataType                  DataType = "unknown"
+	BeaconStateDataType              DataType = "beacon_state"
+	BeaconBlockDataType              DataType = "beacon_block"
+	ExecutionPayloadEnvelopeDataType DataType = "execution_payload_envelope"
+	BeaconBadBlockDataType           DataType = "beacon_bad_block"
+	BeaconBadBlobDataType            DataType = "beacon_bad_blob"
+	BlockTraceDataType               DataType = "execution_block_trace"
+	BadBlockDataType                 DataType = "execution_bad_block"
 )

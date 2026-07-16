@@ -81,6 +81,42 @@ func DBBeaconBlockToProtoBeaconBlock(bs *persistence.BeaconBlock) *indexer.Beaco
 	}
 }
 
+func ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(bs *indexer.ExecutionPayloadEnvelope) *persistence.ExecutionPayloadEnvelope {
+	return &persistence.ExecutionPayloadEnvelope{
+		ID:   bs.GetId().GetValue(),
+		Node: bs.GetNode().GetValue(),
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: int64(bs.GetSlot().GetValue()),
+		//nolint:gosec // not worried about int64 overflow here
+		Epoch:                int64(bs.GetEpoch().GetValue()),
+		BlockRoot:            bs.GetBlockRoot().GetValue(),
+		FetchedAt:            bs.GetFetchedAt().AsTime(),
+		NodeVersion:          bs.GetNodeVersion().GetValue(),
+		Location:             bs.GetLocation().GetValue(),
+		ContentEncoding:      bs.GetContentEncoding().GetValue(),
+		Network:              bs.GetNetwork().GetValue(),
+		BeaconImplementation: bs.GetBeaconImplementation().GetValue(),
+	}
+}
+
+func DBExecutionPayloadEnvelopeToProtoExecutionPayloadEnvelope(bs *persistence.ExecutionPayloadEnvelope) *indexer.ExecutionPayloadEnvelope {
+	return &indexer.ExecutionPayloadEnvelope{
+		Id:   &wrapperspb.StringValue{Value: bs.ID},
+		Node: &wrapperspb.StringValue{Value: bs.Node},
+		//nolint:gosec // not worried about int64 overflow here
+		Slot: &wrapperspb.UInt64Value{Value: uint64(bs.Slot)},
+		//nolint:gosec // not worried about int64 overflow here
+		Epoch:                &wrapperspb.UInt64Value{Value: uint64(bs.Epoch)},
+		BlockRoot:            &wrapperspb.StringValue{Value: bs.BlockRoot},
+		FetchedAt:            timestamppb.New(bs.FetchedAt),
+		NodeVersion:          &wrapperspb.StringValue{Value: bs.NodeVersion},
+		Location:             &wrapperspb.StringValue{Value: bs.Location},
+		Network:              &wrapperspb.StringValue{Value: bs.Network},
+		ContentEncoding:      &wrapperspb.StringValue{Value: bs.ContentEncoding},
+		BeaconImplementation: &wrapperspb.StringValue{Value: bs.BeaconImplementation},
+	}
+}
+
 func ProtoBeaconBadBlockToDBBeaconBadBlock(bs *indexer.BeaconBadBlock) *persistence.BeaconBadBlock {
 	return &persistence.BeaconBadBlock{
 		ID:   bs.GetId().GetValue(),

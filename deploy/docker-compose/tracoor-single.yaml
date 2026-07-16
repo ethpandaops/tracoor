@@ -16,6 +16,7 @@ server:
         beaconStates: 1m
         executionBlockTraces: 15m
         beaconBlocks: 1m
+        executionPayloadEnvelopes: 1m
   # ethereum:
   #   network: devnet-name
   #   config:
@@ -38,6 +39,7 @@ agents:
       features:
         fetchBeaconState: true
         fetchBeaconBlock: true
+        fetchExecutionPayloadEnvelope: true
         fetchBeaconBadBlock: true
         fetchBeaconBadBlob: true
         fetchExecutionBlockTrace: true

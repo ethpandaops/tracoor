@@ -156,6 +156,34 @@ func (s *FSStore) DeleteBeaconBlock(ctx context.Context, location string) error 
 	return s.removeFile(path)
 }
 
+func (s *FSStore) SaveExecutionPayloadEnvelope(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
+
+	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	if err := s.saveFile(params.Data, path); err != nil {
+		return "", err
+	}
+
+	return params.Location, nil
+}
+
+func (s *FSStore) GetExecutionPayloadEnvelope(ctx context.Context, location string) (*[]byte, error) {
+	parts := strings.Split(location, "/")
+
+	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+}
+
+func (s *FSStore) GetExecutionPayloadEnvelopeURL(ctx context.Context, params *GetURLParams) (string, error) {
+	return "", errors.New("not supported")
+}
+
+func (s *FSStore) DeleteExecutionPayloadEnvelope(ctx context.Context, location string) error {
+	parts := strings.Split(location, "/")
+	path := filepath.Join(s.basePath, filepath.Join(parts...))
+
+	return s.removeFile(path)
+}
+
 func (s *FSStore) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
 	parts := strings.Split(params.Location, "/")
 

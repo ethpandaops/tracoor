@@ -35,6 +35,20 @@ message BeaconBlock {
   google.protobuf.StringValue content_encoding = 11;
 }
 
+message ExecutionPayloadEnvelope {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.StringValue node = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  google.protobuf.UInt64Value slot = 4;
+  google.protobuf.UInt64Value epoch = 5;
+  google.protobuf.StringValue block_root = 6;
+  google.protobuf.StringValue node_version = 7;
+  google.protobuf.StringValue location = 8;
+  google.protobuf.StringValue network = 9;
+  google.protobuf.StringValue beacon_implementation = 10;
+  google.protobuf.StringValue content_encoding = 11;
+}
+
 message BeaconBadBlock {
   google.protobuf.StringValue id = 1;
   google.protobuf.StringValue node = 2;
@@ -146,6 +160,17 @@ service Indexer {
       returns (CountBeaconBlockResponse) {}
   rpc ListUniqueBeaconBlockValues(ListUniqueBeaconBlockValuesRequest)
       returns (ListUniqueBeaconBlockValuesResponse) {}
+
+  // ExecutionPayloadEnvelope
+  rpc CreateExecutionPayloadEnvelope(CreateExecutionPayloadEnvelopeRequest)
+      returns (CreateExecutionPayloadEnvelopeResponse) {}
+  rpc ListExecutionPayloadEnvelope(ListExecutionPayloadEnvelopeRequest)
+      returns (ListExecutionPayloadEnvelopeResponse) {}
+  rpc CountExecutionPayloadEnvelope(CountExecutionPayloadEnvelopeRequest)
+      returns (CountExecutionPayloadEnvelopeResponse) {}
+  rpc ListUniqueExecutionPayloadEnvelopeValues(
+      ListUniqueExecutionPayloadEnvelopeValuesRequest)
+      returns (ListUniqueExecutionPayloadEnvelopeValuesResponse) {}
   // BeaconBadBlock
   rpc CreateBeaconBadBlock(CreateBeaconBadBlockRequest)
       returns (CreateBeaconBadBlockResponse) {}
@@ -228,6 +253,23 @@ message CreateBeaconBlockRequest {
 }
 
 message CreateBeaconBlockResponse { google.protobuf.StringValue id = 1; }
+
+message CreateExecutionPayloadEnvelopeRequest {
+  google.protobuf.StringValue node = 1;
+  google.protobuf.Timestamp fetched_at = 2;
+  google.protobuf.UInt64Value slot = 3;
+  google.protobuf.UInt64Value epoch = 4;
+  google.protobuf.StringValue block_root = 5;
+  google.protobuf.StringValue node_version = 6;
+  google.protobuf.StringValue location = 7;
+  google.protobuf.StringValue network = 8;
+  google.protobuf.StringValue beacon_implementation = 9;
+  google.protobuf.StringValue content_encoding = 10;
+}
+
+message CreateExecutionPayloadEnvelopeResponse {
+  google.protobuf.StringValue id = 1;
+}
 
 message CreateBeaconBadBlockRequest {
   google.protobuf.StringValue node = 1;
@@ -477,6 +519,69 @@ message ListUniqueBeaconBadBlockValuesResponse {
   repeated string location = 6;
   repeated string network = 7;
   repeated string beacon_implementation = 8;
+}
+
+message ListUniqueExecutionPayloadEnvelopeValuesRequest {
+  enum Field {
+    NODE = 0;
+    SLOT = 1;
+    EPOCH = 2;
+    BLOCK_ROOT = 3;
+    NODE_VERSION = 4;
+    LOCATION = 5;
+    NETWORK = 6;
+    BEACON_IMPLEMENTATION = 7;
+  }
+  repeated Field fields = 1;
+}
+
+message ListUniqueExecutionPayloadEnvelopeValuesResponse {
+  repeated string node = 1;
+  repeated uint64 slot = 2;
+  repeated uint64 epoch = 3;
+  repeated string block_root = 4;
+  repeated string node_version = 5;
+  repeated string location = 6;
+  repeated string network = 7;
+  repeated string beacon_implementation = 8;
+}
+
+message ListExecutionPayloadEnvelopeRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+
+  PaginationCursor pagination = 10;
+  string id = 11;
+  string beacon_implementation = 12;
+}
+
+message ListExecutionPayloadEnvelopeResponse {
+  repeated ExecutionPayloadEnvelope execution_payload_envelopes = 1;
+}
+
+message CountExecutionPayloadEnvelopeRequest {
+  string node = 1;
+  uint64 slot = 2;
+  uint64 epoch = 3;
+  string block_root = 4;
+  string node_version = 5;
+  string location = 6;
+  string network = 7;
+  google.protobuf.Timestamp before = 8;
+  google.protobuf.Timestamp after = 9;
+  string beacon_implementation = 10;
+  string id = 11;
+}
+
+message CountExecutionPayloadEnvelopeResponse {
+  google.protobuf.UInt64Value count = 1;
 }
 
 message ListBeaconBadBlockRequest {

@@ -22,6 +22,18 @@ export interface BeaconBlock {
   beacon_implementation: string;
 }
 
+export interface ExecutionPayloadEnvelope {
+  id: string;
+  node: string;
+  fetched_at: string;
+  slot: number;
+  epoch: number;
+  block_root: string;
+  node_version: string;
+  network: string;
+  beacon_implementation: string;
+}
+
 export interface BeaconBadBlock {
   id: string;
   node: string;
@@ -80,6 +92,15 @@ export type BeaconStateField =
   | 'beacon_implementation';
 
 export type BeaconBlockField =
+  | 'node'
+  | 'slot'
+  | 'epoch'
+  | 'block_root'
+  | 'node_version'
+  | 'network'
+  | 'beacon_implementation';
+
+export type ExecutionPayloadEnvelopeField =
   | 'node'
   | 'slot'
   | 'epoch'
@@ -216,6 +237,38 @@ export interface V1CountBeaconBlockRequest {
 
 export interface V1ListUniqueBeaconBlockValuesRequest {
   fields: BeaconBlockField[];
+}
+
+export interface V1ListExecutionPayloadEnvelopeRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1CountExecutionPayloadEnvelopeRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1ListUniqueExecutionPayloadEnvelopeValuesRequest {
+  fields: ExecutionPayloadEnvelopeField[];
 }
 
 export interface V1ListBeaconBadBlockRequest {
@@ -376,6 +429,24 @@ export interface V1CountBeaconBlockResponse {
 }
 
 export interface V1ListUniqueBeaconBlockValuesResponse {
+  node?: string[];
+  slot?: number[];
+  epoch?: number[];
+  block_root?: string[];
+  node_version?: string[];
+  network?: string[];
+  beacon_implementation?: string[];
+}
+
+export interface V1ListExecutionPayloadEnvelopeResponse {
+  execution_payload_envelopes?: ExecutionPayloadEnvelope[];
+}
+
+export interface V1CountExecutionPayloadEnvelopeResponse {
+  count?: number;
+}
+
+export interface V1ListUniqueExecutionPayloadEnvelopeValuesResponse {
   node?: string[];
   slot?: number[];
   epoch?: number[];

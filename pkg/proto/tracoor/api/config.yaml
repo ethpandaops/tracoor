@@ -25,6 +25,14 @@ http:
       body: "*"
     - selector: api.API.CountBeaconBlock
       post: /v1/api/count-beacon-block
+    - selector: api.API.ListExecutionPayloadEnvelope
+      post: /v1/api/list-execution-payload-envelope
+      body: "*"
+    - selector: api.API.ListUniqueExecutionPayloadEnvelopeValues
+      post: /v1/api/list-unique-execution-payload-envelope-values
+      body: "*"
+    - selector: api.API.CountExecutionPayloadEnvelope
+      post: /v1/api/count-execution-payload-envelope
       body: "*"
 
     - selector: api.API.ListBeaconBadBlock

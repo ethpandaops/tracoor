@@ -432,6 +432,92 @@ func (s *S3Store) DeleteBeaconBlock(ctx context.Context, location string) error 
 	return err
 }
 
+func (s *S3Store) SaveExecutionPayloadEnvelope(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
+		return "", errors.New("data is nil")
+	}
+
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+	if err != nil {
+		var apiErr smithy.APIError
+
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to save frame: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(ExecutionPayloadEnvelopeDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(ExecutionPayloadEnvelopeDataType), len(*params.Data))
+
+	return params.Location, err
+}
+
+func (s *S3Store) GetExecutionPayloadEnvelopeURL(ctx context.Context, params *GetURLParams) (string, error) {
+	url, err := s.getPresignedURL(ctx, params)
+	if err != nil {
+		return "", err
+	}
+
+	s.basicMetrics.ObserveItemURLRetreived(string(ExecutionPayloadEnvelopeDataType))
+
+	return url, nil
+}
+
+func (s *S3Store) GetExecutionPayloadEnvelope(ctx context.Context, location string) (*[]byte, error) {
+	s.basicMetrics.ObserveCacheMiss(string(ExecutionPayloadEnvelopeDataType))
+
+	data, err := s.GetRaw(ctx, location)
+	if err != nil {
+		return nil, err
+	}
+
+	s.basicMetrics.ObserveItemRetreived(string(ExecutionPayloadEnvelopeDataType))
+
+	b := data.Bytes()
+
+	return &b, nil
+}
+
+func (s *S3Store) DeleteExecutionPayloadEnvelope(ctx context.Context, location string) error {
+	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(location),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NotFound:
+				return ErrNotFound
+			default:
+				return errors.New("failed to delete: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemRemoved(string(ExecutionPayloadEnvelopeDataType))
+
+	return err
+}
+
 func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
 	if params.Data == nil {
 		return "", errors.New("data is nil")

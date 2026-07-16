@@ -13,12 +13,13 @@ import (
 
 func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 	i.log.WithFields(logrus.Fields{
-		"beacon_state":          i.config.Retention.BeaconStates.Duration,
-		"beacon_block":          i.config.Retention.BeaconBlocks.Duration,
-		"beacon_bad_block":      i.config.Retention.BeaconBadBlocks.Duration,
-		"beacon_bad_blob":       i.config.Retention.BeaconBadBlobs.Duration,
-		"execution_block_trace": i.config.Retention.ExecutionBlockTraces.Duration,
-		"execution_bad_block":   i.config.Retention.ExecutionBadBlocks.Duration,
+		"beacon_state":               i.config.Retention.BeaconStates.Duration,
+		"beacon_block":               i.config.Retention.BeaconBlocks.Duration,
+		"execution_payload_envelope": i.config.Retention.ExecutionPayloadEnvelopes.Duration,
+		"beacon_bad_block":           i.config.Retention.BeaconBadBlocks.Duration,
+		"beacon_bad_blob":            i.config.Retention.BeaconBadBlobs.Duration,
+		"execution_block_trace":      i.config.Retention.ExecutionBlockTraces.Duration,
+		"execution_bad_block":        i.config.Retention.ExecutionBadBlocks.Duration,
 	}).Info("Starting retention watcher")
 
 	for {
@@ -28,6 +29,10 @@ func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 
 		if err := i.purgeOldBeaconBlocks(ctx); err != nil {
 			i.log.WithError(err).Error("Failed to delete old beacon blocks")
+		}
+
+		if err := i.purgeOldExecutionPayloadEnvelopes(ctx); err != nil {
+			i.log.WithError(err).Error("Failed to delete old execution payload envelopes")
 		}
 
 		if err := i.purgeOldBeaconBadBlocks(ctx); err != nil {
@@ -156,6 +161,52 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 				"id":      block.ID,
 			},
 		).Debug("Deleted beacon block")
+	}
+
+	return nil
+}
+
+func (i *Indexer) purgeOldExecutionPayloadEnvelopes(ctx context.Context) error {
+	before := time.Now().Add(-i.config.Retention.ExecutionPayloadEnvelopes.Duration)
+
+	filter := &persistence.ExecutionPayloadEnvelopeFilter{
+		Before: &before,
+	}
+
+	envelopes, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	if err != nil {
+		return err
+	}
+
+	i.log.WithField("before", before).Debugf("Purging %d old execution payload envelopes", len(envelopes))
+
+	for _, envelope := range envelopes {
+		// Delete from the store first
+		if err := i.store.DeleteExecutionPayloadEnvelope(ctx, envelope.Location); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				i.log.WithField("envelope_id", envelope.ID).Warn("Execution payload envelope not found in store")
+			} else {
+				i.log.WithError(err).WithField("envelope_id", envelope.ID).Error("Failed to delete execution payload envelope from store, will retry next time")
+
+				continue
+			}
+		}
+
+		err := i.db.DeleteExecutionPayloadEnvelope(ctx, envelope.ID)
+		if err != nil {
+			i.log.WithError(err).WithField("envelope_id", envelope.ID).Error("Failed to delete execution payload envelope")
+
+			continue
+		}
+
+		i.log.WithFields(
+			logrus.Fields{
+				"node":    envelope.Node,
+				"network": envelope.Network,
+				"slot":    envelope.Slot,
+				"id":      envelope.ID,
+			},
+		).Debug("Deleted execution payload envelope")
 	}
 
 	return nil

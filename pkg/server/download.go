@@ -53,6 +53,10 @@ func (d *ObjectDownloader) Start() error {
 		return fmt.Errorf("failed to register beacon block download handler: %v", err)
 	}
 
+	if err := d.mux.HandlePath("GET", "/download/execution_payload_envelope/{id}", d.executionPayloadEnvelopeHandler); err != nil {
+		return fmt.Errorf("failed to register execution payload envelope download handler: %v", err)
+	}
+
 	if err := d.mux.HandlePath("GET", "/download/beacon_bad_block/{id}", d.beaconBadBlockHandler); err != nil {
 		return fmt.Errorf("failed to register beacon bad block download handler: %v", err)
 	}
@@ -235,6 +239,94 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 	if err == nil {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		filename = compression.RemoveExtension(filename)
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+	_, err = w.Write(*data)
+	if err != nil {
+		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
+func (d *ObjectDownloader) executionPayloadEnvelopeHandler(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	ctx := r.Context()
+
+	id := pathParams["id"]
+	if id == "" {
+		d.writeJSONError(w, "No ID provided", http.StatusBadRequest)
+
+		return
+	}
+
+	resp, err := d.indexer.ListExecutionPayloadEnvelope(ctx, &indexer.ListExecutionPayloadEnvelopeRequest{
+		Id: id,
+		Pagination: &indexer.PaginationCursor{
+			Limit: 1,
+		},
+	})
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to list execution payload envelopes for ID %s", id)
+
+		d.writeJSONError(w, "Failed to list execution payload envelopes", http.StatusInternalServerError)
+
+		return
+	}
+
+	if len(resp.ExecutionPayloadEnvelopes) == 0 {
+		d.writeJSONError(w, "No execution payload envelopes found", http.StatusNotFound)
+
+		return
+	}
+
+	if len(resp.ExecutionPayloadEnvelopes) > 1 {
+		d.writeJSONError(w, "More than one execution payload envelope found", http.StatusInternalServerError)
+
+		return
+	}
+
+	envelope := resp.ExecutionPayloadEnvelopes[0]
+
+	if d.store.PreferURLs() {
+		var itemURL string
+
+		itemURL, err = d.store.GetExecutionPayloadEnvelopeURL(ctx, &tStore.GetURLParams{
+			Location:        envelope.Location.Value,
+			Expiry:          3600,
+			ContentEncoding: envelope.ContentEncoding.GetValue(),
+		})
+		if err != nil {
+			d.log.WithError(err).Errorf("Failed to get URL for execution payload envelope ID %s", id)
+			d.writeJSONError(w, "Failed to get URL for item", http.StatusInternalServerError)
+
+			return
+		}
+
+		http.Redirect(w, r, itemURL, http.StatusTemporaryRedirect)
+
+		return
+	}
+
+	data, err := d.store.GetExecutionPayloadEnvelope(ctx, envelope.Location.Value)
+	if err != nil {
+		d.log.WithError(err).Errorf("Failed to get execution payload envelope from store for ID %s from %s", id, envelope.Location.Value)
+
+		d.writeJSONError(w, "Failed to get execution payload envelope", http.StatusInternalServerError)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", string(mime.GetContentTypeFromExtension(filepath.Ext(envelope.Location.Value))))
+
+	filename := filepath.Base(envelope.Location.Value)
+
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(envelope.ContentEncoding.GetValue())
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+	} else if compression.HasCompressionExtension(envelope.Location.Value, algo) {
 		w.Header().Set("Content-Encoding", algo.ContentEncoding)
 
 		filename = compression.RemoveExtension(filename)

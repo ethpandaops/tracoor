@@ -46,12 +46,13 @@ type agent struct {
 
 	store store.Store
 
-	beaconStateQueue         chan *BeaconStateRequest
-	beaconBlockQueue         chan *BeaconBlockRequest
-	beaconBadBlockQueue      chan *BeaconBadBlockRequest
-	beaconBadBlobQueue       chan *BeaconBadBlobRequest
-	executionBlockTraceQueue chan *ExecutionBlockTraceRequest
-	executionBadBlockQueue   chan *ExecutionBadBlockRequest
+	beaconStateQueue              chan *BeaconStateRequest
+	beaconBlockQueue              chan *BeaconBlockRequest
+	executionPayloadEnvelopeQueue chan *ExecutionPayloadEnvelopeRequest
+	beaconBadBlockQueue           chan *BeaconBadBlockRequest
+	beaconBadBlobQueue            chan *BeaconBadBlobRequest
+	executionBlockTraceQueue      chan *ExecutionBlockTraceRequest
+	executionBadBlockQueue        chan *ExecutionBadBlockRequest
 
 	compressor *compression.Compressor
 }
@@ -80,20 +81,21 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}
 
 	return &agent{
-		Config:                   config,
-		node:                     node,
-		log:                      log,
-		metrics:                  GetMetricsInstance(namespace),
-		scheduler:                gocron.NewScheduler(time.Local),
-		indexer:                  indexerClient,
-		store:                    st,
-		beaconStateQueue:         make(chan *BeaconStateRequest, 1000),
-		beaconBlockQueue:         make(chan *BeaconBlockRequest, 1000),
-		beaconBadBlockQueue:      make(chan *BeaconBadBlockRequest, 1000),
-		beaconBadBlobQueue:       make(chan *BeaconBadBlobRequest, 1000),
-		executionBlockTraceQueue: make(chan *ExecutionBlockTraceRequest, 1000),
-		executionBadBlockQueue:   make(chan *ExecutionBadBlockRequest, 1000),
-		compressor:               compression.NewCompressor(),
+		Config:                        config,
+		node:                          node,
+		log:                           log,
+		metrics:                       GetMetricsInstance(namespace),
+		scheduler:                     gocron.NewScheduler(time.Local),
+		indexer:                       indexerClient,
+		store:                         st,
+		beaconStateQueue:              make(chan *BeaconStateRequest, 1000),
+		beaconBlockQueue:              make(chan *BeaconBlockRequest, 1000),
+		executionPayloadEnvelopeQueue: make(chan *ExecutionPayloadEnvelopeRequest, 1000),
+		beaconBadBlockQueue:           make(chan *BeaconBadBlockRequest, 1000),
+		beaconBadBlobQueue:            make(chan *BeaconBadBlobRequest, 1000),
+		executionBlockTraceQueue:      make(chan *ExecutionBlockTraceRequest, 1000),
+		executionBadBlockQueue:        make(chan *ExecutionBadBlockRequest, 1000),
+		compressor:                    compression.NewCompressor(),
 	}, nil
 }
 
@@ -163,6 +165,7 @@ func (s *agent) Start(ctx context.Context) error {
 
 		go s.processBeaconStateQueue(ctx)
 		go s.processBeaconBlockQueue(ctx)
+		go s.processExecutionPayloadEnvelopeQueue(ctx)
 		go s.processBeaconBadBlockQueue(ctx)
 		go s.processBeaconBadBlobQueue(ctx)
 
@@ -192,6 +195,7 @@ func (s *agent) Start(ctx context.Context) error {
 
 			s.enqueueBeaconState(ctx, event.Slot)
 			s.enqueueBeaconBlock(ctx, event.Slot)
+			s.enqueueExecutionPayloadEnvelope(ctx, event.Slot)
 
 			return nil
 		})
@@ -225,6 +229,7 @@ func (s *agent) Start(ctx context.Context) error {
 
 				s.enqueueBeaconState(ctx, slot)
 				s.enqueueBeaconBlock(ctx, slot)
+				s.enqueueExecutionPayloadEnvelope(ctx, slot)
 			}
 
 			// Go back and fetch all the new execution block traces

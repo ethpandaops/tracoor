@@ -366,6 +366,139 @@ func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniq
 	return response, nil
 }
 
+func (i *API) ListExecutionPayloadEnvelope(ctx context.Context, req *api.ListExecutionPayloadEnvelopeRequest) (*api.ListExecutionPayloadEnvelopeResponse, error) {
+	pagination := &indexer.PaginationCursor{
+		Limit:   100,
+		Offset:  0,
+		OrderBy: "fetched_at DESC",
+	}
+
+	if req.Pagination != nil {
+		pagination = &indexer.PaginationCursor{
+			Limit:   req.Pagination.Limit,
+			Offset:  req.Pagination.Offset,
+			OrderBy: req.Pagination.OrderBy,
+		}
+	}
+
+	rq := &indexer.ListExecutionPayloadEnvelopeRequest{
+		Id:                   req.Id,
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		Before:               req.Before,
+		After:                req.After,
+		BeaconImplementation: req.BeaconImplementation,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListExecutionPayloadEnvelope(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list execution payload envelopes: %w", err).Error())
+	}
+
+	protoEnvelopes := make([]*api.ExecutionPayloadEnvelope, len(resp.ExecutionPayloadEnvelopes))
+	for i, envelope := range resp.ExecutionPayloadEnvelopes {
+		protoEnvelopes[i] = &api.ExecutionPayloadEnvelope{
+			Id:                   envelope.Id,
+			Node:                 envelope.Node,
+			Slot:                 envelope.Slot,
+			Epoch:                envelope.Epoch,
+			BlockRoot:            envelope.BlockRoot,
+			NodeVersion:          envelope.NodeVersion,
+			Network:              envelope.Network,
+			FetchedAt:            envelope.FetchedAt,
+			BeaconImplementation: envelope.BeaconImplementation,
+		}
+	}
+
+	return &api.ListExecutionPayloadEnvelopeResponse{
+		ExecutionPayloadEnvelopes: protoEnvelopes,
+	}, nil
+}
+
+func (i *API) CountExecutionPayloadEnvelope(ctx context.Context, req *api.CountExecutionPayloadEnvelopeRequest) (*api.CountExecutionPayloadEnvelopeResponse, error) {
+	rq := &indexer.CountExecutionPayloadEnvelopeRequest{
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		BeaconImplementation: req.BeaconImplementation,
+		Before:               req.Before,
+		After:                req.After,
+	}
+
+	resp, err := i.indexer.CountExecutionPayloadEnvelope(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count execution payload envelopes: %w", err).Error())
+	}
+
+	return &api.CountExecutionPayloadEnvelopeResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
+func (i *API) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req *api.ListUniqueExecutionPayloadEnvelopeValuesRequest) (*api.ListUniqueExecutionPayloadEnvelopeValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest{
+		Fields: []indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field{},
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_node:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_node_version:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE_VERSION
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_network:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NETWORK
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_slot:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_SLOT
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_epoch:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_EPOCH
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_block_root:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BLOCK_ROOT
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_beacon_implementation:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BEACON_IMPLEMENTATION
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueExecutionPayloadEnvelopeValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique execution payload envelope values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueExecutionPayloadEnvelopeValuesResponse{
+		Node:                 resp.Node,
+		Slot:                 resp.Slot,
+		Epoch:                resp.Epoch,
+		BlockRoot:            resp.BlockRoot,
+		NodeVersion:          resp.NodeVersion,
+		Network:              resp.Network,
+		BeaconImplementation: resp.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
 func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBlockRequest) (*api.ListBeaconBadBlockResponse, error) {
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
