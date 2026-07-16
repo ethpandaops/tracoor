@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/sirupsen/logrus"

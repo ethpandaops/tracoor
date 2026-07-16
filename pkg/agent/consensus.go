@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/mime"

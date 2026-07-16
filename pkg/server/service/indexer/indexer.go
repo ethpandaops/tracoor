@@ -3,7 +3,7 @@ package indexer
 import (
 	"context"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/server/ethereum"
 	"github.com/ethpandaops/tracoor/pkg/server/persistence"

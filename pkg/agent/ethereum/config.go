@@ -3,7 +3,7 @@ package ethereum
 import (
 	"fmt"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 )

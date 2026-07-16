@@ -23,11 +23,13 @@ jobs:
           # Strip the 'refs/tags/' prefix
           TAG_NAME=${GITHUB_REF#refs/tags/}
 
-          # Extract suffix from tag name after the last '-' (e.g., 'dencun' from 'v1.0.0-dencun')
-          RELEASE_SUFFIX=${TAG_NAME##*-}
-
-          # Check if the suffix is still a version pattern (e.g., 'v0.0.44'), in which case there's no suffix
-          if [[ $RELEASE_SUFFIX =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          # A release-branch tag is a semver core followed by everything after the
+          # FIRST '-' (e.g. 'glamsterdam-devnet-7' from '0.0.1-glamsterdam-devnet-7',
+          # 'dencun' from 'v1.0.0-dencun'). Anchoring on the semver core keeps
+          # multi-word suffixes intact and leaves plain 'vX.Y.Z' tags unsuffixed.
+          if [[ $TAG_NAME =~ ^v?[0-9]+\.[0-9]+\.[0-9]+-(.+)$ ]]; then
+            RELEASE_SUFFIX="${BASH_REMATCH[1]}"
+          else
             RELEASE_SUFFIX=""
           fi
 
@@ -38,7 +40,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
         with:
-          go-version: '1.24.x'
+          go-version-file: 'go.mod'
       - uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7 # v3.8.2
         name: Set up Node
         with:

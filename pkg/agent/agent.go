@@ -15,9 +15,10 @@ import (
 	//nolint:gosec // only exposed if pprofAddr config is set
 	_ "net/http/pprof"
 
-	eth2v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	eth2v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
+	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 	"github.com/ethpandaops/tracoor/pkg/agent/indexer"
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/networks"
@@ -96,7 +97,6 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 	}, nil
 }
 
-//nolint:gocyclo // this is a complex function but most of it is event callbacks
 func (s *agent) Start(ctx context.Context) error {
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
@@ -146,33 +146,11 @@ func (s *agent) Start(ctx context.Context) error {
 				return nil
 			}
 
-			// Fetch the beacon block from the beacon node.
-			block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, fmt.Sprintf("%#x", event.Block))
-			if err != nil {
-				logCtx.WithError(err).Error("Failed to fetch beacon block")
+			if err := s.enqueueExecutionBlockTraceForBeaconBlock(ctx, fmt.Sprintf("%#x", event.Block)); err != nil {
+				logCtx.WithError(err).Error("Failed to queue execution block trace from beacon block event")
 
 				return err
 			}
-
-			if block == nil {
-				logCtx.Error("Failed to fetch beacon block - the beacon node returned a nil block.")
-
-				return errors.New("failed to fetch beacon block")
-			}
-
-			// Rip out the execution block number from the block
-			executionBlockNumber := block.Data.Message.Body.ExecutionPayload.BlockNumber
-
-			executionBlockHash := block.Data.Message.Body.ExecutionPayload.BlockHash
-
-			executionBlockNumberUint, err := strconv.ParseUint(executionBlockNumber, 10, 64)
-			if err != nil {
-				logCtx.WithError(err).Error("Failed to parse execution block number when processing beacon block event")
-
-				return err
-			}
-
-			s.enqueueExecutionBlockTrace(ctx, executionBlockHash, executionBlockNumberUint)
 
 			return nil
 		})
@@ -257,32 +235,13 @@ func (s *agent) Start(ctx context.Context) error {
 
 				logCtx := logrus.WithField("target_slot", slot)
 
-				// Fetch a version immune beacon block from the beacon node.
-				block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, fmt.Sprintf("%d", slot))
-				if err != nil {
-					logCtx.WithError(err).Error("Failed to fetch beacon block")
+				logCtx.Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
+
+				if err := s.enqueueExecutionBlockTraceForBeaconBlock(ctx, fmt.Sprintf("%d", slot)); err != nil {
+					logCtx.WithError(err).Error("Failed to queue execution block trace after a beacon chain reorg")
 
 					return err
 				}
-
-				// Rip out the execution block number from the block
-				executionBlockNumber := block.Data.Message.Body.ExecutionPayload.BlockNumber
-
-				executionBlockHash := block.Data.Message.Body.ExecutionPayload.BlockHash
-
-				executionBlockNumberUint, err := strconv.ParseUint(executionBlockNumber, 10, 64)
-				if err != nil {
-					logCtx.WithError(err).Error("Failed to parse execution block number when processing beacon block event")
-
-					return err
-				}
-
-				logCtx.WithFields(logrus.Fields{
-					"execution_block_number": executionBlockNumber,
-					"execution_block_hash":   executionBlockHash,
-				}).Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
-
-				s.enqueueExecutionBlockTrace(ctx, executionBlockHash, executionBlockNumberUint)
 			}
 
 			return nil
@@ -409,6 +368,83 @@ func (s *agent) ServePProf(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+const (
+	executionBlockNumberResolveAttempts = 5
+	executionBlockNumberResolveDelay    = 3 * time.Second
+)
+
+// enqueueExecutionBlockTraceForBeaconBlock resolves the execution block a
+// beacon block commits to and queues a trace fetch for it. Pre-gloas blocks
+// embed the execution payload, so the block number is read straight off the
+// block. Gloas (ePBS) blocks only commit to the payload's block hash via the
+// bid, so the number is resolved from the execution node with a bounded
+// retry to give the builder time to reveal the payload.
+func (s *agent) enqueueExecutionBlockTraceForBeaconBlock(ctx context.Context, blockID string) error {
+	block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, blockID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch beacon block: %w", err)
+	}
+
+	if block == nil {
+		return errors.New("beacon node returned a nil block")
+	}
+
+	payload := block.Data.Message.Body.ExecutionPayload
+	if payload.BlockHash != "" {
+		blockNumber, perr := strconv.ParseUint(payload.BlockNumber, 10, 64)
+		if perr != nil {
+			return fmt.Errorf("failed to parse execution block number: %w", perr)
+		}
+
+		s.enqueueExecutionBlockTrace(ctx, payload.BlockHash, blockNumber)
+
+		return nil
+	}
+
+	bidBlockHash := block.Data.Message.Body.SignedExecutionPayloadBid.Message.BlockHash
+	if bidBlockHash == "" {
+		return errors.New("beacon block contains no execution payload or execution payload bid")
+	}
+
+	blockNumber, err := s.resolveExecutionBlockNumber(ctx, bidBlockHash)
+	if err != nil {
+		return fmt.Errorf("failed to resolve execution block number for bid block hash %s: %w", bidBlockHash, err)
+	}
+
+	s.enqueueExecutionBlockTrace(ctx, bidBlockHash, blockNumber)
+
+	return nil
+}
+
+// resolveExecutionBlockNumber looks up an execution block number by hash,
+// retrying while the execution node reports the block as unknown.
+func (s *agent) resolveExecutionBlockNumber(ctx context.Context, blockHash string) (uint64, error) {
+	var lastErr error
+
+	for attempt := 0; attempt < executionBlockNumberResolveAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			case <-time.After(executionBlockNumberResolveDelay):
+			}
+		}
+
+		number, err := s.node.Execution().GetBlockNumberByHash(ctx, blockHash)
+		if err == nil {
+			return number, nil
+		}
+
+		if !errors.Is(err, execution.ErrBlockNotFound) {
+			return 0, err
+		}
+
+		lastErr = err
+	}
+
+	return 0, lastErr
 }
 
 func rootAsString(r phase0.Root) string {
