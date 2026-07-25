@@ -49,10 +49,40 @@ func (s *FSStore) Healthy(ctx context.Context) error {
 	return nil
 }
 
-func (s *FSStore) Exists(ctx context.Context, location string) (bool, error) {
+// resolve turns a location into an absolute path rooted at the store's base
+// path, and rejects it if the resolved path would fall outside that base
+// path (for example because location contains ".." segments or is an
+// absolute path of its own). Every method that turns a caller-supplied
+// location into a filesystem path must go through this, since location
+// values are not otherwise validated before reaching the store.
+func (s *FSStore) resolve(location string) (string, error) {
 	parts := strings.Split(location, "/")
+	joined := filepath.Join(s.basePath, filepath.Join(parts...))
 
-	_, err := os.Stat(filepath.Join(s.basePath, filepath.Join(parts...)))
+	base, err := filepath.Abs(s.basePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve base path: %w", err)
+	}
+
+	resolved, err := filepath.Abs(joined)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve location: %w", err)
+	}
+
+	if resolved != base && !strings.HasPrefix(resolved, base+string(filepath.Separator)) {
+		return "", fmt.Errorf("%w: location %q resolves outside the store's base path", ErrInvalid, location)
+	}
+
+	return resolved, nil
+}
+
+func (s *FSStore) Exists(ctx context.Context, location string) (bool, error) {
+	path, err := s.resolve(location)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -83,10 +113,6 @@ func (s *FSStore) saveFile(data *[]byte, path string) error {
 	return nil
 }
 
-func (s *FSStore) constructLocation(parts ...string) string {
-	return filepath.Join(parts...)
-}
-
 func (s *FSStore) getFile(path string) (*[]byte, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -101,9 +127,11 @@ func (s *FSStore) removeFile(path string) error {
 }
 
 func (s *FSStore) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -112,9 +140,12 @@ func (s *FSStore) SaveBeaconState(ctx context.Context, params *SaveParams) (stri
 }
 
 func (s *FSStore) GetBeaconState(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
-	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.getFile(path)
 }
 
 func (s *FSStore) GetBeaconStateURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -122,16 +153,20 @@ func (s *FSStore) GetBeaconStateURL(ctx context.Context, params *GetURLParams) (
 }
 
 func (s *FSStore) DeleteBeaconState(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
 	return s.removeFile(path)
 }
 
 func (s *FSStore) SaveBeaconBlock(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -140,9 +175,12 @@ func (s *FSStore) SaveBeaconBlock(ctx context.Context, params *SaveParams) (stri
 }
 
 func (s *FSStore) GetBeaconBlock(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
-	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.getFile(path)
 }
 
 func (s *FSStore) GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -150,16 +188,20 @@ func (s *FSStore) GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (
 }
 
 func (s *FSStore) DeleteBeaconBlock(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
 	return s.removeFile(path)
 }
 
 func (s *FSStore) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -168,8 +210,10 @@ func (s *FSStore) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (s
 }
 
 func (s *FSStore) GetBeaconBadBlock(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
 	return s.getFile(path)
 }
@@ -179,16 +223,20 @@ func (s *FSStore) GetBeaconBadBlockURL(ctx context.Context, params *GetURLParams
 }
 
 func (s *FSStore) DeleteBeaconBadBlock(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
 	return s.removeFile(path)
 }
 
 func (s *FSStore) SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -197,9 +245,12 @@ func (s *FSStore) SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (st
 }
 
 func (s *FSStore) GetBeaconBadBlob(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
-	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.getFile(path)
 }
 
 func (s *FSStore) GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -207,16 +258,20 @@ func (s *FSStore) GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams)
 }
 
 func (s *FSStore) DeleteBeaconBadBlob(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
 	return s.removeFile(path)
 }
 
 func (s *FSStore) SaveExecutionBlockTrace(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -225,9 +280,12 @@ func (s *FSStore) SaveExecutionBlockTrace(ctx context.Context, params *SaveParam
 }
 
 func (s *FSStore) GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
-	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.getFile(path)
 }
 
 func (s *FSStore) GetExecutionBlockTraceURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -235,16 +293,20 @@ func (s *FSStore) GetExecutionBlockTraceURL(ctx context.Context, params *GetURLP
 }
 
 func (s *FSStore) DeleteExecutionBlockTrace(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
 	return s.removeFile(path)
 }
 
 func (s *FSStore) SaveExecutionBadBlock(ctx context.Context, params *SaveParams) (string, error) {
-	parts := strings.Split(params.Location, "/")
+	path, err := s.resolve(params.Location)
+	if err != nil {
+		return "", err
+	}
 
-	path := filepath.Join(s.basePath, filepath.Join(parts...))
 	if err := s.saveFile(params.Data, path); err != nil {
 		return "", err
 	}
@@ -253,9 +315,12 @@ func (s *FSStore) SaveExecutionBadBlock(ctx context.Context, params *SaveParams)
 }
 
 func (s *FSStore) GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error) {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return nil, err
+	}
 
-	return s.getFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.getFile(path)
 }
 
 func (s *FSStore) GetExecutionBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -263,9 +328,12 @@ func (s *FSStore) GetExecutionBadBlockURL(ctx context.Context, params *GetURLPar
 }
 
 func (s *FSStore) DeleteExecutionBadBlock(ctx context.Context, location string) error {
-	parts := strings.Split(location, "/")
+	path, err := s.resolve(location)
+	if err != nil {
+		return err
+	}
 
-	return s.removeFile(filepath.Join(s.basePath, filepath.Join(parts...)))
+	return s.removeFile(path)
 }
 
 func (s *FSStore) PathPrefix() string {
@@ -277,31 +345,27 @@ func (s *FSStore) PreferURLs() bool {
 }
 
 func (s *FSStore) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {
-	location := s.constructLocation("handshake_tokens", node)
-
-	exists, err := s.Exists(ctx, location)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
+	return s.Exists(ctx, filepath.Join("handshake_tokens", node))
 }
 
 func (s *FSStore) SaveStorageHandshakeToken(ctx context.Context, node, data string) error {
-	location := s.constructLocation(s.basePath, "handshake_tokens", node)
-	dataBytes := []byte(data)
-
-	if err := s.saveFile(&dataBytes, location); err != nil {
+	path, err := s.resolve(filepath.Join("handshake_tokens", node))
+	if err != nil {
 		return err
 	}
 
-	return nil
+	dataBytes := []byte(data)
+
+	return s.saveFile(&dataBytes, path)
 }
 
 func (s *FSStore) GetStorageHandshakeToken(ctx context.Context, node string) (string, error) {
-	location := s.constructLocation(s.basePath, "handshake_tokens", node)
+	path, err := s.resolve(filepath.Join("handshake_tokens", node))
+	if err != nil {
+		return "", err
+	}
 
-	data, err := s.getFile(location)
+	data, err := s.getFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -314,8 +378,15 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 		return errors.New("source and destination are required")
 	}
 
-	source := filepath.Join(s.basePath, params.Source)
-	destination := filepath.Join(s.basePath, params.Destination)
+	source, err := s.resolve(params.Source)
+	if err != nil {
+		return err
+	}
+
+	destination, err := s.resolve(params.Destination)
+	if err != nil {
+		return err
+	}
 
 	if err := s.ensureDir(destination); err != nil {
 		return err
@@ -328,7 +399,7 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 	}
 
 	// Write to the destination file
-	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // path is constructed from validated basePath
+	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // destination is validated by resolve()
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 
