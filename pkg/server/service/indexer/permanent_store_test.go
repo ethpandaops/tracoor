@@ -92,7 +92,7 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 
 	t.Run("queue and process block", func(t *testing.T) {
 		// Queue a block for processing with a channel
-		processChan := make(chan struct{})
+		processChan := make(chan error, 1)
 		blockInfo := PermanentStoreBlock{
 			Location:      blockLocation,
 			BlockRoot:     "0x1234",
@@ -153,7 +153,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	// Queue a block for processing with a channel
-	processChan1 := make(chan struct{})
+	processChan1 := make(chan error, 1)
 	blockInfo := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
@@ -191,7 +191,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
 
 	// Process the same block again with a new channel
-	processChan2 := make(chan struct{})
+	processChan2 := make(chan error, 1)
 	blockInfo2 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
@@ -253,7 +253,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		BlockRoot:     "0x1234",
 		Network:       "mainnet",
 		Slot:          123,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan error, 1),
 	}
 
 	// Second block
@@ -262,7 +262,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		BlockRoot:     "0x1234", // Same root
 		Network:       "goerli", // Different network
 		Slot:          123,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan error, 1),
 	}
 
 	permanentStore.QueueBlock(blockInfo1)
@@ -379,7 +379,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
 		Network:       "mainnet",
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan error, 1),
 	}
 
 	permanentStore1.QueueBlock(blockInfo1)
@@ -420,7 +420,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
 		Network:       "mainnet",
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan error, 1),
 	}
 
 	permanentStore2.QueueBlock(blockInfo2)
@@ -456,7 +456,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a channel to track when processing is complete
-	processChan := make(chan struct{})
+	processChan := make(chan error, 1)
 
 	// Queue a block for processing with the channel
 	blockInfo := PermanentStoreBlock{
@@ -486,7 +486,7 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Now test the stop procedure with a block in the queue
 	// Queue another block before stopping
-	processChan2 := make(chan struct{})
+	processChan2 := make(chan error, 1)
 	queuedBlock := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xqueued",
@@ -534,7 +534,7 @@ func TestPermanentStoreStop(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xunprocessed",
 		Network:       "mainnet",
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan error, 1),
 		Slot:          3,
 	}
 	permanentStore.QueueBlock(unprocessedBlock)
@@ -583,7 +583,7 @@ func TestPermanentStoreLocation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify we can find blocks by querying the permanent block table
-	processChan := make(chan struct{})
+	processChan := make(chan error, 1)
 	blockInfo.ProcessedChan = processChan
 
 	// Queue the block for processing

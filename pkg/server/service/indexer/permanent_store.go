@@ -20,7 +20,7 @@ type PermanentStoreBlock struct {
 	BlockRoot     string
 	Network       string
 	Slot          phase0.Slot
-	ProcessedChan chan struct{}
+	ProcessedChan chan error
 }
 
 // PermanentStore ensures that at least one copy of each block per network is retained
@@ -110,12 +110,21 @@ func (p *PermanentStore) IsEnabled() bool {
 
 // QueueBlock adds a block to the queue for processing.
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
-	// Check if the permanent store is enabled
+	// Check if the permanent store is enabled. There was never a permanence
+	// guarantee to keep in a deployment where this feature isn't turned on,
+	// so this is reported as success rather than failure.
 	if !p.IsEnabled() {
+		sendProcessedResult(block, nil)
+
 		return
 	}
 
+	// The store is shutting down. Unlike being disabled, this is a transient
+	// state: the block wasn't archived, so callers waiting on the result
+	// should treat it as not yet safe to act on rather than as success.
 	if p.stopped {
+		sendProcessedResult(block, fmt.Errorf("permanent store is stopped"))
+
 		return
 	}
 
@@ -132,6 +141,22 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			"network":    block.Network,
 			"location":   block.Location,
 		}).Warn("Failed to queue block for permanent storage, queue is full")
+
+		sendProcessedResult(block, fmt.Errorf("permanent store queue is full"))
+	}
+}
+
+// sendProcessedResult reports the outcome of attempting to process a block,
+// if the caller asked to be told (ProcessedChan is non-nil). The channel is
+// expected to be buffered by at least one slot, so this never blocks.
+func sendProcessedResult(block PermanentStoreBlock, err error) {
+	if block.ProcessedChan == nil {
+		return
+	}
+
+	select {
+	case block.ProcessedChan <- err:
+	default:
 	}
 }
 
@@ -163,16 +188,16 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 	}
 }
 
-// processBlock processes a single block.
-func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreBlock) error {
+// processBlock processes a single block. The named return value is reported
+// back to whoever is waiting on block.ProcessedChan, so every exit path
+// (including the early returns below) must leave err set correctly rather
+// than swallowing a failure.
+func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreBlock) (err error) {
 	// Create a cache key for this block
 	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
 
-	// Close the processed channel so that the caller can wait for the block to be processed
 	defer func() {
-		if block.ProcessedChan != nil {
-			close(block.ProcessedChan)
-		}
+		sendProcessedResult(block, err)
 	}()
 
 	// Check if we've already processed this block
@@ -190,8 +215,6 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 	// Try to acquire a distributed lock with retries
 	var acquired bool
-
-	var err error
 
 	retryInterval := 200 * time.Millisecond
 	maxRetryDuration := 35 * time.Second
@@ -285,9 +308,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}
 
 	// Check if block is already recorded in database before checking the store
-	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
-	if err != nil {
-		p.log.WithError(err).WithFields(logrus.Fields{
+	permanentBlock, lookupErr := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
+	if lookupErr != nil {
+		p.log.WithError(lookupErr).WithFields(logrus.Fields{
 			"block_root": block.BlockRoot,
 			"network":    block.Network,
 		}).Error("Failed to check if block is already recorded in database")
@@ -319,27 +342,31 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			"location":   permanentLocation,
 		}).Debug("Block already exists in permanent location")
 
-		// Add to cache to avoid future checks
-		p.cache.Add(cacheKey, true)
-
-		// Ensure the block is recorded in the database even if it already exists in storage
-		if perr := p.recordPermanentBlock(ctx, block); perr != nil {
-			p.log.WithError(perr).WithFields(logrus.Fields{
+		// Ensure the block is recorded in the database even if it already
+		// exists in storage. Only cache success once the record actually
+		// lands: caching before this would let a later check for the same
+		// block believe it's fully durable when the database still has no
+		// row for it.
+		if err = p.recordPermanentBlock(ctx, block); err != nil {
+			p.log.WithError(err).WithFields(logrus.Fields{
 				"block_root": block.BlockRoot,
 				"network":    block.Network,
 				"slot":       block.Slot,
 			}).Error("Failed to record permanent block in database")
+
+			return err
 		}
+
+		p.cache.Add(cacheKey, true)
 
 		return nil
 	}
 
 	// Copy the block to the permanent location
-	err = p.store.Copy(ctx, &store.CopyParams{
+	if err = p.store.Copy(ctx, &store.CopyParams{
 		Source:      block.Location,
 		Destination: permanentLocation,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to copy block to permanent location: %w", err)
 	}
 
@@ -350,13 +377,16 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		"to":         permanentLocation,
 	}).Info("Copied block to permanent location")
 
-	// Record the block in the database
-	if perr := p.recordPermanentBlock(ctx, block); perr != nil {
-		p.log.WithError(perr).WithFields(logrus.Fields{
+	// Record the block in the database. As above, only cache success once
+	// the record actually lands.
+	if err = p.recordPermanentBlock(ctx, block); err != nil {
+		p.log.WithError(err).WithFields(logrus.Fields{
 			"block_root": block.BlockRoot,
 			"network":    block.Network,
 			"slot":       block.Slot,
 		}).Error("Failed to record permanent block in database")
+
+		return err
 	}
 
 	// Add to cache to avoid future checks
