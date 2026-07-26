@@ -120,15 +120,28 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 			Location:      block.Location,
 			BlockRoot:     block.BlockRoot,
 			Network:       block.Network,
-			ProcessedChan: make(chan struct{}),
+			ProcessedChan: make(chan error, 1),
 			//nolint:gosec // This is a valid conversion
 			Slot: phase0.Slot(block.Slot),
 		}
 
 		i.permanentStore.QueueBlock(b)
 
-		// Wait for the block to be processed
-		<-b.ProcessedChan
+		// Wait for the permanent store to finish with this block, without
+		// blocking forever if the context is cancelled (for example during
+		// shutdown). If it could not guarantee a durable copy, leave the
+		// original alone rather than delete it out from under a copy that
+		// was never actually made -- it will be retried on the next cycle.
+		select {
+		case permErr := <-b.ProcessedChan:
+			if permErr != nil {
+				i.log.WithError(permErr).WithField("block_id", block.ID).Error("Permanent store could not process block, will retry next time")
+
+				continue
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 
 		// Delete from the store first
 		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {
