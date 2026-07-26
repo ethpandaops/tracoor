@@ -127,8 +127,13 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 
 		i.permanentStore.QueueBlock(b)
 
-		// Wait for the block to be processed
-		<-b.ProcessedChan
+		// Wait for the block to be processed, without blocking forever if the
+		// context is cancelled (for example during shutdown).
+		select {
+		case <-b.ProcessedChan:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 
 		// Delete from the store first
 		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {

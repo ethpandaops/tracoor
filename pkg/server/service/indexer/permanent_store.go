@@ -112,10 +112,14 @@ func (p *PermanentStore) IsEnabled() bool {
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	// Check if the permanent store is enabled
 	if !p.IsEnabled() {
+		closeProcessedChan(block)
+
 		return
 	}
 
 	if p.stopped {
+		closeProcessedChan(block)
+
 		return
 	}
 
@@ -132,6 +136,19 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			"network":    block.Network,
 			"location":   block.Location,
 		}).Warn("Failed to queue block for permanent storage, queue is full")
+
+		closeProcessedChan(block)
+	}
+}
+
+// closeProcessedChan closes a block's ProcessedChan if one was provided.
+// Callers that wait on ProcessedChan (retention's purge loop, in particular)
+// need it closed on every path through QueueBlock, not just the one where
+// the block is actually queued, or they block forever whenever a block is
+// skipped instead of queued.
+func closeProcessedChan(block PermanentStoreBlock) {
+	if block.ProcessedChan != nil {
+		close(block.ProcessedChan)
 	}
 }
 
@@ -169,11 +186,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
 
 	// Close the processed channel so that the caller can wait for the block to be processed
-	defer func() {
-		if block.ProcessedChan != nil {
-			close(block.ProcessedChan)
-		}
-	}()
+	defer closeProcessedChan(block)
 
 	// Check if we've already processed this block
 	if _, ok := p.cache.Get(cacheKey); ok {
