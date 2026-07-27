@@ -12,14 +12,14 @@ import (
 type ExecutionBlockTrace struct {
 	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
-	Node                    string    `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1"`
+	Node                    string    `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1;uniqueIndex:idx_execution_block_trace_unique,where:deleted_at IS NULL,priority:1"`
 	FetchedAt               time.Time `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:idx_execution_block_trace_fetchedat,where:deleted_at IS NULL;index:idx_execution_block_trace_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	ExecutionImplementation string
 	NodeVersion             string `gorm:"not null;default:''"`
 	Location                string `gorm:"not null;default:''"`
 	ContentEncoding         string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:idx_execution_block_trace_network,where:deleted_at IS NULL;index:idx_execution_block_trace_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockHash               string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	Network                 string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:idx_execution_block_trace_network,where:deleted_at IS NULL;index:idx_execution_block_trace_fetchedat_network,where:deleted_at IS NULL,priority:2;uniqueIndex:idx_execution_block_trace_unique,where:deleted_at IS NULL,priority:3"`
+	BlockHash               string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2;uniqueIndex:idx_execution_block_trace_unique,where:deleted_at IS NULL,priority:2"`
 	BlockNumber             int64
 }
 

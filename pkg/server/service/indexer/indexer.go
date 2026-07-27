@@ -229,6 +229,10 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	if err := i.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "beacon state already indexed")
+		}
+
 		i.log.WithError(err).WithFields(logFields).Error("Failed to index state")
 
 		return nil, status.Error(codes.Internal, "failed to index state")
@@ -487,6 +491,10 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 	}
 
 	if err := i.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
+		}
+
 		i.log.WithError(err).WithFields(logFields).Error("Failed to index block")
 
 		return nil, status.Error(codes.Internal, "failed to index block")
@@ -753,6 +761,10 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 	}
 
 	if err := i.db.InsertBeaconBadBlock(ctx, ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
+		}
+
 		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad block")
 
 		return nil, status.Error(codes.Internal, "failed to index bad block")
@@ -1014,6 +1026,10 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 	}
 
 	if err := i.db.InsertBeaconBadBlob(ctx, ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "beacon blob already indexed")
+		}
+
 		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad blob")
 
 		return nil, status.Error(codes.Internal, "failed to index bad blob")
@@ -1237,6 +1253,10 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 	}
 
 	if err := i.db.InsertExecutionBlockTrace(ctx, ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "execution block trace already indexed")
+		}
+
 		return nil, status.Error(codes.Internal, "failed to insert execution block trace")
 	}
 
@@ -1442,6 +1462,10 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 	}
 
 	if err := i.db.InsertExecutionBadBlock(ctx, ProtoExecutionBadBlockToDBExecutionBadBlock(block)); err != nil {
+		if persistence.IsUniqueConstraintError(err) {
+			return nil, status.Error(codes.AlreadyExists, "execution bad block already indexed")
+		}
+
 		return nil, status.Error(codes.Internal, "failed to insert execution bad block")
 	}
 

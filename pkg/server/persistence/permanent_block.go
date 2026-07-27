@@ -15,8 +15,8 @@ type PermanentBlock struct {
 	gorm.Model
 	// We have to use int64 here as SQLite doesn't support uint64
 	Slot      int64  `gorm:"index:idx_permanent_block_slot,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:1"`
-	BlockRoot string `gorm:"index:idx_permanent_block_blockroot,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:2"`
-	Network   string `gorm:"index:idx_permanent_block_network,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:3"`
+	BlockRoot string `gorm:"index:idx_permanent_block_blockroot,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:2;uniqueIndex:idx_permanent_block_unique,where:deleted_at IS NULL,priority:1"`
+	Network   string `gorm:"index:idx_permanent_block_network,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:3;uniqueIndex:idx_permanent_block_unique,where:deleted_at IS NULL,priority:2"`
 }
 
 type PermanentBlockFilter struct {
