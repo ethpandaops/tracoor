@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
@@ -32,8 +33,15 @@ type PermanentStore struct {
 	queue   chan PermanentStoreBlock
 	cache   *lru.Cache[string, bool]
 	enabled bool
-	stopped bool
 	nodeID  string
+
+	// mu guards stopped, since QueueBlock's "reject if stopped, otherwise
+	// Add(1) to wg" sequence and Stop's "set stopped, then Wait on wg" must
+	// not interleave, or a block could be admitted to the queue after Stop
+	// has already observed a zero counter and returned.
+	mu      sync.Mutex
+	stopped bool
+	wg      sync.WaitGroup
 }
 
 type PermanentStoreConfig struct {
@@ -63,6 +71,19 @@ func NewPermanentStore(log logrus.FieldLogger, st store.Store, db *persistence.I
 	}, nil
 }
 
+func (p *PermanentStore) tryEnqueue() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.stopped {
+		return false
+	}
+
+	p.wg.Add(1)
+
+	return true
+}
+
 // Start starts the permanent store.
 func (p *PermanentStore) Start(ctx context.Context) error {
 	p.log.Info("Starting permanent store")
@@ -75,33 +96,43 @@ func (p *PermanentStore) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the permanent store.
+// Stop stops the permanent store. It blocks until every block that was
+// successfully queued has finished processing (not merely been received off
+// the queue), or until ctx is done.
 func (p *PermanentStore) Stop(ctx context.Context) error {
 	p.log.Info("Stopping permanent store")
 
-	// Set the stopped flag to prevent new blocks from being queued
+	// Set the stopped flag to prevent new blocks from being queued. Taking
+	// the lock here means any QueueBlock call that already passed the
+	// stopped check has necessarily already called wg.Add before this Wait
+	// call is reached, so it's counted.
+	p.mu.Lock()
 	p.stopped = true
+	p.mu.Unlock()
 
-	// Wait until the queue is empty
+	done := make(chan struct{})
+
+	go func() {
+		p.wg.Wait()
+		close(done)
+	}()
+
 	attempts := 0
 
-	for len(p.queue) > 0 {
-		p.log.WithField("remaining", len(p.queue)).Debug("Waiting for queue to empty")
-
+	for {
 		select {
+		case <-done:
+			p.log.Debug("All queued blocks finished processing, permanent store stopped")
+
+			return nil
 		case <-ctx.Done():
 			return ctx.Err()
-		// Continue waiting
 		case <-time.After(250 * time.Millisecond):
 			attempts++
 
-			p.log.WithField("attempts", attempts).Info("Waiting for queue to drain...")
+			p.log.WithField("attempts", attempts).Info("Waiting for in-flight blocks to finish...")
 		}
 	}
-
-	p.log.Debug("Queue is empty, permanent store stopped")
-
-	return nil
 }
 
 func (p *PermanentStore) IsEnabled() bool {
@@ -115,7 +146,10 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 		return
 	}
 
-	if p.stopped {
+	// Reserve a slot in the wait group before the block is admitted to the
+	// queue, so Stop can't observe "nothing outstanding" while a block is
+	// still sitting in the channel or being handed to processBlock.
+	if !p.tryEnqueue() {
 		return
 	}
 
@@ -127,6 +161,8 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			"location":   block.Location,
 		}).Debug("Queued block for permanent storage")
 	default:
+		p.wg.Done()
+
 		p.log.WithFields(logrus.Fields{
 			"block_root": block.BlockRoot,
 			"network":    block.Network,
@@ -147,19 +183,28 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 				return
 			}
 
-			// Skip empty blocks
-			if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
-				continue
-			}
-
-			if err := p.processBlock(ctx, block); err != nil {
-				p.log.WithError(err).WithFields(logrus.Fields{
-					"block_root": block.BlockRoot,
-					"network":    block.Network,
-					"location":   block.Location,
-				}).Error("Failed to process block for permanent storage")
-			}
+			p.handleQueuedBlock(ctx, block)
 		}
+	}
+}
+
+// handleQueuedBlock processes a single block taken off the queue and marks
+// it done in the wait group, regardless of which path it takes. This is what
+// lets Stop wait for actual completion rather than just queue drain.
+func (p *PermanentStore) handleQueuedBlock(ctx context.Context, block PermanentStoreBlock) {
+	defer p.wg.Done()
+
+	// Skip empty blocks
+	if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
+		return
+	}
+
+	if err := p.processBlock(ctx, block); err != nil {
+		p.log.WithError(err).WithFields(logrus.Fields{
+			"block_root": block.BlockRoot,
+			"network":    block.Network,
+			"location":   block.Location,
+		}).Error("Failed to process block for permanent storage")
 	}
 }
 
