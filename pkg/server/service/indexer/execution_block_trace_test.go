@@ -269,7 +269,7 @@ func TestIndexerExecutionBlockTraceDownloading(t *testing.T) {
 
 		location, err := index.Store().SaveExecutionBlockTrace(ctx, &store.SaveParams{
 			Data:            &compressedData,
-			Location:        "data.json",
+			Location:        testDataLocation,
 			ContentEncoding: compression.Gzip.ContentEncoding,
 		})
 		if err != nil {

@@ -41,43 +41,43 @@ func GetBasicMetricsInstance(namespace, storeType string, enabled bool) *BasicMe
 				Namespace: namespace,
 				Name:      "items_added_count",
 				Help:      "Number of items added to the store",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			itemsRemoved: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "items_removed_count",
 				Help:      "Number of items removed from the store",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			itemsRetreived: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "items_retrieved_count",
 				Help:      "Number of items retreived from the store",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			itemsStored: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "items_stored_total",
 				Help:      "Number of items stored in the store",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			itemsUrlsRetreived: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "items_urls_retrieved_count",
 				Help:      "Number of items URLs retreived",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			cacheHit: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "cache_hit_count",
 				Help:      "Number of cache hits",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			cacheMiss: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "cache_miss_count",
 				Help:      "Number of cache misses",
-			}, []string{"type"}),
+			}, []string{labelType}),
 			itemsAddedBytes: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 				Namespace: namespace,
 				Name:      "items_added_bytes",
 				Help:      "Size of items added to the store",
 				Buckets:   prometheus.ExponentialBuckets(1024000, 2, 13),
-			}, []string{"type"}),
+			}, []string{labelType}),
 		}
 
 		if enabled {

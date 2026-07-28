@@ -398,7 +398,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
-						"slot":      slot,
+						logKeySlot:  slot,
 						"blockRoot": blockRoot,
 						"filePath":  filePath,
 					}).WithError(err).Error("Failed to save beacon bad block to store")
@@ -616,7 +616,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
-						"slot":      slot,
+						logKeySlot:  slot,
 						"blockRoot": blockRoot,
 						"index":     index,
 						"filePath":  filePath,

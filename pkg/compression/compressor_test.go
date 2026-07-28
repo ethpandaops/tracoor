@@ -10,6 +10,11 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/compression"
 )
 
+const (
+	testFilename   = "test"
+	testFilenameGz = "test.gz"
+)
+
 func TestNewCompressor(t *testing.T) {
 	c := compression.NewCompressor()
 	assert.NotNil(t, c)
@@ -70,13 +75,13 @@ func TestCompressor_Decompress(t *testing.T) {
 		{
 			name:     "Decompress Gzip",
 			data:     compressed,
-			filename: "test.gz",
+			filename: testFilenameGz,
 			wantErr:  false,
 		},
 		{
 			name:     "Decompress with nil data",
 			data:     nil,
-			filename: "test.gz",
+			filename: testFilenameGz,
 			wantErr:  true,
 		},
 		{
@@ -111,13 +116,13 @@ func TestAddExtension(t *testing.T) {
 	}{
 		{
 			name:      "Add Gzip extension",
-			filename:  "test",
+			filename:  testFilename,
 			algorithm: compression.Gzip,
 			want:      "test.gz",
 		},
 		{
 			name:      "Extension already present",
-			filename:  "test.gz",
+			filename:  testFilenameGz,
 			algorithm: compression.Gzip,
 			want:      "test.gz",
 		},
@@ -142,13 +147,13 @@ func TestRemoveExtension(t *testing.T) {
 	}{
 		{
 			name:      "Remove Gzip extension",
-			filename:  "test.gz",
+			filename:  testFilenameGz,
 			algorithm: compression.Gzip,
 			want:      "test",
 		},
 		{
 			name:      "No extension to remove",
-			filename:  "test",
+			filename:  testFilename,
 			algorithm: compression.Gzip,
 			want:      "test",
 		},
@@ -179,13 +184,13 @@ func TestHasCompressionExtension(t *testing.T) {
 	}{
 		{
 			name:      "Has Gzip extension",
-			filename:  "test.gz",
+			filename:  testFilenameGz,
 			algorithm: compression.Gzip,
 			want:      true,
 		},
 		{
 			name:      "No Gzip extension",
-			filename:  "test",
+			filename:  testFilename,
 			algorithm: compression.Gzip,
 			want:      false,
 		},
@@ -210,7 +215,7 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 	}{
 		{
 			name:     "Get Gzip algorithm",
-			filename: "test.gz",
+			filename: testFilenameGz,
 			want:     compression.Gzip,
 			wantErr:  false,
 		},

@@ -16,6 +16,8 @@ import (
 
 const (
 	ServiceType = "tracoor.api"
+
+	OrderFetchedAtDesc = "fetched_at DESC"
 )
 
 type API struct {
@@ -104,7 +106,7 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -237,7 +239,7 @@ func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockReque
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -370,7 +372,7 @@ func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBloc
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -503,7 +505,7 @@ func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobR
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -642,7 +644,7 @@ func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutio
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -767,7 +769,7 @@ func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionB
 	pagination := &indexer.PaginationCursor{
 		Limit:   100,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {

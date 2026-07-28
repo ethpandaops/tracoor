@@ -3,6 +3,10 @@ package store
 type Type string
 
 const (
+	labelType = "type"
+)
+
+const (
 	UnknownStore Type = "unknown"
 	S3StoreType  Type = "s3"
 	FSStoreType  Type = "fs"

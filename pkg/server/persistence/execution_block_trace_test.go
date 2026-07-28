@@ -94,7 +94,7 @@ func TestListExecutionBlockTrace(t *testing.T) {
 	}
 	page := &PaginationCursor{}
 
-	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow("test-id", "test-node"))
+	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{columnID, columnNode}).AddRow("test-id", "test-node"))
 
 	traces, err := indexer.ListExecutionBlockTrace(ctx, filter, page)
 	assert.NoError(t, err)
@@ -123,13 +123,13 @@ func TestExecutionBlockTraceFilters(t *testing.T) {
 			name   string
 			filter ExecutionBlockTraceFilter
 		}{
-			{"ID", ExecutionBlockTraceFilter{ID: &trace.ID}},
-			{"Node", ExecutionBlockTraceFilter{Node: &trace.Node}},
+			{fieldID, ExecutionBlockTraceFilter{ID: &trace.ID}},
+			{fieldNode, ExecutionBlockTraceFilter{Node: &trace.Node}},
 			{"BlockHash", ExecutionBlockTraceFilter{BlockHash: &trace.BlockHash}},
 			{"BlockNumber", ExecutionBlockTraceFilter{BlockNumber: &trace.BlockNumber}},
-			{"NodeVersion", ExecutionBlockTraceFilter{NodeVersion: &trace.NodeVersion}},
-			{"Location", ExecutionBlockTraceFilter{Location: &trace.Location}},
-			{"Network", ExecutionBlockTraceFilter{Network: &trace.Network}},
+			{fieldNodeVersion, ExecutionBlockTraceFilter{NodeVersion: &trace.NodeVersion}},
+			{fieldLocation, ExecutionBlockTraceFilter{Location: &trace.Location}},
+			{fieldNetwork, ExecutionBlockTraceFilter{Network: &trace.Network}},
 			{"ExecutionImplementation", ExecutionBlockTraceFilter{ExecutionImplementation: &trace.ExecutionImplementation}},
 		}
 
