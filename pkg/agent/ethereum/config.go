@@ -28,22 +28,16 @@ type Config struct {
 	// the beacon node cache.
 	BeaconStateAgeThresholdEpochs uint64 `yaml:"beaconStateAgeThresholdEpochs" default:"1"`
 
-	// MaxConcurrentBeaconStateFetches bounds how many beacon states may be fetched
-	// at once across every agent in the process. Each fetch holds the raw state and
-	// its compressed copy in memory, so this caps peak memory independently of how
-	// many agents are configured. Applied process-wide by whichever agent starts
-	// first, so it is only meaningful when set consistently across agents.
+	// MaxConcurrentBeaconStateFetches bounds in-flight beacon state fetches across
+	// every agent in the process, capping peak memory independently of how many
+	// agents are configured. Applied process-wide by whichever agent starts first.
 	MaxConcurrentBeaconStateFetches int `yaml:"maxConcurrentBeaconStateFetches" default:"10"`
 
-	// MaxConcurrentExecutionBadBlockFetches bounds how many bad block fetches may
-	// be in flight at once across every agent in the process. The response carries
-	// every bad block the node still holds and is decoded into memory for the whole
-	// indexing pass. Applied process-wide, as above.
-	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"4"`
+	// MaxConcurrentExecutionBadBlockFetches bounds in-flight bad block fetches,
+	// as above.
+	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"10"`
 }
 
-// GetMaxConcurrentBeaconStateFetches returns the configured beacon state fetch
-// concurrency, or 0 to use the agent default.
 func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
 	if c.MaxConcurrentBeaconStateFetches <= 0 {
 		return 0
@@ -52,8 +46,6 @@ func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
 	return c.MaxConcurrentBeaconStateFetches
 }
 
-// GetMaxConcurrentExecutionBadBlockFetches returns the configured bad block fetch
-// concurrency, or 0 to use the agent default.
 func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int {
 	if c.MaxConcurrentExecutionBadBlockFetches <= 0 {
 		return 0

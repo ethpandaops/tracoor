@@ -77,9 +77,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		stateID = fmt.Sprintf("%d", slot)
 	}
 
-	// Bound how many states are in flight process-wide. The raw state and its
-	// compressed copy are both held until the upload finishes, so the slot is
-	// kept for that whole window rather than just the fetch.
+	// Held until the upload finishes, not just the fetch, as the raw state and its
+	// compressed copy are both live until then.
 	releaseFetchSlot, err := s.acquireBeaconStateFetch(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to acquire beacon state fetch slot")
