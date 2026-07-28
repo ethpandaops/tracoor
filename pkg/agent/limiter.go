@@ -7,12 +7,13 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// Both paths read a whole response into memory, so peak usage is the limit
-// multiplied by the response size. States are roughly an order of magnitude
-// larger than bad block responses.
+// Each of these paths reads a whole response into memory, so peak usage is the
+// limit multiplied by the response size. States are roughly an order of
+// magnitude larger than bad block responses or payload envelopes.
 const (
-	defaultMaxConcurrentBeaconStateFetches       = 10
-	defaultMaxConcurrentExecutionBadBlockFetches = 10
+	defaultMaxConcurrentBeaconStateFetches              = 10
+	defaultMaxConcurrentExecutionBadBlockFetches        = 10
+	defaultMaxConcurrentExecutionPayloadEnvelopeFetches = 10
 )
 
 // fetchLimiter is a lazily sized process-wide concurrency budget. It is
@@ -41,8 +42,9 @@ func (l *fetchLimiter) acquire(ctx context.Context, limit, def int) (func(), err
 }
 
 var (
-	beaconStateFetchLimiter       fetchLimiter
-	executionBadBlockFetchLimiter fetchLimiter
+	beaconStateFetchLimiter              fetchLimiter
+	executionBadBlockFetchLimiter        fetchLimiter
+	executionPayloadEnvelopeFetchLimiter fetchLimiter
 )
 
 func (s *agent) acquireBeaconStateFetch(ctx context.Context) (func(), error) {
@@ -58,5 +60,13 @@ func (s *agent) acquireExecutionBadBlockFetch(ctx context.Context) (func(), erro
 		ctx,
 		s.Config.Ethereum.GetMaxConcurrentExecutionBadBlockFetches(),
 		defaultMaxConcurrentExecutionBadBlockFetches,
+	)
+}
+
+func (s *agent) acquireExecutionPayloadEnvelopeFetch(ctx context.Context) (func(), error) {
+	return executionPayloadEnvelopeFetchLimiter.acquire(
+		ctx,
+		s.Config.Ethereum.GetMaxConcurrentExecutionPayloadEnvelopeFetches(),
+		defaultMaxConcurrentExecutionPayloadEnvelopeFetches,
 	)
 }

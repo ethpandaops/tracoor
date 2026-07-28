@@ -36,6 +36,10 @@ type Config struct {
 	// MaxConcurrentExecutionBadBlockFetches bounds in-flight bad block fetches,
 	// as above.
 	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"10"`
+
+	// MaxConcurrentExecutionPayloadEnvelopeFetches bounds in-flight execution
+	// payload envelope fetches, as above.
+	MaxConcurrentExecutionPayloadEnvelopeFetches int `yaml:"maxConcurrentExecutionPayloadEnvelopeFetches" default:"10"`
 }
 
 func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
@@ -52,6 +56,14 @@ func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int {
 	}
 
 	return c.MaxConcurrentExecutionBadBlockFetches
+}
+
+func (c *Config) GetMaxConcurrentExecutionPayloadEnvelopeFetches() int {
+	if c.MaxConcurrentExecutionPayloadEnvelopeFetches <= 0 {
+		return 0
+	}
+
+	return c.MaxConcurrentExecutionPayloadEnvelopeFetches
 }
 
 func (c *Config) Validate() error {

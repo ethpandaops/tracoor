@@ -353,6 +353,17 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	var envelopeRaw []byte
 
+	// Held only while a fetch is in flight and, on success, until the upload
+	// finishes. The retry delays below are spent without a slot so a payload that
+	// is never revealed does not occupy one for the whole backoff.
+	var releaseFetchSlot func()
+
+	defer func() {
+		if releaseFetchSlot != nil {
+			releaseFetchSlot()
+		}
+	}()
+
 	for attempt := 0; attempt < executionPayloadEnvelopeFetchAttempts; attempt++ {
 		if attempt > 0 {
 			select {
@@ -362,10 +373,19 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 			}
 		}
 
+		release, aErr := s.acquireExecutionPayloadEnvelopeFetch(ctx)
+		if aErr != nil {
+			return errors.Wrap(aErr, "failed to acquire execution payload envelope fetch slot")
+		}
+
 		envelopeRaw, err = s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
 		if err == nil {
+			releaseFetchSlot = release
+
 			break
 		}
+
+		release()
 
 		if !goerrors.Is(err, api.ErrNotFound) {
 			return errors.Wrap(err, "failed to fetch execution payload envelope")
@@ -386,6 +406,10 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 	if err != nil {
 		return errors.Wrap(err, "failed to compress execution payload envelope")
 	}
+
+	// Drop the raw envelope before the upload so only the compressed copy is held
+	// for the duration of the store write.
+	envelopeRaw = nil
 
 	s.log.WithField("location", location).Debug("Saving execution payload envelope")
 
