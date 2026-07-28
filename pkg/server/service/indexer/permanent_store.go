@@ -122,15 +122,15 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	select {
 	case p.queue <- block:
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
-			"location":   block.Location,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
+			KeyLocation:  block.Location,
 		}).Debug("Queued block for permanent storage")
 	default:
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
-			"location":   block.Location,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
+			KeyLocation:  block.Location,
 		}).Warn("Failed to queue block for permanent storage, queue is full")
 	}
 }
@@ -154,9 +154,9 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 			if err := p.processBlock(ctx, block); err != nil {
 				p.log.WithError(err).WithFields(logrus.Fields{
-					"block_root": block.BlockRoot,
-					"network":    block.Network,
-					"location":   block.Location,
+					KeyBlockRoot: block.BlockRoot,
+					KeyNetwork:   block.Network,
+					KeyLocation:  block.Location,
 				}).Error("Failed to process block for permanent storage")
 			}
 		}
@@ -178,8 +178,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Check if we've already processed this block
 	if _, ok := p.cache.Get(cacheKey); ok {
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit)")
 
 		return nil
@@ -211,9 +211,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 				// If the error indicates someone else has the lock, retry
 				if err.Error() != "" && time.Since(startTime) < maxRetryDuration {
 					p.log.WithFields(logrus.Fields{
-						"block_root": block.BlockRoot,
-						"network":    block.Network,
-						"lock_key":   lockKey,
+						KeyBlockRoot: block.BlockRoot,
+						KeyNetwork:   block.Network,
+						KeyLockKey:   lockKey,
 						"error":      err.Error(),
 						"elapsed":    time.Since(startTime).String(),
 					}).Debug("Failed to acquire lock, retrying...")
@@ -233,9 +233,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			// If we couldn't acquire the lock but there's no error, retry
 			if time.Since(startTime) < maxRetryDuration {
 				p.log.WithFields(logrus.Fields{
-					"block_root": block.BlockRoot,
-					"network":    block.Network,
-					"lock_key":   lockKey,
+					KeyBlockRoot: block.BlockRoot,
+					KeyNetwork:   block.Network,
+					KeyLockKey:   lockKey,
 					"elapsed":    time.Since(startTime).String(),
 				}).Debug("Failed to acquire lock, retrying...")
 
@@ -245,9 +245,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			}
 
 			p.log.WithFields(logrus.Fields{
-				"block_root": block.BlockRoot,
-				"network":    block.Network,
-				"lock_key":   lockKey,
+				KeyBlockRoot: block.BlockRoot,
+				KeyNetwork:   block.Network,
+				KeyLockKey:   lockKey,
 			}).Debug("Failed to acquire lock after retries, another instance is processing this block")
 
 			return nil
@@ -256,9 +256,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 	if !acquired {
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
-			"lock_key":   lockKey,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
+			KeyLockKey:   lockKey,
 		}).Debug("Failed to acquire lock after maximum retry duration")
 
 		return nil
@@ -267,9 +267,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	defer func() {
 		if lerr := p.db.ReleaseLock(ctx, lockKey, p.nodeID); lerr != nil {
 			p.log.WithError(lerr).WithFields(logrus.Fields{
-				"block_root": block.BlockRoot,
-				"network":    block.Network,
-				"lock_key":   lockKey,
+				KeyBlockRoot: block.BlockRoot,
+				KeyNetwork:   block.Network,
+				KeyLockKey:   lockKey,
 			}).Error("Failed to release lock")
 		}
 	}()
@@ -277,8 +277,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Check again after acquiring the lock
 	if _, ok := p.cache.Get(cacheKey); ok {
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit after lock)")
 
 		return nil
@@ -288,13 +288,13 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
 	if err != nil {
 		p.log.WithError(err).WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
 		}).Error("Failed to check if block is already recorded in database")
 	} else if permanentBlock != nil {
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
 		}).Debug("Block already recorded in database")
 
 		// Add to cache to avoid future checks
@@ -314,9 +314,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 	if exists {
 		p.log.WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
-			"location":   permanentLocation,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
+			KeyLocation:  permanentLocation,
 		}).Debug("Block already exists in permanent location")
 
 		// Add to cache to avoid future checks
@@ -325,9 +325,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		// Ensure the block is recorded in the database even if it already exists in storage
 		if perr := p.recordPermanentBlock(ctx, block); perr != nil {
 			p.log.WithError(perr).WithFields(logrus.Fields{
-				"block_root": block.BlockRoot,
-				"network":    block.Network,
-				"slot":       block.Slot,
+				KeyBlockRoot: block.BlockRoot,
+				KeyNetwork:   block.Network,
+				KeySlot:      block.Slot,
 			}).Error("Failed to record permanent block in database")
 		}
 
@@ -344,8 +344,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}
 
 	p.log.WithFields(logrus.Fields{
-		"block_root": block.BlockRoot,
-		"network":    block.Network,
+		KeyBlockRoot: block.BlockRoot,
+		KeyNetwork:   block.Network,
 		"from":       block.Location,
 		"to":         permanentLocation,
 	}).Info("Copied block to permanent location")
@@ -353,9 +353,9 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Record the block in the database
 	if perr := p.recordPermanentBlock(ctx, block); perr != nil {
 		p.log.WithError(perr).WithFields(logrus.Fields{
-			"block_root": block.BlockRoot,
-			"network":    block.Network,
-			"slot":       block.Slot,
+			KeyBlockRoot: block.BlockRoot,
+			KeyNetwork:   block.Network,
+			KeySlot:      block.Slot,
 		}).Error("Failed to record permanent block in database")
 	}
 

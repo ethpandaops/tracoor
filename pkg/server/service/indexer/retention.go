@@ -66,7 +66,7 @@ func (i *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 		Before: &before,
 	}
 
-	states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -94,10 +94,10 @@ func (i *Indexer) purgeOldBeaconStates(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":    state.Node,
-				"network": state.Network,
-				"slot":    state.Slot,
-				"id":      state.ID,
+				KeyNode:    state.Node,
+				KeyNetwork: state.Network,
+				KeySlot:    state.Slot,
+				KeyID:      state.ID,
 			},
 		).Debug("Deleted beacon state")
 	}
@@ -112,7 +112,7 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 		Before: &before,
 	}
 
-	blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -155,10 +155,10 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":    block.Node,
-				"network": block.Network,
-				"slot":    block.Slot,
-				"id":      block.ID,
+				KeyNode:    block.Node,
+				KeyNetwork: block.Network,
+				KeySlot:    block.Slot,
+				KeyID:      block.ID,
 			},
 		).Debug("Deleted beacon block")
 	}
@@ -219,7 +219,7 @@ func (i *Indexer) purgeOldBeaconBadBlocks(ctx context.Context) error {
 		Before: &before,
 	}
 
-	blocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	blocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -247,10 +247,10 @@ func (i *Indexer) purgeOldBeaconBadBlocks(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":    block.Node,
-				"network": block.Network,
-				"slot":    block.Slot,
-				"id":      block.ID,
+				KeyNode:    block.Node,
+				KeyNetwork: block.Network,
+				KeySlot:    block.Slot,
+				KeyID:      block.ID,
 			},
 		).Debug("Deleted beacon bad block")
 	}
@@ -265,7 +265,7 @@ func (i *Indexer) purgeOldBeaconBadBlobs(ctx context.Context) error {
 		Before: &before,
 	}
 
-	blobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	blobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -293,11 +293,11 @@ func (i *Indexer) purgeOldBeaconBadBlobs(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":    blob.Node,
-				"network": blob.Network,
-				"slot":    blob.Slot,
-				"index":   blob.Index,
-				"id":      blob.ID,
+				KeyNode:    blob.Node,
+				KeyNetwork: blob.Network,
+				KeySlot:    blob.Slot,
+				KeyIndex:   blob.Index,
+				KeyID:      blob.ID,
 			},
 		).Debug("Deleted beacon bad blob")
 	}
@@ -312,7 +312,7 @@ func (i *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 		Before: &before,
 	}
 
-	traces, err := i.db.ListExecutionBlockTrace(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	traces, err := i.db.ListExecutionBlockTrace(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -340,10 +340,10 @@ func (i *Indexer) purgeOldExecutionTraces(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":         trace.Node,
-				"network":      trace.Network,
+				KeyNode:        trace.Node,
+				KeyNetwork:     trace.Network,
 				"block_number": trace.BlockNumber,
-				"id":           trace.ID,
+				KeyID:          trace.ID,
 			},
 		).Debug("Deleted execution block trace")
 	}
@@ -358,7 +358,7 @@ func (i *Indexer) purgeOldExecutionBadBlocks(ctx context.Context) error {
 		Before: &before,
 	}
 
-	blocks, err := i.db.ListExecutionBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: "fetched_at ASC"})
+	blocks, err := i.db.ListExecutionBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10000, Offset: 0, OrderBy: OrderFetchedAtAsc})
 	if err != nil {
 		return err
 	}
@@ -386,10 +386,10 @@ func (i *Indexer) purgeOldExecutionBadBlocks(ctx context.Context) error {
 
 		i.log.WithFields(
 			logrus.Fields{
-				"node":       block.Node,
-				"network":    block.Network,
+				KeyNode:      block.Node,
+				KeyNetwork:   block.Network,
 				"block_hash": block.BlockHash,
-				"id":         block.ID,
+				KeyID:        block.ID,
 			},
 		).Debug("Deleted execution block trace")
 	}

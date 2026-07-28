@@ -96,7 +96,7 @@ func TestListBeaconState(t *testing.T) {
 	}
 	page := &PaginationCursor{}
 
-	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow("test-id", "test-node"))
+	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{columnID, columnNode}).AddRow("test-id", "test-node"))
 
 	states, err := indexer.ListBeaconState(ctx, filter, page)
 	assert.NoError(t, err)
@@ -288,15 +288,15 @@ func TestBeaconStateIndividualFilters(t *testing.T) {
 			name   string
 			filter BeaconStateFilter
 		}{
-			{"ID", BeaconStateFilter{ID: &beaconState.ID}},
-			{"Node", BeaconStateFilter{Node: &beaconState.Node}},
-			{"Slot", BeaconStateFilter{Slot: &slot}},
-			{"Epoch", BeaconStateFilter{Epoch: &epoch}},
+			{fieldID, BeaconStateFilter{ID: &beaconState.ID}},
+			{fieldNode, BeaconStateFilter{Node: &beaconState.Node}},
+			{fieldSlot, BeaconStateFilter{Slot: &slot}},
+			{fieldEpoch, BeaconStateFilter{Epoch: &epoch}},
 			{"StateRoot", BeaconStateFilter{StateRoot: &beaconState.StateRoot}},
-			{"NodeVersion", BeaconStateFilter{NodeVersion: &beaconState.NodeVersion}},
-			{"Location", BeaconStateFilter{Location: &beaconState.Location}},
-			{"Network", BeaconStateFilter{Network: &beaconState.Network}},
-			{"BeaconImplementation", BeaconStateFilter{BeaconImplementation: &beaconState.BeaconImplementation}},
+			{fieldNodeVersion, BeaconStateFilter{NodeVersion: &beaconState.NodeVersion}},
+			{fieldLocation, BeaconStateFilter{Location: &beaconState.Location}},
+			{fieldNetwork, BeaconStateFilter{Network: &beaconState.Network}},
+			{fieldBeaconImplementation, BeaconStateFilter{BeaconImplementation: &beaconState.BeaconImplementation}},
 		}
 
 		for _, tc := range testCases {

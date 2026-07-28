@@ -98,7 +98,7 @@ func TestListBeaconBadBlob(t *testing.T) {
 	}
 	page := &PaginationCursor{}
 
-	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow("test-id", "test-node"))
+	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{columnID, columnNode}).AddRow("test-id", "test-node"))
 
 	blobs, err := indexer.ListBeaconBadBlob(ctx, filter, page)
 	assert.NoError(t, err)
@@ -301,15 +301,15 @@ func TestBeaconBadBlobIndividualFilters(t *testing.T) {
 			name   string
 			filter BeaconBadBlobFilter
 		}{
-			{"ID", BeaconBadBlobFilter{ID: &beaconBlob.ID}},
-			{"Node", BeaconBadBlobFilter{Node: &beaconBlob.Node}},
-			{"Slot", BeaconBadBlobFilter{Slot: &slot}},
-			{"Epoch", BeaconBadBlobFilter{Epoch: &epoch}},
-			{"BlockRoot", BeaconBadBlobFilter{BlockRoot: &beaconBlob.BlockRoot}},
-			{"NodeVersion", BeaconBadBlobFilter{NodeVersion: &beaconBlob.NodeVersion}},
-			{"Location", BeaconBadBlobFilter{Location: &beaconBlob.Location}},
-			{"Network", BeaconBadBlobFilter{Network: &beaconBlob.Network}},
-			{"BeaconImplementation", BeaconBadBlobFilter{BeaconImplementation: &beaconBlob.BeaconImplementation}},
+			{fieldID, BeaconBadBlobFilter{ID: &beaconBlob.ID}},
+			{fieldNode, BeaconBadBlobFilter{Node: &beaconBlob.Node}},
+			{fieldSlot, BeaconBadBlobFilter{Slot: &slot}},
+			{fieldEpoch, BeaconBadBlobFilter{Epoch: &epoch}},
+			{fieldBlockRoot, BeaconBadBlobFilter{BlockRoot: &beaconBlob.BlockRoot}},
+			{fieldNodeVersion, BeaconBadBlobFilter{NodeVersion: &beaconBlob.NodeVersion}},
+			{fieldLocation, BeaconBadBlobFilter{Location: &beaconBlob.Location}},
+			{fieldNetwork, BeaconBadBlobFilter{Network: &beaconBlob.Network}},
+			{fieldBeaconImplementation, BeaconBadBlobFilter{BeaconImplementation: &beaconBlob.BeaconImplementation}},
 			{"Index", BeaconBadBlobFilter{Index: &index}},
 		}
 

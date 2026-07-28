@@ -10,6 +10,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	logKeyLock  = "key"
+	logKeyOwner = "owner"
+)
+
 // DistributedLock represents a lock in the database.
 type DistributedLock struct {
 	gorm.Model
@@ -95,18 +100,18 @@ func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.D
 	})
 	if err != nil {
 		i.log.WithFields(logrus.Fields{
-			"key":   key,
-			"owner": owner,
-			"error": err.Error(),
+			logKeyLock:  key,
+			logKeyOwner: owner,
+			"error":     err.Error(),
 		}).Debug("Failed to acquire lock")
 
 		return false, errors.Wrap(err, "failed to acquire lock")
 	}
 
 	i.log.WithFields(logrus.Fields{
-		"key":   key,
-		"owner": owner,
-		"ttl":   ttl,
+		logKeyLock:  key,
+		logKeyOwner: owner,
+		"ttl":       ttl,
 	}).Debug("Acquired lock")
 
 	return true, nil
@@ -121,16 +126,16 @@ func (i *Indexer) ReleaseLock(ctx context.Context, key, owner string) error {
 
 	if result.RowsAffected == 0 {
 		i.log.WithFields(logrus.Fields{
-			"key":   key,
-			"owner": owner,
+			logKeyLock:  key,
+			logKeyOwner: owner,
 		}).Debug("Lock not found or not owned by the given owner")
 
 		return nil
 	}
 
 	i.log.WithFields(logrus.Fields{
-		"key":   key,
-		"owner": owner,
+		logKeyLock:  key,
+		logKeyOwner: owner,
 	}).Debug("Released lock")
 
 	return nil

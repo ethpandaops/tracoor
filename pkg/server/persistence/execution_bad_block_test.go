@@ -96,7 +96,7 @@ func TestListExecutionBadBlock(t *testing.T) {
 	}
 	page := &PaginationCursor{}
 
-	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "node"}).AddRow("test-id", "test-node"))
+	mock.ExpectQuery("SELECT \\* FROM").WithArgs(filter.ID).WillReturnRows(sqlmock.NewRows([]string{columnID, columnNode}).AddRow("test-id", "test-node"))
 
 	blocks, err := indexer.ListExecutionBadBlock(ctx, filter, page)
 	assert.NoError(t, err)
@@ -264,14 +264,14 @@ func TestExecutionBadBlockIndividualFilters(t *testing.T) {
 			name   string
 			filter ExecutionBadBlockFilter
 		}{
-			{"ID", ExecutionBadBlockFilter{ID: &block.ID}},
-			{"Node", ExecutionBadBlockFilter{Node: &block.Node}},
+			{fieldID, ExecutionBadBlockFilter{ID: &block.ID}},
+			{fieldNode, ExecutionBadBlockFilter{Node: &block.Node}},
 			{"BlockHash", ExecutionBadBlockFilter{BlockHash: &block.BlockHash}},
 			{"BlockNumber", ExecutionBadBlockFilter{BlockNumber: &block.BlockNumber.Int64}},
 			{"BlockExtraData", ExecutionBadBlockFilter{BlockExtraData: &block.BlockExtraData.String}},
-			{"NodeVersion", ExecutionBadBlockFilter{NodeVersion: &block.NodeVersion}},
-			{"Location", ExecutionBadBlockFilter{Location: &block.Location}},
-			{"Network", ExecutionBadBlockFilter{Network: &block.Network}},
+			{fieldNodeVersion, ExecutionBadBlockFilter{NodeVersion: &block.NodeVersion}},
+			{fieldLocation, ExecutionBadBlockFilter{Location: &block.Location}},
+			{fieldNetwork, ExecutionBadBlockFilter{Network: &block.Network}},
 			{"ExecutionImplementation", ExecutionBadBlockFilter{ExecutionImplementation: &block.ExecutionImplementation}},
 		}
 

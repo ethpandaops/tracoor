@@ -270,7 +270,7 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 
 		location, err := index.Store().SaveExecutionBadBlock(ctx, &store.SaveParams{
 			Data:            &compressedData,
-			Location:        "data.json",
+			Location:        testDataLocation,
 			ContentEncoding: compression.Gzip.ContentEncoding,
 		})
 		if err != nil {
