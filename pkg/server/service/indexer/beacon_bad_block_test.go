@@ -88,7 +88,7 @@ func TestIndexerBeaconBadBlockDownloading(t *testing.T) {
 
 		location, err := index.Store().SaveBeaconBadBlock(ctx, &store.SaveParams{
 			Data:            &compressedData,
-			Location:        "data.json",
+			Location:        testDataLocation,
 			ContentEncoding: compression.Gzip.ContentEncoding,
 		})
 		if err != nil {

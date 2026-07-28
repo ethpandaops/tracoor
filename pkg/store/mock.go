@@ -11,13 +11,17 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// minioTestCredential is the access key and secret the mock minio container is
+// started with. Test-only; not a real credential.
+const minioTestCredential = "minioadmin"
+
 func setupMinioContainer(ctx context.Context, bucketName string) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "minio/minio",
 		ExposedPorts: []string{"9000/tcp"},
 		Env: map[string]string{
-			"MINIO_ACCESS_KEY": "minioadmin",
-			"MINIO_SECRET_KEY": "minioadmin",
+			"MINIO_ACCESS_KEY": minioTestCredential,
+			"MINIO_SECRET_KEY": minioTestCredential,
 		},
 		Cmd:        []string{"server", "/data"},
 		WaitingFor: wait.ForListeningPort("9000/tcp").WithStartupTimeout(2 * time.Minute),
@@ -60,8 +64,8 @@ func NewMockS3Store(ctx context.Context, bucket string) (Store, func() error, er
 	store, err := NewS3Store("throwaway", logrus.New(), &S3StoreConfig{
 		Endpoint:     "http://" + endpoint,
 		Region:       "us-east-1",
-		AccessKey:    "minioadmin",
-		AccessSecret: "minioadmin",
+		AccessKey:    minioTestCredential,
+		AccessSecret: minioTestCredential,
 		BucketName:   bucket,
 	}, DefaultOptions().SetMetricsEnabled(false))
 	if err != nil {

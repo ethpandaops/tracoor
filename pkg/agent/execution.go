@@ -97,6 +97,15 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 }
 
 func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
+	// Held across the indexing pass below, as the decoded slice is retained until
+	// it completes.
+	releaseFetchSlot, err := s.acquireExecutionBadBlockFetch(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire execution bad block fetch slot")
+	}
+
+	defer releaseFetchSlot()
+
 	// Fetch the bad blocks from the execution node.
 	blocks, err := s.node.Execution().GetBadBlocks(ctx)
 	if err != nil {

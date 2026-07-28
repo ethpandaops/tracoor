@@ -33,6 +33,12 @@ const (
 	KeyLocation                = "location"
 	KeyFetchedAt               = "fetched_at"
 	KeyBeaconImplementation    = "beacon_implementation"
+	KeyID                      = "id"
+	KeyIndex                   = "index"
+	KeyLockKey                 = "lock_key"
+
+	OrderFetchedAtDesc = "fetched_at DESC"
+	OrderFetchedAtAsc  = "fetched_at ASC"
 )
 
 type Indexer struct {
@@ -291,7 +297,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -557,7 +563,7 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -815,7 +821,7 @@ func (i *Indexer) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeaco
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -1010,7 +1016,7 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		KeyLocation:             req.GetLocation().GetValue(),
 		KeyFetchedAt:            req.GetFetchedAt().AsTime(),
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
-		"index":                 req.GetIndex().GetValue(),
+		KeyIndex:                req.GetIndex().GetValue(),
 	}
 
 	if err := i.db.InsertBeaconBadBlob(ctx, ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob)); err != nil {
@@ -1080,7 +1086,7 @@ func (i *Indexer) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeacon
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -1301,7 +1307,7 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
@@ -1511,7 +1517,7 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {

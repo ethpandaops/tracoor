@@ -55,7 +55,14 @@ type agent struct {
 	compressor *compression.Compressor
 }
 
-const namespace = "tracoor_agent"
+const (
+	namespace = "tracoor_agent"
+
+	logKeyPurpose = "purpose"
+	logKeySlot    = "slot"
+	labelAgent    = "agent"
+	labelQueue    = "queue"
+)
 
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
 	if config == nil {
@@ -127,9 +134,9 @@ func (s *agent) Start(ctx context.Context) error {
 			}
 
 			logCtx := s.log.WithFields(logrus.Fields{
-				"event_slot": event.Slot,
-				"event_root": fmt.Sprintf("%#x", event.Block),
-				"purpose":    "execution_block_trace",
+				"event_slot":  event.Slot,
+				"event_root":  fmt.Sprintf("%#x", event.Block),
+				logKeyPurpose: "execution_block_trace",
 			})
 
 			// Check if the block is too old to bother fetching.
@@ -195,9 +202,9 @@ func (s *agent) Start(ctx context.Context) error {
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			logCtx := s.log.WithFields(logrus.Fields{
 				"event_topic": "block",
-				"slot":        event.Slot,
+				logKeySlot:    event.Slot,
 				"root":        fmt.Sprintf("%#x", event.Block),
-				"purpose":     "beacon_state_and_block",
+				logKeyPurpose: "beacon_state_and_block",
 			})
 
 			if ignore, err := s.node.ShouldIgnoreEventFromSlot(event.Slot); err != nil {
@@ -224,7 +231,7 @@ func (s *agent) Start(ctx context.Context) error {
 					"event_old_head_block": rootAsString(chainReorg.OldHeadBlock),
 					"event_new_head_block": rootAsString(chainReorg.NewHeadBlock),
 					"event_depth":          chainReorg.Depth,
-					"purpose":              "chain_reorg",
+					logKeyPurpose:          "chain_reorg",
 					"event_slot":           chainReorg.Slot,
 				},
 			)

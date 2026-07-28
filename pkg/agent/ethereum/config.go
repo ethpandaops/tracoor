@@ -27,6 +27,31 @@ type Config struct {
 	// which can cause the agent to get stuck as old states might not be available in
 	// the beacon node cache.
 	BeaconStateAgeThresholdEpochs uint64 `yaml:"beaconStateAgeThresholdEpochs" default:"1"`
+
+	// MaxConcurrentBeaconStateFetches bounds in-flight beacon state fetches across
+	// every agent in the process, capping peak memory independently of how many
+	// agents are configured. Applied process-wide by whichever agent starts first.
+	MaxConcurrentBeaconStateFetches int `yaml:"maxConcurrentBeaconStateFetches" default:"10"`
+
+	// MaxConcurrentExecutionBadBlockFetches bounds in-flight bad block fetches,
+	// as above.
+	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"10"`
+}
+
+func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
+	if c.MaxConcurrentBeaconStateFetches <= 0 {
+		return 0
+	}
+
+	return c.MaxConcurrentBeaconStateFetches
+}
+
+func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int {
+	if c.MaxConcurrentExecutionBadBlockFetches <= 0 {
+		return 0
+	}
+
+	return c.MaxConcurrentExecutionBadBlockFetches
 }
 
 func (c *Config) Validate() error {

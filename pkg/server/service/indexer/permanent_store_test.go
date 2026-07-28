@@ -96,7 +96,7 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 		blockInfo := PermanentStoreBlock{
 			Location:      blockLocation,
 			BlockRoot:     "0x1234",
-			Network:       "mainnet",
+			Network:       testNetwork,
 			Slot:          123,
 			ProcessedChan: processChan,
 		}
@@ -157,7 +157,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	blockInfo := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		Slot:          123,
 		ProcessedChan: processChan1,
 	}
@@ -195,7 +195,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	blockInfo2 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		Slot:          123,
 		ProcessedChan: processChan2,
 	}
@@ -251,7 +251,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	blockInfo1 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		Slot:          123,
 		ProcessedChan: make(chan struct{}),
 	}
@@ -378,7 +378,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	blockInfo1 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		ProcessedChan: make(chan struct{}),
 	}
 
@@ -419,7 +419,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	blockInfo2 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		ProcessedChan: make(chan struct{}),
 	}
 
@@ -462,7 +462,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	blockInfo := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xstop",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		ProcessedChan: processChan,
 		Slot:          1,
 	}
@@ -490,7 +490,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	queuedBlock := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xqueued",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		ProcessedChan: processChan2,
 		Slot:          2,
 	}
@@ -533,7 +533,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	unprocessedBlock := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xunprocessed",
-		Network:       "mainnet",
+		Network:       testNetwork,
 		ProcessedChan: make(chan struct{}),
 		Slot:          3,
 	}
@@ -562,7 +562,7 @@ func TestPermanentStoreLocation(t *testing.T) {
 	blockInfo := PermanentStoreBlock{
 		Location:  "test/location/block.ssz",
 		BlockRoot: "0xabcd1234",
-		Network:   "mainnet",
+		Network:   testNetwork,
 		Slot:      123456,
 	}
 

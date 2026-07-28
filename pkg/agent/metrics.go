@@ -39,23 +39,23 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Namespace: namespace,
 				Name:      "queue_size",
 				Help:      "The size of the queue",
-			}, []string{"queue", "agent"}),
+			}, []string{labelQueue, labelAgent}),
 			queueItemProcessingTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 				Namespace: namespace,
 				Name:      "queue_item_processing_time_seconds",
 				Help:      "The time it takes to process an item from the queue",
 				Buckets:   prometheus.LinearBuckets(0, 3, 10),
-			}, []string{"queue", "agent"}),
+			}, []string{labelQueue, labelAgent}),
 			itemExported: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "item_exported",
 				Help:      "The number of items exported",
-			}, []string{"queue", "agent"}),
+			}, []string{labelQueue, labelAgent}),
 			queueItemSkipped: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "queue_item_skipped",
 				Help:      "The number of items skipped",
-			}, []string{"queue", "agent"}),
+			}, []string{labelQueue, labelAgent}),
 		}
 
 		prometheus.MustRegister(metricsInstance.queueSize)

@@ -77,6 +77,15 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		stateID = fmt.Sprintf("%d", slot)
 	}
 
+	// Held until the upload finishes, not just the fetch, as the raw state and its
+	// compressed copy are both live until then.
+	releaseFetchSlot, err := s.acquireBeaconStateFetch(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire beacon state fetch slot")
+	}
+
+	defer releaseFetchSlot()
+
 	// Fetch the state
 	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
@@ -90,6 +99,10 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	if err != nil {
 		return errors.Wrap(err, "failed to compress beacon state")
 	}
+
+	// Drop the raw state before the upload so only the compressed copy is held
+	// for the duration of the store write.
+	state = nil
 
 	// Upload the state to the store
 	location, err = s.store.SaveBeaconState(ctx, &store.SaveParams{
@@ -385,7 +398,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
-						"slot":      slot,
+						logKeySlot:  slot,
 						"blockRoot": blockRoot,
 						"filePath":  filePath,
 					}).WithError(err).Error("Failed to save beacon bad block to store")
@@ -603,7 +616,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
-						"slot":      slot,
+						logKeySlot:  slot,
 						"blockRoot": blockRoot,
 						"index":     index,
 						"filePath":  filePath,
