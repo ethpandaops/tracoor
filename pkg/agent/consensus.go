@@ -81,9 +81,9 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	// Held until the upload finishes, not just the fetch, as the raw state and its
 	// compressed copy are both live until then.
-	releaseFetchSlot, err := s.acquireBeaconStateFetch(ctx)
+	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to acquire beacon state fetch slot")
+		return errors.Wrap(err, "failed to acquire fetch slot")
 	}
 
 	defer releaseFetchSlot()
@@ -202,6 +202,14 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 
 	stateID := fmt.Sprintf("%d", slot)
 
+	// Held until the upload finishes, not just the fetch.
+	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire fetch slot")
+	}
+
+	defer releaseFetchSlot()
+
 	// Fetch the block
 	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
@@ -213,6 +221,10 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	if err != nil {
 		return errors.Wrap(err, "failed to compress beacon block")
 	}
+
+	// Drop the raw block before the upload so only the compressed copy is held
+	// for the duration of the store write.
+	blockRaw = nil
 
 	s.log.WithField("location", location).Debug("Saving beacon block")
 
@@ -373,9 +385,9 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 			}
 		}
 
-		release, aErr := s.acquireExecutionPayloadEnvelopeFetch(ctx)
+		release, aErr := s.acquireFetchSlot(ctx)
 		if aErr != nil {
-			return errors.Wrap(aErr, "failed to acquire execution payload envelope fetch slot")
+			return errors.Wrap(aErr, "failed to acquire fetch slot")
 		}
 
 		envelopeRaw, err = s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))

@@ -7,14 +7,19 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// Each of these paths reads a whole response into memory, so peak usage is the
-// limit multiplied by the response size. States are roughly an order of
-// magnitude larger than bad block responses or payload envelopes.
-const (
-	defaultMaxConcurrentBeaconStateFetches              = 10
-	defaultMaxConcurrentExecutionBadBlockFetches        = 10
-	defaultMaxConcurrentExecutionPayloadEnvelopeFetches = 10
-)
+// defaultMaxConcurrentFetches bounds how many fetches may be in flight at once
+// across every agent in the process.
+//
+// Every fetch path reads a whole response into memory before compressing and
+// storing it, so peak usage is this limit multiplied by the largest response.
+// A single shared budget is deliberate: per-path budgets bound each path but
+// not the total, which is how 10 states + 10 block traces + 10 bad blocks came
+// to run concurrently and OOM a 6GB limit.
+//
+// Sizing from a devnet with 47 agents: block traces are the largest at ~168MB,
+// then states at ~74MB and bad blocks at ~13MB, so 10 caps the worst case near
+// 1.7GB regardless of which paths are active.
+const defaultMaxConcurrentFetches = 10
 
 // fetchLimiter is a lazily sized process-wide concurrency budget. It is
 // package-level because `single` mode runs an agent per node in one process and
@@ -41,32 +46,15 @@ func (l *fetchLimiter) acquire(ctx context.Context, limit, def int) (func(), err
 	return func() { l.sem.Release(1) }, nil
 }
 
-var (
-	beaconStateFetchLimiter              fetchLimiter
-	executionBadBlockFetchLimiter        fetchLimiter
-	executionPayloadEnvelopeFetchLimiter fetchLimiter
-)
+var globalFetchLimiter fetchLimiter
 
-func (s *agent) acquireBeaconStateFetch(ctx context.Context) (func(), error) {
-	return beaconStateFetchLimiter.acquire(
+// acquireFetchSlot blocks until a fetch slot is free or ctx is cancelled. The
+// returned release function must be called once the fetched payload and
+// anything derived from it are no longer referenced.
+func (s *agent) acquireFetchSlot(ctx context.Context) (func(), error) {
+	return globalFetchLimiter.acquire(
 		ctx,
-		s.Config.Ethereum.GetMaxConcurrentBeaconStateFetches(),
-		defaultMaxConcurrentBeaconStateFetches,
-	)
-}
-
-func (s *agent) acquireExecutionBadBlockFetch(ctx context.Context) (func(), error) {
-	return executionBadBlockFetchLimiter.acquire(
-		ctx,
-		s.Config.Ethereum.GetMaxConcurrentExecutionBadBlockFetches(),
-		defaultMaxConcurrentExecutionBadBlockFetches,
-	)
-}
-
-func (s *agent) acquireExecutionPayloadEnvelopeFetch(ctx context.Context) (func(), error) {
-	return executionPayloadEnvelopeFetchLimiter.acquire(
-		ctx,
-		s.Config.Ethereum.GetMaxConcurrentExecutionPayloadEnvelopeFetches(),
-		defaultMaxConcurrentExecutionPayloadEnvelopeFetches,
+		s.Config.Ethereum.GetMaxConcurrentFetches(),
+		defaultMaxConcurrentFetches,
 	)
 }

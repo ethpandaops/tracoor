@@ -38,6 +38,15 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		return nil
 	}
 
+	// Held until the upload finishes, not just the fetch. Block traces are the
+	// largest payload the agent handles.
+	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire fetch slot")
+	}
+
+	defer releaseFetchSlot()
+
 	// Fetch the execution block trace from the execution node.
 	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash, s.node.Execution().Metadata().Client(ctx))
 	if err != nil {
@@ -50,6 +59,10 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	if err != nil {
 		return errors.Wrapf(err, "failed to compress execution block trace")
 	}
+
+	// Drop the raw trace before the upload so only the compressed copy is held
+	// for the duration of the store write.
+	*data = nil
 
 	location := CreateExecutionBlockTraceFileName(
 		s.Config.Name,
@@ -99,9 +112,9 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
 	// Held across the indexing pass below, as the decoded slice is retained until
 	// it completes.
-	releaseFetchSlot, err := s.acquireExecutionBadBlockFetch(ctx)
+	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to acquire execution bad block fetch slot")
+		return errors.Wrap(err, "failed to acquire fetch slot")
 	}
 
 	defer releaseFetchSlot()

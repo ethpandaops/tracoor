@@ -28,42 +28,21 @@ type Config struct {
 	// the beacon node cache.
 	BeaconStateAgeThresholdEpochs uint64 `yaml:"beaconStateAgeThresholdEpochs" default:"1"`
 
-	// MaxConcurrentBeaconStateFetches bounds in-flight beacon state fetches across
-	// every agent in the process, capping peak memory independently of how many
-	// agents are configured. Applied process-wide by whichever agent starts first.
-	MaxConcurrentBeaconStateFetches int `yaml:"maxConcurrentBeaconStateFetches" default:"10"`
-
-	// MaxConcurrentExecutionBadBlockFetches bounds in-flight bad block fetches,
-	// as above.
-	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"10"`
-
-	// MaxConcurrentExecutionPayloadEnvelopeFetches bounds in-flight execution
-	// payload envelope fetches, as above.
-	MaxConcurrentExecutionPayloadEnvelopeFetches int `yaml:"maxConcurrentExecutionPayloadEnvelopeFetches" default:"10"`
+	// MaxConcurrentFetches bounds how many fetches of any kind - states, blocks,
+	// envelopes, block traces, bad blocks and bad blobs - may be in flight at once
+	// across every agent in the process. Each holds its whole response in memory,
+	// so this caps peak usage independently of how many agents are configured.
+	// A single shared budget is deliberate: per-path budgets bound each path but
+	// not the total. Applied process-wide by whichever agent starts first.
+	MaxConcurrentFetches int `yaml:"maxConcurrentFetches" default:"10"`
 }
 
-func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
-	if c.MaxConcurrentBeaconStateFetches <= 0 {
+func (c *Config) GetMaxConcurrentFetches() int {
+	if c.MaxConcurrentFetches <= 0 {
 		return 0
 	}
 
-	return c.MaxConcurrentBeaconStateFetches
-}
-
-func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int {
-	if c.MaxConcurrentExecutionBadBlockFetches <= 0 {
-		return 0
-	}
-
-	return c.MaxConcurrentExecutionBadBlockFetches
-}
-
-func (c *Config) GetMaxConcurrentExecutionPayloadEnvelopeFetches() int {
-	if c.MaxConcurrentExecutionPayloadEnvelopeFetches <= 0 {
-		return 0
-	}
-
-	return c.MaxConcurrentExecutionPayloadEnvelopeFetches
+	return c.MaxConcurrentFetches
 }
 
 func (c *Config) Validate() error {
