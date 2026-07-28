@@ -77,6 +77,16 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		stateID = fmt.Sprintf("%d", slot)
 	}
 
+	// Bound how many states are in flight process-wide. The raw state and its
+	// compressed copy are both held until the upload finishes, so the slot is
+	// kept for that whole window rather than just the fetch.
+	releaseFetchSlot, err := s.acquireBeaconStateFetch(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire beacon state fetch slot")
+	}
+
+	defer releaseFetchSlot()
+
 	// Fetch the state
 	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
@@ -90,6 +100,10 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	if err != nil {
 		return errors.Wrap(err, "failed to compress beacon state")
 	}
+
+	// Drop the raw state before the upload so only the compressed copy is held
+	// for the duration of the store write.
+	state = nil
 
 	// Upload the state to the store
 	location, err = s.store.SaveBeaconState(ctx, &store.SaveParams{
