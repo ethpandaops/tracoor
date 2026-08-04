@@ -47,37 +47,37 @@ func newMetrics(namespace string, enabled bool) *Metrics {
 			Namespace: namespace,
 			Name:      "promotions_total",
 			Help:      "Number of promotions per trigger (a capture with N triggers counts N times).",
-		}, []string{"network", "trigger"}),
+		}, []string{labelNetwork, "trigger"}),
 		captures: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "captures_total",
 			Help:      "Number of captures written to the corpus.",
-		}, []string{"network", "branch"}),
+		}, []string{labelNetwork, "branch"}),
 		unpaired: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "unpaired_captures_total",
 			Help:      "Number of captures promoted without a pre-state (buffer holes).",
-		}, []string{"network"}),
+		}, []string{labelNetwork}),
 		skips: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "skips_total",
 			Help:      "Number of triggered candidates skipped instead of promoted.",
-		}, []string{"network", "reason"}),
+		}, []string{labelNetwork, "reason"}),
 		errors: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "errors_total",
 			Help:      "Number of errors while processing candidates.",
-		}, []string{"network"}),
+		}, []string{labelNetwork}),
 		corpusBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "corpus_bytes_total",
 			Help:      "Bytes written to the corpus store.",
-		}, []string{"network", "kind"}),
+		}, []string{labelNetwork, "kind"}),
 		lastProcessedEpoch: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "last_processed_epoch",
 			Help:      "Highest epoch processed per network.",
-		}, []string{"network"}),
+		}, []string{labelNetwork}),
 	}
 
 	if enabled {

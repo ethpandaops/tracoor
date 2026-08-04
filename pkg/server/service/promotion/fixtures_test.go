@@ -29,6 +29,7 @@ import (
 const (
 	testNetwork = "testnet"
 	testNode    = "cl-1-test"
+	testMeta    = "test"
 )
 
 func fillRoot(b byte) phase0.Root {
@@ -58,7 +59,7 @@ func testBlock(t *testing.T, slot uint64, parentRoot, stateRoot phase0.Root, mut
 	t.Helper()
 
 	bits := bitfield.NewBitvector512()
-	for i := uint64(0); i < bits.Len(); i++ {
+	for i := range bits.Len() {
 		bits.SetBitAt(i, true)
 	}
 
@@ -97,7 +98,7 @@ func withAttesterSlashing(body *altair.BeaconBlockBody) {
 
 func withSparseSyncBits(body *altair.BeaconBlockBody) {
 	bits := bitfield.NewBitvector512()
-	for i := uint64(0); i < 100; i++ {
+	for i := range uint64(100) {
 		bits.SetBitAt(i, true)
 	}
 
@@ -214,8 +215,8 @@ func (e *env) insertBlockRow(node string, slot, epoch uint64, rootHex, location 
 		ContentEncoding:      compression.Gzip.ContentEncoding,
 		Location:             location,
 		Network:              testNetwork,
-		BeaconImplementation: "test",
-		NodeVersion:          "test",
+		BeaconImplementation: testMeta,
+		NodeVersion:          testMeta,
 	}))
 }
 
@@ -251,8 +252,8 @@ func (e *env) seedState(node string, slot uint64, stateRoot phase0.Root, raw []b
 		ContentEncoding:      compression.Gzip.ContentEncoding,
 		Location:             location,
 		Network:              testNetwork,
-		BeaconImplementation: "test",
-		NodeVersion:          "test",
+		BeaconImplementation: testMeta,
+		NodeVersion:          testMeta,
 	}))
 }
 

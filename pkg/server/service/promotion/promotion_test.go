@@ -2,6 +2,7 @@ package promotion
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -172,6 +173,57 @@ func TestRateCap(t *testing.T) {
 	}
 
 	assert.Equal(t, map[uint64]int{163: 1, 166: 1, 167: 2}, slots)
+}
+
+// A failed corpus write consumes no rate budget and holds the epoch back for
+// retry: after the store recovers, the capture is promoted with the budget
+// intact.
+func TestFailedWriteConsumesNoBudgetAndRetries(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.RateCapPerHour = 1 })
+	gvr := fillRoot(0x11)
+
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	// Corpus outage: every write fails.
+	require.NoError(t, os.Chmod(e.corpusDir, 0o555))
+
+	e.promoter.tick(t.Context())
+	assert.Empty(t, e.findManifests())
+
+	// Recovery: the held-back epoch is retried and the (unconsumed) budget
+	// admits the capture.
+	require.NoError(t, os.Chmod(e.corpusDir, 0o755))
+
+	e.promoter.tick(t.Context())
+	require.Len(t, e.findManifests(), 1)
+}
+
+// A persistently failing epoch is retried boundedly, then abandoned loudly -
+// one poison candidate must not block every later epoch until the reaper
+// eats them.
+func TestFailingEpochIsAbandonedAfterBoundedRetries(t *testing.T) {
+	e := newEnv(t, nil)
+	gvr := fillRoot(0x11)
+
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	require.NoError(t, os.Chmod(e.corpusDir, 0o555))
+
+	for range maxEpochAttempts {
+		e.promoter.tick(t.Context())
+	}
+
+	// The epoch was abandoned and progress advanced past it.
+	assert.Equal(t, uint64(5), e.promoter.lastProcessedEpoch[testNetwork])
+
+	// Even after recovery the abandoned capture is not retried (until a
+	// restart rescan); nothing was promoted.
+	require.NoError(t, os.Chmod(e.corpusDir, 0o755))
+
+	e.promoter.tick(t.Context())
+	assert.Empty(t, e.findManifests())
 }
 
 // After a restart-rescan, cap budget is NOT spent on captures that already

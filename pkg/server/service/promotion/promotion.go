@@ -48,6 +48,15 @@ const (
 	// epochRowLimit bounds a single epoch listing; 32-ish slots times a
 	// handful of nodes sits far below it.
 	epochRowLimit = 10000
+
+	// maxEpochAttempts bounds how often a failing epoch is retried before
+	// the service abandons it and moves on.
+	maxEpochAttempts = 10
+
+	// Shared log-field and metric-label keys.
+	labelNetwork   = "network"
+	labelSlot      = "slot"
+	labelBlockRoot = "block_root"
 )
 
 // Promoter is the promotion service. All mutable state is owned by the single
@@ -72,6 +81,11 @@ type Promoter struct {
 
 	rate map[string]*rateWindow
 
+	// retries bounds how often a failing epoch is retried before the
+	// service advances past it: only the first failing epoch per network
+	// can block, so a single entry per network suffices.
+	retries map[string]*epochRetry
+
 	done     chan struct{}
 	stopOnce sync.Once
 }
@@ -79,6 +93,11 @@ type Promoter struct {
 type rateWindow struct {
 	start time.Time
 	count uint64
+}
+
+type epochRetry struct {
+	epoch    uint64
+	attempts int
 }
 
 // NewPromoter creates the promotion service. The corpus store is built from
@@ -103,6 +122,7 @@ func NewPromoter(ctx context.Context, log logrus.FieldLogger, conf *Config, db *
 		lastProcessedEpoch: make(map[string]uint64),
 		networkGVR:         make(map[string]string),
 		rate:               make(map[string]*rateWindow),
+		retries:            make(map[string]*epochRetry),
 		done:               make(chan struct{}),
 	}, nil
 }
@@ -155,7 +175,7 @@ func (p *Promoter) run(ctx context.Context) {
 }
 
 func (p *Promoter) tick(ctx context.Context) {
-	values, err := p.db.DistinctBeaconBlockValues(ctx, []string{"network"})
+	values, err := p.db.DistinctBeaconBlockValues(ctx, []string{labelNetwork})
 	if err != nil {
 		p.log.WithError(err).Error("Failed to list networks")
 
@@ -169,7 +189,7 @@ func (p *Promoter) tick(ctx context.Context) {
 
 		if err := p.processNetwork(ctx, network); err != nil {
 			p.metrics.ObserveError(network)
-			p.log.WithError(err).WithField("network", network).Error("Failed to process network")
+			p.log.WithError(err).WithField(labelNetwork, network).Error("Failed to process network")
 		}
 	}
 }
@@ -201,11 +221,26 @@ func (p *Promoter) processNetwork(ctx context.Context, network string) error {
 
 	for epoch := from; epoch <= target; epoch++ {
 		if err := p.processEpoch(ctx, network, epoch, headSlot); err != nil {
-			// Do not advance past a failing epoch; retry next tick. The
-			// retention reaper bounds how long that can go on, and the
-			// error metric makes the loss visible, never silent.
-			return errors.Wrapf(err, "failed to process epoch %d", epoch)
+			// Hold the epoch back and retry next tick - the existence
+			// probe makes re-processing free - but only boundedly: a
+			// deterministic poison candidate must not block every later
+			// epoch until the reaper eats them.
+			retry := p.retries[network]
+			if retry == nil || retry.epoch != epoch {
+				retry = &epochRetry{epoch: epoch}
+				p.retries[network] = retry
+			}
+
+			retry.attempts++
+			if retry.attempts < maxEpochAttempts {
+				return errors.Wrapf(err, "failed to process epoch %d (attempt %d/%d)", epoch, retry.attempts, maxEpochAttempts)
+			}
+
+			p.log.WithError(err).WithFields(logrus.Fields{labelNetwork: network, "epoch": epoch}).Error("Abandoning epoch after repeated failures; its unpromoted captures are lost")
+			p.metrics.ObserveError(network)
 		}
+
+		delete(p.retries, network)
 
 		p.lastProcessedEpoch[network] = epoch
 		p.metrics.ObserveLastProcessedEpoch(network, epoch)
@@ -275,6 +310,8 @@ func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, head
 
 	baselineSlot, haveBaseline := p.baselineSlot(pass)
 
+	var failed error
+
 	for _, slot := range pass.slots {
 		cands := pass.bySlot[slot]
 		isReorg := len(cands) > 1
@@ -290,12 +327,17 @@ func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, head
 
 			if err := p.promote(ctx, pass, cand, parent, triggers, branches[cand.root]); err != nil {
 				p.metrics.ObserveError(network)
-				p.log.WithError(err).WithFields(logrus.Fields{"network": network, "slot": slot, "block_root": cand.root}).Error("Failed to promote candidate")
+				p.log.WithError(err).WithFields(logrus.Fields{labelNetwork: network, labelSlot: slot, labelBlockRoot: cand.root}).Error("Failed to promote candidate")
+
+				// Hold the epoch back so the capture is retried next tick;
+				// the existence probe makes re-processing free, and the
+				// retention window bounds how long a retry can matter.
+				failed = err
 			}
 		}
 	}
 
-	return nil
+	return failed
 }
 
 // buildCandidates fetches every distinct root's bytes once and byte-peeks the
@@ -364,7 +406,7 @@ func (p *Promoter) loadCandidate(ctx context.Context, network string, cand *cand
 			// Truncated or misfiled: promote nothing under a label the
 			// payload contradicts.
 			p.metrics.ObserveSkip(network, SkipReasonMalformed)
-			p.log.WithError(err).WithFields(logrus.Fields{"location": row.Location, "slot": cand.slot}).Warn("Block bytes fail sanity rules")
+			p.log.WithError(err).WithFields(logrus.Fields{"location": row.Location, labelSlot: cand.slot}).Warn("Block bytes fail sanity rules")
 
 			continue
 		}
@@ -613,7 +655,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 	// consumed once the capture is known to be new.
 	if !bypassCap && !p.headroom(pass.network) {
 		p.metrics.ObserveSkip(pass.network, SkipReasonRateCapped)
-		p.log.WithFields(logrus.Fields{"network": pass.network, "slot": cand.slot, "block_root": cand.root}).Debug("Rate cap exhausted, skipping promotion")
+		p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot, labelBlockRoot: cand.root}).Debug("Rate cap exhausted, skipping promotion")
 
 		return nil
 	}
@@ -646,7 +688,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		gvr = p.resolveNetworkGVR(ctx, pass.network)
 		if gvr == "" {
 			p.metrics.ObserveSkip(pass.network, SkipReasonGVRAmbiguous)
-			p.log.WithFields(logrus.Fields{"network": pass.network, "slot": cand.slot}).Warn("No genesis validators root resolvable; refusing to label capture")
+			p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot}).Warn("No genesis validators root resolvable; refusing to label capture")
 
 			return nil
 		}
@@ -667,10 +709,6 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 
 			return nil
 		}
-	}
-
-	if !bypassCap {
-		p.consume(pass.network)
 	}
 
 	if stateRaw != nil {
@@ -732,6 +770,13 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		return errors.Wrap(err, "failed to write manifest")
 	}
 
+	// The manifest is the commit point: budget is only consumed once the
+	// capture actually landed, so a corpus-store outage cannot burn the
+	// hourly window on failed writes.
+	if !bypassCap {
+		p.consume(pass.network)
+	}
+
 	p.metrics.ObserveCorpusBytes(pass.network, "manifest", len(data))
 	p.metrics.ObserveCapture(pass.network, branch)
 
@@ -744,9 +789,9 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 	}
 
 	p.log.WithFields(logrus.Fields{
-		"network":       network,
-		"slot":          cand.slot,
-		"block_root":    cand.root,
+		labelNetwork:    network,
+		labelSlot:       cand.slot,
+		labelBlockRoot:  cand.root,
 		"triggers":      triggers,
 		"branch":        branch,
 		"pair_verified": manifest.Promotion.PairVerified,
