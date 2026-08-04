@@ -91,8 +91,9 @@ type Promoter struct {
 }
 
 type rateWindow struct {
-	start time.Time
-	count uint64
+	start       time.Time
+	commonCount uint64
+	rareCount   uint64
 }
 
 type epochRetry struct {
@@ -603,9 +604,36 @@ func (p *Promoter) lookaheadChildren(ctx context.Context, pass *epochPass) map[s
 	return out
 }
 
-// headroom reports whether the per-network hourly window has budget left,
-// without consuming any.
-func (p *Promoter) headroom(network string) bool {
+// rateTier classifies a capture for admission. Reorgs are uncapped: they are
+// self-limiting per slot and the orphaned branch is unobtainable anywhere
+// else. Rare-but-not-bounded classes (slashings can arrive by the hundreds
+// in a mass-slashing incident) get their own budget so they never compete
+// with a participation/gap flood, yet keep a hard ceiling. Everything
+// repetitive or spammable draws from the common budget.
+type rateTier int
+
+const (
+	tierUncapped rateTier = iota
+	tierRare
+	tierCommon
+)
+
+func classifyTier(triggers []string) rateTier {
+	if slices.Contains(triggers, TriggerReorg) {
+		return tierUncapped
+	}
+
+	for _, trigger := range triggers {
+		switch trigger {
+		case TriggerSlashing, TriggerVoluntaryExit, TriggerBLSToExecutionChange, TriggerForkBoundary:
+			return tierRare
+		}
+	}
+
+	return tierCommon
+}
+
+func (p *Promoter) window(network string) *rateWindow {
 	now := time.Now()
 
 	w := p.rate[network]
@@ -614,13 +642,34 @@ func (p *Promoter) headroom(network string) bool {
 		p.rate[network] = w
 	}
 
-	return w.count < p.config.RateCapPerHour
+	return w
 }
 
-// consume takes one promotion from the per-network hourly window. When the
-// cap is exhausted the caller skips - it never queues and never deletes.
-func (p *Promoter) consume(network string) {
-	p.rate[network].count++
+// headroom reports whether the tier's per-network hourly budget has room,
+// without consuming any.
+func (p *Promoter) headroom(network string, tier rateTier) bool {
+	w := p.window(network)
+
+	switch tier {
+	case tierUncapped:
+		return true
+	case tierRare:
+		return w.rareCount < p.config.RareCapPerHour
+	default:
+		return w.commonCount < p.config.RateCapPerHour
+	}
+}
+
+// consume takes one promotion from the tier's hourly budget. When a budget
+// is exhausted the caller skips - it never queues and never deletes.
+func (p *Promoter) consume(network string, tier rateTier) {
+	switch tier {
+	case tierUncapped:
+	case tierRare:
+		p.window(network).rareCount++
+	default:
+		p.window(network).commonCount++
+	}
 }
 
 // promote copies the candidate block, its pre-state (the post-state of its
@@ -636,7 +685,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 	}
 
 	id := captureID(cand.slot, cand.root)
-	bypassCap := slices.Contains(triggers, TriggerReorg)
+	tier := classifyTier(triggers)
 
 	// Provisional dedupe with the cached network GVR: on a rescan this
 	// skips the capture before any state-sized fetch happens.
@@ -653,9 +702,14 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 
 	// Cheap headroom probe before the state fetch; the budget is only
 	// consumed once the capture is known to be new.
-	if !bypassCap && !p.headroom(pass.network) {
-		p.metrics.ObserveSkip(pass.network, SkipReasonRateCapped)
-		p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot, labelBlockRoot: cand.root}).Debug("Rate cap exhausted, skipping promotion")
+	if !p.headroom(pass.network, tier) {
+		reason := SkipReasonRateCappedCommon
+		if tier == tierRare {
+			reason = SkipReasonRateCappedRare
+		}
+
+		p.metrics.ObserveSkip(pass.network, reason)
+		p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot, labelBlockRoot: cand.root, "tier": reason}).Debug("Rate cap exhausted, skipping promotion")
 
 		return nil
 	}
@@ -773,9 +827,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 	// The manifest is the commit point: budget is only consumed once the
 	// capture actually landed, so a corpus-store outage cannot burn the
 	// hourly window on failed writes.
-	if !bypassCap {
-		p.consume(pass.network)
-	}
+	p.consume(pass.network, tier)
 
 	p.metrics.ObserveCorpusBytes(pass.network, "manifest", len(data))
 	p.metrics.ObserveCapture(pass.network, branch)

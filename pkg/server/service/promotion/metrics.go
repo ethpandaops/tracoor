@@ -19,11 +19,12 @@ type Metrics struct {
 // Skip reasons. Every non-promotion of a candidate that fired a trigger is
 // visible, never silent.
 const (
-	SkipReasonRateCapped      = "rate_capped"
-	SkipReasonMissingObject   = "missing_object"
-	SkipReasonMalformed       = "malformed"
-	SkipReasonGVRAmbiguous    = "gvr_ambiguous"
-	SkipReasonAlreadyPromoted = "already_promoted"
+	SkipReasonRateCappedCommon = "rate_capped_common"
+	SkipReasonRateCappedRare   = "rate_capped_rare"
+	SkipReasonMissingObject    = "missing_object"
+	SkipReasonMalformed        = "malformed"
+	SkipReasonGVRAmbiguous     = "gvr_ambiguous"
+	SkipReasonAlreadyPromoted  = "already_promoted"
 )
 
 var (

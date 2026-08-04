@@ -30,11 +30,18 @@ type Config struct {
 	SlotsPerEpoch  uint64         `yaml:"slotsPerEpoch" default:"32"`
 	SecondsPerSlot human.Duration `yaml:"secondsPerSlot" default:"12s"`
 
-	// RateCapPerHour caps promotions per network per hour. It is the only
-	// flood guard: when exhausted the service skips - it never queues and
-	// never deletes. Reorg promotions bypass the cap (self-limiting and the
-	// highest-value class).
+	// RateCapPerHour caps common-tier promotions (gap, low_participation,
+	// baseline, undecodable_fork, deposit, execution_request) per network
+	// per hour. It is the flood guard: when exhausted the service skips -
+	// it never queues and never deletes.
 	RateCapPerHour uint64 `yaml:"rateCapPerHour" default:"30"`
+
+	// RareCapPerHour is a separate budget for rare-tier promotions
+	// (slashing, voluntary_exit, bls_to_execution_change, fork_boundary),
+	// so the rarest captures never compete with a participation/gap flood
+	// during a stall, while a mass-slashing incident still meets a hard
+	// ceiling. Reorg promotions are uncapped (self-limiting per slot).
+	RareCapPerHour uint64 `yaml:"rareCapPerHour" default:"120"`
 
 	// BaselineEveryNEpochs promotes the first qualifying slot of every Nth
 	// epoch regardless of triggers; a corpus of only pathologies is its own

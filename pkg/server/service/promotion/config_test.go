@@ -21,6 +21,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, uint64(32), conf.SlotsPerEpoch)
 	assert.Equal(t, 12*time.Second, conf.SecondsPerSlot.Duration)
 	assert.Equal(t, uint64(30), conf.RateCapPerHour)
+	assert.Equal(t, uint64(120), conf.RareCapPerHour)
 	assert.Equal(t, uint64(8), conf.BaselineEveryNEpochs)
 	assert.Equal(t, uint64(2), conf.GapTrigger)
 	assert.InDelta(t, 0.95, conf.SyncParticipationFloor, 1e-9)

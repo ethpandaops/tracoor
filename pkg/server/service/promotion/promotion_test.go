@@ -133,6 +133,59 @@ func TestIdempotency(t *testing.T) {
 	assert.Equal(t, before, e.corpusFiles())
 }
 
+// Rare-tier triggers (slashing etc.) draw from their own budget: a
+// participation/gap flood that exhausts the common cap never crowds out the
+// rarest captures.
+func TestRareTriggerBeatsCommonFlood(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.RateCapPerHour = 1 })
+	gvr := fillRoot(0x11)
+	now := time.Now()
+
+	// 163 (gap) consumes the entire common budget; 168 (gap) is capped.
+	e.seedChain(gvr, 160, 163, 164, 165, 168)
+
+	// A slashing at 166 arrives mid-flood.
+	e.seedBlock(testNode, 166, 5, slotRoot(0xe1, 166), testBlock(t, 166, blockRootFor(165), slotRoot(0xb1, 166), withAttesterSlashing), now)
+	e.seedState(testNode, 166, slotRoot(0xb1, 166), testState(gvr, 166), now)
+
+	e.seedHeadAnchor(224)
+	e.promoter.tick(t.Context())
+
+	slots := map[uint64][]string{}
+
+	for _, path := range e.findManifests() {
+		m := e.readManifest(path)
+		slots[m.Block.Slot] = m.Promotion.Triggers
+	}
+
+	assert.Contains(t, slots, uint64(163), "common budget goes to the first gap")
+	assert.NotContains(t, slots, uint64(168), "second gap must be rate capped")
+	require.Contains(t, slots, uint64(166), "slashing must not compete with the flood")
+	assert.Equal(t, []string{TriggerSlashing}, slots[166])
+}
+
+// The rare tier has its own hard ceiling: a mass-slashing incident cannot
+// flood the corpus either.
+func TestRareCapCeiling(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.RareCapPerHour = 1 })
+	gvr := fillRoot(0x11)
+	now := time.Now()
+
+	e.seedChain(gvr, 160)
+
+	for _, slot := range []uint64{161, 162} {
+		e.seedBlock(testNode, slot, 5, slotRoot(0xe1, slot), testBlock(t, slot, blockRootFor(slot-1), slotRoot(0xb1, slot), withAttesterSlashing), now)
+		e.seedState(testNode, slot, slotRoot(0xb1, slot), testState(gvr, slot), now)
+	}
+
+	e.seedHeadAnchor(224)
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+	assert.Equal(t, uint64(161), e.readManifest(manifests[0]).Block.Slot)
+}
+
 // The rate cap skips (never queues, never deletes); reorg promotions bypass
 // it; a rescan does not burn budget on already-promoted captures.
 func TestRateCap(t *testing.T) {

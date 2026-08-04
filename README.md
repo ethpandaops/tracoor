@@ -93,7 +93,9 @@ consensus captures — as a replayable `(parent post-state, block)` pair plus a
 every devnet. Interesting means: slashings, exits, deposits, execution
 requests, missed-block runs, reorgs (both branches), fork boundaries,
 low sync participation, undecodable (brand-new) forks, plus a periodic
-baseline. A per-network hourly rate cap bounds volume; the service never
+baseline. Two per-network hourly rate budgets bound volume (a common one for
+repetitive symptoms, a separate one for rare events so they never compete
+with floods; reorgs are uncapped); the service never
 deletes anything and keeps no persistent state.
 
 The corpus layout is self-describing:

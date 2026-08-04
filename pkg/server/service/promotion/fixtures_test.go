@@ -187,6 +187,7 @@ checkInterval: 30s
 slotsPerEpoch: 32
 secondsPerSlot: 2s
 rateCapPerHour: 1000
+rareCapPerHour: 120
 baselineEveryNEpochs: 8
 gapTrigger: 2
 syncParticipationFloor: 0.95
