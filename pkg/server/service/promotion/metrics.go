@@ -13,6 +13,7 @@ type Metrics struct {
 	skips              *prometheus.CounterVec
 	errors             *prometheus.CounterVec
 	corpusBytes        *prometheus.CounterVec
+	networkResets      *prometheus.CounterVec
 	lastProcessedEpoch *prometheus.GaugeVec
 }
 
@@ -21,10 +22,19 @@ type Metrics struct {
 const (
 	SkipReasonRateCappedCommon = "rate_capped_common"
 	SkipReasonRateCappedRare   = "rate_capped_rare"
+	SkipReasonRateCappedReorg  = "rate_capped_reorg"
 	SkipReasonMissingObject    = "missing_object"
 	SkipReasonMalformed        = "malformed"
 	SkipReasonGVRAmbiguous     = "gvr_ambiguous"
 	SkipReasonAlreadyPromoted  = "already_promoted"
+	SkipReasonRowLimit         = "row_limit_truncated"
+	SkipReasonImplausibleEpoch = "implausible_head_epoch"
+)
+
+// Reasons a network's per-process state was discarded and rebuilt.
+const (
+	ResetReasonHeightRegression = "height_regression"
+	ResetReasonIdentityChange   = "identity_change"
 )
 
 var (
@@ -34,15 +44,15 @@ var (
 
 // GetMetricsInstance returns the process-wide promotion metrics, registering
 // them at most once so multiple service instances (restarts, tests) are safe.
-func GetMetricsInstance(namespace string, enabled bool) *Metrics {
+func GetMetricsInstance(namespace string) *Metrics {
 	metricsOnce.Do(func() {
-		metricsInstance = newMetrics(namespace, enabled)
+		metricsInstance = newMetrics(namespace)
 	})
 
 	return metricsInstance
 }
 
-func newMetrics(namespace string, enabled bool) *Metrics {
+func newMetrics(namespace string) *Metrics {
 	m := &Metrics{
 		promotions: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -74,6 +84,11 @@ func newMetrics(namespace string, enabled bool) *Metrics {
 			Name:      "corpus_bytes_total",
 			Help:      "Bytes written to the corpus store.",
 		}, []string{labelNetwork, "kind"}),
+		networkResets: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "network_resets_total",
+			Help:      "Number of times a network's promotion cursor and identity were discarded and rebuilt.",
+		}, []string{labelNetwork, "reason"}),
 		lastProcessedEpoch: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "last_processed_epoch",
@@ -81,17 +96,16 @@ func newMetrics(namespace string, enabled bool) *Metrics {
 		}, []string{labelNetwork}),
 	}
 
-	if enabled {
-		prometheus.MustRegister(
-			m.promotions,
-			m.captures,
-			m.unpaired,
-			m.skips,
-			m.errors,
-			m.corpusBytes,
-			m.lastProcessedEpoch,
-		)
-	}
+	prometheus.MustRegister(
+		m.promotions,
+		m.captures,
+		m.unpaired,
+		m.skips,
+		m.errors,
+		m.corpusBytes,
+		m.networkResets,
+		m.lastProcessedEpoch,
+	)
 
 	return m
 }
@@ -118,6 +132,10 @@ func (m *Metrics) ObserveError(network string) {
 
 func (m *Metrics) ObserveCorpusBytes(network, kind string, n int) {
 	m.corpusBytes.WithLabelValues(network, kind).Add(float64(n))
+}
+
+func (m *Metrics) ObserveNetworkReset(network, reason string) {
+	m.networkResets.WithLabelValues(network, reason).Inc()
 }
 
 func (m *Metrics) ObserveLastProcessedEpoch(network string, epoch uint64) {

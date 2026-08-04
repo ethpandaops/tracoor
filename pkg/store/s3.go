@@ -134,8 +134,9 @@ func (s *S3Store) SaveRaw(ctx context.Context, params *SaveParams) (string, erro
 		input.ContentEncoding = aws.String(params.ContentEncoding)
 	}
 
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
+	// Unlike the older Save* methods, a failed put returns before the
+	// counters move: an object that was not written is not an object added.
+	if _, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware)); err != nil {
 		var apiErr smithy.APIError
 
 		if errors.As(err, &apiErr) {
@@ -148,12 +149,14 @@ func (s *S3Store) SaveRaw(ctx context.Context, params *SaveParams) (string, erro
 				return "", errors.New("failed to save raw object: " + apiErr.Error())
 			}
 		}
+
+		return "", err
 	}
 
 	s.basicMetrics.ObserveItemAdded(string(RawDataType))
 	s.basicMetrics.ObserveItemAddedBytes(string(RawDataType), len(*params.Data))
 
-	return params.Location, err
+	return params.Location, nil
 }
 
 func (s *S3Store) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {

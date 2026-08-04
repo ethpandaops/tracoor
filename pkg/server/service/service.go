@@ -30,7 +30,7 @@ const (
 	ServiceTypePromotion Type = promotion.ServiceType
 )
 
-func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store, grpcConn string, grpcOpts []grpc.DialOption, ethConfig *ethereum.Config) ([]GRPCService, error) {
+func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config, p *persistence.Indexer, c store.Store, bufferStore store.Config, grpcConn string, grpcOpts []grpc.DialOption, ethConfig *ethereum.Config) ([]GRPCService, error) {
 	services := []GRPCService{}
 
 	// Indexer
@@ -72,6 +72,12 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 		}
 
 		if err := cfg.Promotion.ValidateRetention(retention); err != nil {
+			return nil, err
+		}
+
+		// The corpus outlives every devnet; the buffer is reaped. They must
+		// not be the same destination.
+		if err := cfg.Promotion.ValidateDistinctFrom(bufferStore); err != nil {
 			return nil, err
 		}
 

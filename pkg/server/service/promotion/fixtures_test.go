@@ -15,6 +15,7 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec/altair"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/creasty/defaults"
 	"github.com/google/uuid"
 	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/sirupsen/logrus"
@@ -197,8 +198,27 @@ store:
     base_path: %s
 `, corpusDir)
 
+	// Defaults first, then the document - exactly the order the server uses,
+	// so a field the document omits behaves in tests as it will in prod.
 	conf := &Config{}
+	require.NoError(t, defaults.Set(conf))
 	require.NoError(t, yaml.Unmarshal([]byte(doc), conf))
+
+	return conf
+}
+
+// storeConfig builds a store.Config the way yaml loading would, so the raw
+// message behind it is a real unmarshaller rather than a zero value.
+func storeConfig(t *testing.T, storeType string, config map[string]string) store.Config {
+	t.Helper()
+
+	doc := fmt.Sprintf("type: %s\nconfig:\n", storeType)
+	for key, value := range config {
+		doc += fmt.Sprintf("  %s: %q\n", key, value)
+	}
+
+	conf := store.Config{}
+	require.NoError(t, yaml.Unmarshal([]byte(doc), &conf))
 
 	return conf
 }
@@ -349,6 +369,47 @@ func (e *env) readManifest(path string) *Manifest {
 	require.NoError(e.t, json.Unmarshal(data, manifest))
 
 	return manifest
+}
+
+// purge removes every indexed block and state for the test network, standing
+// in for the retention reaper.
+func (e *env) purge() {
+	e.t.Helper()
+
+	blocks, err := e.db.ListBeaconBlock(e.t.Context(), &persistence.BeaconBlockFilter{Network: ptr(testNetwork)}, &persistence.PaginationCursor{Limit: 10000, OrderBy: "slot ASC"})
+	require.NoError(e.t, err)
+
+	for _, row := range blocks {
+		require.NoError(e.t, e.db.RemoveBeaconBlock(e.t.Context(), row.ID))
+	}
+
+	states, err := e.db.ListBeaconState(e.t.Context(), &persistence.BeaconStateFilter{Network: ptr(testNetwork)}, &persistence.PaginationCursor{Limit: 10000, OrderBy: "slot ASC"})
+	require.NoError(e.t, err)
+
+	for _, row := range states {
+		require.NoError(e.t, e.db.RemoveBeaconState(e.t.Context(), row.ID))
+	}
+}
+
+// expireIdentity ages out the cached genesis validators root so the next tick
+// re-resolves it.
+func (e *env) expireIdentity() {
+	e.t.Helper()
+
+	e.promoter.network(testNetwork).gvrResolved = time.Now().Add(-2 * networkIdentityTTL)
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// requireWriteProtectable skips a test that relies on a read-only directory
+// actually blocking writes. Root ignores the mode bits, and the test would
+// then assert nothing at all.
+func requireWriteProtectable(t *testing.T) {
+	t.Helper()
+
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: read-only directories do not block writes")
+	}
 }
 
 func (e *env) readCorpusObject(path string) []byte {

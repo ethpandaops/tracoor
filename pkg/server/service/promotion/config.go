@@ -34,16 +34,33 @@ type Config struct {
 	// baseline, undecodable_fork, deposit, execution_request) per network
 	// per hour. It is the flood guard: when exhausted the service skips -
 	// it never queues and never deletes.
+	//
+	// The window is tumbling, not sliding: it resets an hour after its first
+	// promotion, so a burst straddling the boundary can spend two budgets
+	// within a few minutes. That is deliberate - the cap bounds sustained
+	// volume, not instantaneous burstiness.
+	//
+	// A cap of 0 promotes nothing in that tier. To drop a class of captures,
+	// prefer disabling its trigger: a zero cap is indistinguishable in the
+	// metrics from a permanently exhausted budget.
 	RateCapPerHour uint64 `yaml:"rateCapPerHour" default:"30"`
 
 	// RareCapPerHour is a separate budget for rare-tier promotions
 	// (slashing, voluntary_exit, bls_to_execution_change, fork_boundary),
 	// so the rarest captures never compete with a participation/gap flood
 	// during a stall, while a mass-slashing incident still meets a hard
-	// ceiling. Reorg promotions are uncapped (self-limiting per slot).
+	// ceiling.
 	RareCapPerHour uint64 `yaml:"rareCapPerHour" default:"120"`
 
-	// BaselineEveryNEpochs promotes the first qualifying slot of every Nth
+	// ReorgCapPerHour is a deliberately generous ceiling for reorg
+	// promotions. Reorgs are self-limiting per slot and the orphaned branch
+	// is unobtainable anywhere else, so they get their own budget rather
+	// than competing with anything - but "self-limiting per slot" is not a
+	// bound in aggregate: an equivocation storm, or an agent inserting many
+	// distinct roots per slot, is otherwise unbounded corpus spend.
+	ReorgCapPerHour uint64 `yaml:"reorgCapPerHour" default:"1000"`
+
+	// BaselineEveryNEpochs promotes the lowest indexed slot of every Nth
 	// epoch regardless of triggers; a corpus of only pathologies is its own
 	// blind spot. Fires on epoch%N == 0 so re-processing selects the same
 	// slots.
@@ -94,8 +111,11 @@ func (c *Config) Validate() error {
 		return errors.New("promotion: slotsPerEpoch must be > 0")
 	}
 
-	if c.SecondsPerSlot.Duration <= 0 {
-		return errors.New("promotion: secondsPerSlot must be > 0")
+	// Manifests record seconds_per_slot as an integer, so a sub-second value
+	// would be published as 0 rather than truncated silently. No beacon
+	// chain spec uses one.
+	if c.SecondsPerSlot.Duration < time.Second {
+		return errors.New("promotion: secondsPerSlot must be >= 1s")
 	}
 
 	if c.CheckInterval.Duration <= 0 {
@@ -111,6 +131,73 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// Store config fields that decide whether two store configs address the same
+// physical destination.
+const (
+	keyEndpoint   = "endpoint"
+	keyBucketName = "bucket_name"
+	keyBasePath   = "base_path"
+)
+
+var identityKeys = map[store.Type][]string{
+	store.S3StoreType: {keyEndpoint, keyBucketName},
+	store.FSStoreType: {keyBasePath},
+}
+
+// ValidateDistinctFrom refuses a corpus store that addresses the same
+// destination as the buffer store. The corpus is append-only and outlives
+// every devnet; the buffer is reaped on a schedule. Sharing a bucket between
+// them is never intended, and the failure mode - corpus objects sitting in a
+// bucket somebody eventually points a lifecycle rule at - is silent.
+func (c *Config) ValidateDistinctFrom(buffer store.Config) error {
+	if !c.Enabled || c.Store.Type != buffer.Type {
+		return nil
+	}
+
+	keys, ok := identityKeys[c.Store.Type]
+	if !ok {
+		return nil
+	}
+
+	corpusCfg, err := rawConfigMap(c.Store)
+	if err != nil {
+		return fmt.Errorf("promotion store: %w", err)
+	}
+
+	bufferCfg, err := rawConfigMap(buffer)
+	if err != nil {
+		return fmt.Errorf("promotion store: %w", err)
+	}
+
+	if len(corpusCfg) == 0 || len(bufferCfg) == 0 {
+		return nil
+	}
+
+	for _, key := range keys {
+		if fmt.Sprint(corpusCfg[key]) != fmt.Sprint(bufferCfg[key]) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"promotion: the corpus store addresses the same %s destination as the buffer store (%v); the corpus must be a separate, append-only location",
+		c.Store.Type, keys,
+	)
+}
+
+func rawConfigMap(conf store.Config) (map[string]any, error) {
+	out := map[string]any{}
+	if conf.Config.IsZero() {
+		return out, nil
+	}
+
+	if err := conf.Config.Unmarshal(&out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // ValidateRetention refuses to run when the buffer cannot outlive the

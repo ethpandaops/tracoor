@@ -16,15 +16,17 @@ type BeaconState struct {
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_state_slot,where:deleted_at IS NULL;index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
-	Epoch                int64
+	Slot int64 `gorm:"index:idx_beacon_state_slot,where:deleted_at IS NULL;index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
+	// Indexed alongside network to match the promotion service's per-epoch
+	// walk; see the equivalent index on BeaconBlock.
+	Epoch                int64     `gorm:"index:idx_beacon_state_network_epoch,where:deleted_at IS NULL,priority:2"`
 	StateRoot            string    `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:3"`
 	FetchedAt            time.Time `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_state_fetchedat,where:deleted_at IS NULL;index:idx_beacon_state_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	BeaconImplementation string
 	NodeVersion          string `gorm:"not null;default:''"`
 	ContentEncoding      string `gorm:"not null;default:''"`
 	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	Network              string `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_fetchedat_network,where:deleted_at IS NULL,priority:2;index:idx_beacon_state_network_epoch,where:deleted_at IS NULL,priority:1"`
 }
 
 type BeaconStateFilter struct {

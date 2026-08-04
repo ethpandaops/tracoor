@@ -46,17 +46,32 @@ const (
 	orderSlotDesc = "slot DESC"
 
 	// epochRowLimit bounds a single epoch listing; 32-ish slots times a
-	// handful of nodes sits far below it.
+	// handful of nodes sits far below it. Hitting it is reported, never
+	// silent: a truncated listing is indistinguishable from a short epoch.
 	epochRowLimit = 10000
 
 	// maxEpochAttempts bounds how often a failing epoch is retried before
 	// the service abandons it and moves on.
 	maxEpochAttempts = 10
 
+	// maxEpochsPerTick bounds the work of a single tick. A cold start on a
+	// long retention window, or a mis-indexed row claiming an absurd epoch,
+	// must not turn one tick into an unbounded run of queries; the backlog
+	// simply drains over the following ticks.
+	maxEpochsPerTick = 64
+
+	// networkIdentityTTL is how long a resolved genesis validators root is
+	// trusted before it is re-resolved. Devnets are torn down and recreated
+	// under the same config name constantly, so the GVR is refreshed rather
+	// than pinned for the process lifetime - at the cost of one state fetch
+	// per network per TTL.
+	networkIdentityTTL = 15 * time.Minute
+
 	// Shared log-field and metric-label keys.
 	labelNetwork   = "network"
 	labelSlot      = "slot"
 	labelBlockRoot = "block_root"
+	labelEpoch     = "epoch"
 )
 
 // Promoter is the promotion service. All mutable state is owned by the single
@@ -69,31 +84,57 @@ type Promoter struct {
 	corpus  store.Store
 	metrics *Metrics
 
-	// lastProcessedEpoch tracks per-network progress for this process
-	// lifetime only - deliberately not persisted. On restart the whole
-	// retained window is rescanned; idempotency makes that free.
-	lastProcessedEpoch map[string]uint64
-
-	// networkGVR caches the first genesis validators root observed per
-	// network name. Pairings verified by root carry their own GVR; the
-	// cache only anchors fallback pairings and block-only promotions.
-	networkGVR map[string]string
-
-	rate map[string]*rateWindow
-
-	// retries bounds how often a failing epoch is retried before the
-	// service advances past it: only the first failing epoch per network
-	// can block, so a single entry per network suffices.
-	retries map[string]*epochRetry
+	// networks holds per-network progress for this process lifetime only -
+	// deliberately not persisted. On restart the whole retained window is
+	// rescanned; idempotency makes that free.
+	networks map[string]*networkState
 
 	done     chan struct{}
+	stopped  chan struct{}
 	stopOnce sync.Once
+}
+
+// networkState is everything the service remembers about one network name
+// between ticks. Kurtosis devnets are recreated under the same name
+// constantly, so this state is explicitly resettable: see reset.
+type networkState struct {
+	// lastProcessedEpoch is the cursor; seen distinguishes "epoch 0 done"
+	// from "nothing done yet".
+	lastProcessedEpoch uint64
+	seen               bool
+
+	// gvr is the genesis validators root the network is currently filed
+	// under, and when it was resolved. Pairings verified by root carry
+	// their own GVR; this only anchors fallback pairings and block-only
+	// promotions.
+	gvr         string
+	gvrResolved time.Time
+
+	rate rateWindow
+
+	// retry bounds how often a failing epoch is retried before the service
+	// advances past it: only the first failing epoch can block, so a single
+	// entry per network suffices.
+	retry *epochRetry
+}
+
+// reset drops everything derived from a chain that no longer exists, so the
+// next pass rescans the retained window from its oldest epoch. The rate
+// window deliberately survives: a reset must not hand out a fresh hourly
+// budget, or repeated resets would become a way around the flood guard.
+func (s *networkState) reset() {
+	s.lastProcessedEpoch = 0
+	s.seen = false
+	s.gvr = ""
+	s.gvrResolved = time.Time{}
+	s.retry = nil
 }
 
 type rateWindow struct {
 	start       time.Time
 	commonCount uint64
 	rareCount   uint64
+	reorgCount  uint64
 }
 
 type epochRetry struct {
@@ -114,27 +155,38 @@ func NewPromoter(ctx context.Context, log logrus.FieldLogger, conf *Config, db *
 	}
 
 	return &Promoter{
-		log:                log.WithField("server/module", ServiceType),
-		config:             conf,
-		db:                 db,
-		buffer:             buffer,
-		corpus:             corpus,
-		metrics:            GetMetricsInstance(namespace, true),
-		lastProcessedEpoch: make(map[string]uint64),
-		networkGVR:         make(map[string]string),
-		rate:               make(map[string]*rateWindow),
-		retries:            make(map[string]*epochRetry),
-		done:               make(chan struct{}),
+		log:      log.WithField("server/module", ServiceType),
+		config:   conf,
+		db:       db,
+		buffer:   buffer,
+		corpus:   corpus,
+		metrics:  GetMetricsInstance(namespace),
+		networks: make(map[string]*networkState),
+		done:     make(chan struct{}),
+		stopped:  make(chan struct{}),
 	}, nil
+}
+
+// network returns the mutable state of a network, creating it on first sight.
+func (p *Promoter) network(name string) *networkState {
+	state, ok := p.networks[name]
+	if !ok {
+		state = &networkState{}
+		p.networks[name] = state
+	}
+
+	return state
 }
 
 // Start implements service.GRPCService. The promotion service exposes no RPCs
 // of its own; it only registers its background loop.
 func (p *Promoter) Start(ctx context.Context, _ *grpc.Server) error {
 	p.log.WithFields(logrus.Fields{
-		"lag_epochs":        p.config.LagEpochs,
-		"check_interval":    p.config.CheckInterval.Duration.String(),
-		"rate_cap_per_hour": p.config.RateCapPerHour,
+		"lag_epochs":         p.config.LagEpochs,
+		"check_interval":     p.config.CheckInterval.Duration.String(),
+		"rate_cap_per_hour":  p.config.RateCapPerHour,
+		"rare_cap_per_hour":  p.config.RareCapPerHour,
+		"reorg_cap_per_hour": p.config.ReorgCapPerHour,
 	}).Info("Starting promotion service")
 
 	if err := p.corpus.Healthy(ctx); err != nil {
@@ -146,16 +198,26 @@ func (p *Promoter) Start(ctx context.Context, _ *grpc.Server) error {
 	return nil
 }
 
-// Stop implements service.GRPCService.
-func (p *Promoter) Stop(_ context.Context) error {
+// Stop implements service.GRPCService. It waits for an in-flight tick to
+// finish: the service only ever adds objects, but a half-written capture is
+// worth avoiding when the shutdown is orderly.
+func (p *Promoter) Stop(ctx context.Context) error {
 	p.log.Info("Stopping promotion service")
 
 	p.stopOnce.Do(func() { close(p.done) })
+
+	select {
+	case <-p.stopped:
+	case <-ctx.Done():
+		p.log.Warn("Timed out waiting for the promotion loop to finish")
+	}
 
 	return nil
 }
 
 func (p *Promoter) run(ctx context.Context) {
+	defer close(p.stopped)
+
 	// Process immediately: everything still inside the retention window is
 	// fair game, oldest first, and re-processing is idempotent.
 	p.tick(ctx)
@@ -201,35 +263,92 @@ func (p *Promoter) processNetwork(ctx context.Context, network string) error {
 		return err
 	}
 
-	headEpoch, headSlot := uint64(head.Epoch), uint64(head.Slot) //nolint:gosec // slots/epochs are non-negative
+	state := p.network(network)
+
+	headSlot := uint64(head.Slot) //nolint:gosec // slots are non-negative
+	headEpoch := p.headEpoch(network, head)
+
 	if headEpoch < p.config.LagEpochs {
 		return nil
 	}
 
 	target := headEpoch - p.config.LagEpochs
 
-	from, seen := p.lastProcessedEpoch[network]
-	if seen {
-		from++
-	} else {
+	// A cursor ahead of the target means the chain under this name lost
+	// height: a devnet recreated under the same name (slots restart at 0),
+	// or a mis-indexed row that has since been reaped. Without this the
+	// cursor - which only ever moves forward - would sit above every real
+	// epoch and the service would silently promote nothing until restart.
+	if state.seen && target < state.lastProcessedEpoch {
+		p.log.WithFields(logrus.Fields{
+			labelNetwork:  network,
+			"cursor":      state.lastProcessedEpoch,
+			"head_epoch":  headEpoch,
+			"head_slot":   headSlot,
+			"target":      target,
+			"reset_cause": "height_regression",
+		}).Warn("Network lost height; resetting promotion cursor and network identity")
+
+		state.reset()
+		p.metrics.ObserveNetworkReset(network, ResetReasonHeightRegression)
+	}
+
+	// Resolve the network identity before promoting anything under it. A
+	// changed GVR is the same event seen from the other side, and it can
+	// arrive while the buffer still holds both chains.
+	if p.refreshIdentity(ctx, network, state) && state.seen {
+		// The backlog between the cursor and the target belongs to a chain
+		// this name no longer denotes. Skip it rather than relabel its
+		// captures under the new identity: block-only promotions take
+		// their network id from the cache, so a rescan here would file the
+		// old chain's blocks under the new chain's name. Once the reaper
+		// finishes clearing the old chain the height regression above
+		// fires and rescans what actually remains.
+		p.log.WithFields(logrus.Fields{
+			labelNetwork: network,
+			"from":       state.lastProcessedEpoch + 1,
+			"skipped_to": target,
+		}).Warn("Skipping the epoch backlog spanning a network identity change")
+
+		state.lastProcessedEpoch = target
+	}
+
+	from := state.lastProcessedEpoch + 1
+	if !state.seen {
 		oldest, oerr := p.edgeBlock(ctx, network, orderSlotAsc)
 		if oerr != nil || oldest == nil {
 			return oerr
 		}
 
-		from = uint64(oldest.Epoch) //nolint:gosec // slots/epochs are non-negative
+		from = uint64(oldest.Epoch) //nolint:gosec // epochs are non-negative
 	}
 
-	for epoch := from; epoch <= target; epoch++ {
+	if from > target {
+		return nil
+	}
+
+	last := target
+	if last-from >= maxEpochsPerTick {
+		last = from + maxEpochsPerTick - 1
+
+		p.log.WithFields(logrus.Fields{
+			labelNetwork: network,
+			"from":       from,
+			"until":      last,
+			"target":     target,
+		}).Info("Epoch backlog exceeds one tick's budget; draining over subsequent ticks")
+	}
+
+	for epoch := from; epoch <= last; epoch++ {
 		if err := p.processEpoch(ctx, network, epoch, headSlot); err != nil {
 			// Hold the epoch back and retry next tick - the existence
 			// probe makes re-processing free - but only boundedly: a
 			// deterministic poison candidate must not block every later
 			// epoch until the reaper eats them.
-			retry := p.retries[network]
+			retry := state.retry
 			if retry == nil || retry.epoch != epoch {
 				retry = &epochRetry{epoch: epoch}
-				p.retries[network] = retry
+				state.retry = retry
 			}
 
 			retry.attempts++
@@ -237,17 +356,79 @@ func (p *Promoter) processNetwork(ctx context.Context, network string) error {
 				return errors.Wrapf(err, "failed to process epoch %d (attempt %d/%d)", epoch, retry.attempts, maxEpochAttempts)
 			}
 
-			p.log.WithError(err).WithFields(logrus.Fields{labelNetwork: network, "epoch": epoch}).Error("Abandoning epoch after repeated failures; its unpromoted captures are lost")
+			p.log.WithError(err).WithFields(logrus.Fields{labelNetwork: network, labelEpoch: epoch}).Error("Abandoning epoch after repeated failures; its unpromoted captures are lost")
 			p.metrics.ObserveError(network)
 		}
 
-		delete(p.retries, network)
+		state.retry = nil
+		state.lastProcessedEpoch = epoch
+		state.seen = true
 
-		p.lastProcessedEpoch[network] = epoch
 		p.metrics.ObserveLastProcessedEpoch(network, epoch)
 	}
 
 	return nil
+}
+
+// headEpoch reads the head row's epoch, cross-checked against its slot. The
+// epoch column is agent-computed, so one mis-indexed row could otherwise drag
+// the cursor into epochs that will never exist and stall the service until
+// the row is reaped. The configured spec is the only cross-check available
+// server-side; a persistent complaint here means slotsPerEpoch is wrong for
+// this network, which would also make the retention check wrong.
+func (p *Promoter) headEpoch(network string, head *persistence.BeaconBlock) uint64 {
+	headEpoch, headSlot := uint64(head.Epoch), uint64(head.Slot) //nolint:gosec // slots/epochs are non-negative
+
+	plausible := headSlot/p.config.SlotsPerEpoch + 1
+	if headEpoch <= plausible {
+		return headEpoch
+	}
+
+	p.log.WithFields(logrus.Fields{
+		labelNetwork: network,
+		"head_epoch": headEpoch,
+		labelSlot:    headSlot,
+		"clamped_to": plausible,
+	}).Error("Indexed head epoch is implausible for its slot; clamping. Check that promotion slotsPerEpoch matches the network")
+	p.metrics.ObserveSkip(network, SkipReasonImplausibleEpoch)
+
+	return plausible
+}
+
+// refreshIdentity re-resolves the network's genesis validators root when the
+// cached one has aged out, and reports whether it changed. A changed GVR
+// means this name now denotes a different chain: pinning the first one for
+// the process lifetime would file every later block-only capture under a
+// network that no longer exists.
+func (p *Promoter) refreshIdentity(ctx context.Context, network string, state *networkState) bool {
+	if state.gvr != "" && time.Since(state.gvrResolved) < networkIdentityTTL {
+		return false
+	}
+
+	gvr := p.resolveNetworkGVR(ctx, network)
+	if gvr == "" {
+		return false
+	}
+
+	previous := state.gvr
+	changed := previous != "" && previous != gvr
+
+	if changed {
+		p.log.WithFields(logrus.Fields{
+			labelNetwork:   network,
+			"previous_gvr": previous,
+			"current_gvr":  gvr,
+		}).Warn("Network genesis validators root changed; the name now denotes a different chain")
+
+		state.retry = nil
+
+		p.metrics.ObserveNetworkReset(network, ResetReasonIdentityChange)
+	}
+
+	state.gvr = gvr
+	state.gvrResolved = time.Now()
+
+	return changed
 }
 
 func (p *Promoter) edgeBlock(ctx context.Context, network, order string) (*persistence.BeaconBlock, error) {
@@ -281,9 +462,20 @@ type epochPass struct {
 	byRoot map[string]*candidate
 	slots  []uint64
 
+	// firstIndexedSlot is the lowest slot the index holds for this epoch,
+	// before any object load succeeded or failed. The baseline trigger
+	// keys off it so that an unfetchable block cannot slide the baseline
+	// onto a different slot between scans.
+	firstIndexedSlot uint64
+
 	// children holds every parent_root referenced by a candidate in this
 	// pass: deterministic evidence for canonical-branch resolution.
 	children map[string]bool
+
+	// lookahead caches the parent roots referenced by the next epoch's
+	// earliest blocks, resolved at most once per pass.
+	lookahead       map[string]bool
+	lookaheadLoaded bool
 }
 
 func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, headSlot uint64) error {
@@ -296,13 +488,25 @@ func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, head
 		return nil
 	}
 
+	if len(rows) == epochRowLimit {
+		// The listing was truncated, which is indistinguishable downstream
+		// from an epoch that simply had fewer blocks. Say so.
+		p.metrics.ObserveSkip(network, SkipReasonRowLimit)
+		p.log.WithFields(logrus.Fields{
+			labelNetwork: network,
+			labelEpoch:   epoch,
+			"limit":      epochRowLimit,
+		}).Warn("Epoch listing hit the row limit; some captures in this epoch are not considered")
+	}
+
 	pass := &epochPass{
-		network:  network,
-		epoch:    epoch,
-		headSlot: headSlot,
-		bySlot:   make(map[uint64][]*candidate),
-		byRoot:   make(map[string]*candidate),
-		children: make(map[string]bool),
+		network:          network,
+		epoch:            epoch,
+		headSlot:         headSlot,
+		bySlot:           make(map[uint64][]*candidate),
+		byRoot:           make(map[string]*candidate),
+		children:         make(map[string]bool),
+		firstIndexedSlot: firstIndexedSlot(rows),
 	}
 
 	p.buildCandidates(ctx, pass, rows)
@@ -339,6 +543,25 @@ func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, head
 	}
 
 	return failed
+}
+
+// firstIndexedSlot returns the lowest non-negative slot among the rows.
+func firstIndexedSlot(rows []*persistence.BeaconBlock) uint64 {
+	first := uint64(0)
+	found := false
+
+	for _, row := range rows {
+		if row.Slot < 0 {
+			continue
+		}
+
+		slot := uint64(row.Slot)
+		if !found || slot < first {
+			first, found = slot, true
+		}
+	}
+
+	return first
 }
 
 // buildCandidates fetches every distinct root's bytes once and byte-peeks the
@@ -389,6 +612,8 @@ func (p *Promoter) buildCandidates(ctx context.Context, pass *epochPass, rows []
 
 // loadCandidate fetches, decompresses and peeks a block from any node's copy.
 func (p *Promoter) loadCandidate(ctx context.Context, network string, cand *candidate, rows []*persistence.BeaconBlock) bool {
+	malformed := false
+
 	for _, row := range rows {
 		data, err := p.buffer.GetBeaconBlock(ctx, row.Location)
 		if err != nil || data == nil {
@@ -397,6 +622,8 @@ func (p *Promoter) loadCandidate(ctx context.Context, network string, cand *cand
 
 		raw, err := decompress(*data, row.ContentEncoding)
 		if err != nil {
+			malformed = true
+
 			p.log.WithError(err).WithField("location", row.Location).Warn("Failed to decompress block")
 
 			continue
@@ -406,7 +633,8 @@ func (p *Promoter) loadCandidate(ctx context.Context, network string, cand *cand
 		if err != nil || peek.Slot != cand.slot {
 			// Truncated or misfiled: promote nothing under a label the
 			// payload contradicts.
-			p.metrics.ObserveSkip(network, SkipReasonMalformed)
+			malformed = true
+
 			p.log.WithError(err).WithFields(logrus.Fields{"location": row.Location, labelSlot: cand.slot}).Warn("Block bytes fail sanity rules")
 
 			continue
@@ -420,14 +648,24 @@ func (p *Promoter) loadCandidate(ctx context.Context, network string, cand *cand
 		return true
 	}
 
-	p.metrics.ObserveSkip(network, SkipReasonMissingObject)
+	// One skip per candidate, attributed to what actually went wrong: bytes
+	// we could not trust, or bytes we could not find.
+	if malformed {
+		p.metrics.ObserveSkip(network, SkipReasonMalformed)
+	} else {
+		p.metrics.ObserveSkip(network, SkipReasonMissingObject)
+	}
 
 	return false
 }
 
-// baselineSlot returns the first qualifying slot of a baseline epoch. It is a
-// pure function of the epoch number so re-processing selects the same slots.
-// Requires pass.slots to be sorted.
+// baselineSlot returns the baseline slot of a baseline epoch: the lowest slot
+// the INDEX holds for it, not the lowest slot that happened to load. Which
+// epochs fire is a pure function of the epoch number, and which slot fires is
+// a pure function of the index, so a rescan selects the same capture. Keying
+// off the loaded set instead would slide the baseline onto a neighbouring
+// slot whenever an object became unfetchable, promoting a second baseline for
+// an epoch that already had one.
 func (p *Promoter) baselineSlot(pass *epochPass) (uint64, bool) {
 	if !triggerEnabled(p.config.Triggers.Baseline) || p.config.BaselineEveryNEpochs == 0 {
 		return 0, false
@@ -437,7 +675,9 @@ func (p *Promoter) baselineSlot(pass *epochPass) (uint64, bool) {
 		return 0, false
 	}
 
-	return pass.slots[0], true
+	// The block at that slot may be unloadable, in which case this epoch
+	// simply has no baseline - deterministically.
+	return pass.firstIndexedSlot, true
 }
 
 // parentInfo is everything known about a candidate's parent, resolved by
@@ -566,8 +806,23 @@ func (p *Promoter) resolveBranches(ctx context.Context, pass *epochPass, cands [
 }
 
 // lookaheadChildren byte-peeks the earliest blocks of the next epoch and
-// returns the set of parent roots they reference.
+// returns the set of parent roots they reference. The result is cached on the
+// pass: every reorged slot in an epoch asks the same question, and answering
+// it costs a query plus up to 20 block fetches.
 func (p *Promoter) lookaheadChildren(ctx context.Context, pass *epochPass) map[string]bool {
+	if pass.lookaheadLoaded {
+		return pass.lookahead
+	}
+
+	out := p.fetchLookaheadChildren(ctx, pass)
+
+	pass.lookahead = out
+	pass.lookaheadLoaded = true
+
+	return out
+}
+
+func (p *Promoter) fetchLookaheadChildren(ctx context.Context, pass *epochPass) map[string]bool {
 	out := make(map[string]bool)
 	next := pass.epoch + 1
 
@@ -604,23 +859,24 @@ func (p *Promoter) lookaheadChildren(ctx context.Context, pass *epochPass) map[s
 	return out
 }
 
-// rateTier classifies a capture for admission. Reorgs are uncapped: they are
-// self-limiting per slot and the orphaned branch is unobtainable anywhere
-// else. Rare-but-not-bounded classes (slashings can arrive by the hundreds
-// in a mass-slashing incident) get their own budget so they never compete
-// with a participation/gap flood, yet keep a hard ceiling. Everything
-// repetitive or spammable draws from the common budget.
+// rateTier classifies a capture for admission. Reorgs get their own, very
+// generous budget: they are self-limiting per slot and the orphaned branch is
+// unobtainable anywhere else, but per-slot self-limiting is not a bound in
+// aggregate. Rare-but-not-bounded classes (slashings can arrive by the
+// hundreds in a mass-slashing incident) get a budget of their own so they
+// never compete with a participation/gap flood, yet keep a hard ceiling.
+// Everything repetitive or spammable draws from the common budget.
 type rateTier int
 
 const (
-	tierUncapped rateTier = iota
+	tierReorg rateTier = iota
 	tierRare
 	tierCommon
 )
 
 func classifyTier(triggers []string) rateTier {
 	if slices.Contains(triggers, TriggerReorg) {
-		return tierUncapped
+		return tierReorg
 	}
 
 	for _, trigger := range triggers {
@@ -633,26 +889,38 @@ func classifyTier(triggers []string) rateTier {
 	return tierCommon
 }
 
-func (p *Promoter) window(network string) *rateWindow {
+// skipReason names the metric label for a tier that ran out of budget.
+func (t rateTier) skipReason() string {
+	switch t {
+	case tierReorg:
+		return SkipReasonRateCappedReorg
+	case tierRare:
+		return SkipReasonRateCappedRare
+	default:
+		return SkipReasonRateCappedCommon
+	}
+}
+
+// window returns the network's current hourly budget, rolling it over when
+// the previous one has expired. The window is tumbling, not sliding.
+func (p *Promoter) window(state *networkState) *rateWindow {
 	now := time.Now()
 
-	w := p.rate[network]
-	if w == nil || now.Sub(w.start) >= time.Hour {
-		w = &rateWindow{start: now}
-		p.rate[network] = w
+	if state.rate.start.IsZero() || now.Sub(state.rate.start) >= time.Hour {
+		state.rate = rateWindow{start: now}
 	}
 
-	return w
+	return &state.rate
 }
 
 // headroom reports whether the tier's per-network hourly budget has room,
 // without consuming any.
-func (p *Promoter) headroom(network string, tier rateTier) bool {
-	w := p.window(network)
+func (p *Promoter) headroom(state *networkState, tier rateTier) bool {
+	w := p.window(state)
 
 	switch tier {
-	case tierUncapped:
-		return true
+	case tierReorg:
+		return w.reorgCount < p.config.ReorgCapPerHour
 	case tierRare:
 		return w.rareCount < p.config.RareCapPerHour
 	default:
@@ -662,13 +930,16 @@ func (p *Promoter) headroom(network string, tier rateTier) bool {
 
 // consume takes one promotion from the tier's hourly budget. When a budget
 // is exhausted the caller skips - it never queues and never deletes.
-func (p *Promoter) consume(network string, tier rateTier) {
+func (p *Promoter) consume(state *networkState, tier rateTier) {
+	w := p.window(state)
+
 	switch tier {
-	case tierUncapped:
+	case tierReorg:
+		w.reorgCount++
 	case tierRare:
-		p.window(network).rareCount++
+		w.rareCount++
 	default:
-		p.window(network).commonCount++
+		w.commonCount++
 	}
 }
 
@@ -679,20 +950,21 @@ func (p *Promoter) consume(network string, tier rateTier) {
 // cap is consulted, so a restart-rescan of the retained window is free and
 // never burns the hourly budget on captures the corpus already has.
 func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate, parent parentInfo, triggers []string, branch string) error {
-	forkName := "unknown"
+	forkName := unknownComponent
 	if cand.decoded != nil {
 		forkName = cand.decoded.Version.String()
 	}
 
 	id := captureID(cand.slot, cand.root)
 	tier := classifyTier(triggers)
+	state := p.network(pass.network)
 
 	// Provisional dedupe with the cached network GVR: on a rescan this
 	// skips the capture before any state-sized fetch happens.
 	provisionalKey := ""
 
-	if gvr := p.resolveNetworkGVR(ctx, pass.network); gvr != "" {
-		provisionalKey = capturePath(networkID(pass.network, gvr), forkName, id, captureManifestName)
+	if state.gvr != "" {
+		provisionalKey = capturePath(networkID(pass.network, state.gvr), forkName, id, captureManifestName)
 		if exists, err := p.corpus.Exists(ctx, provisionalKey); err == nil && exists {
 			p.metrics.ObserveSkip(pass.network, SkipReasonAlreadyPromoted)
 
@@ -702,11 +974,8 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 
 	// Cheap headroom probe before the state fetch; the budget is only
 	// consumed once the capture is known to be new.
-	if !p.headroom(pass.network, tier) {
-		reason := SkipReasonRateCappedCommon
-		if tier == tierRare {
-			reason = SkipReasonRateCappedRare
-		}
+	if !p.headroom(state, tier) {
+		reason := tier.skipReason()
 
 		p.metrics.ObserveSkip(pass.network, reason)
 		p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot, labelBlockRoot: cand.root, "tier": reason}).Debug("Rate cap exhausted, skipping promotion")
@@ -723,7 +992,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		expectedStateRoot = normHex(parent.peek.StateRoot.String())
 	}
 
-	stateRaw, prestate := p.resolvePrestate(ctx, pass.network, parent, expectedStateRoot)
+	stateRaw, prestate := p.resolvePrestate(ctx, pass.network, state, parent, expectedStateRoot)
 
 	gvr := ""
 
@@ -739,7 +1008,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		// in the buffer. Without one the capture cannot be filed under an
 		// unambiguous network id, and a wrong prefix mixes incompatible
 		// chains - skip, visibly.
-		gvr = p.resolveNetworkGVR(ctx, pass.network)
+		gvr = state.gvr
 		if gvr == "" {
 			p.metrics.ObserveSkip(pass.network, SkipReasonGVRAmbiguous)
 			p.log.WithFields(logrus.Fields{labelNetwork: pass.network, labelSlot: cand.slot}).Warn("No genesis validators root resolvable; refusing to label capture")
@@ -748,8 +1017,11 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		}
 	}
 
-	if p.networkGVR[pass.network] == "" {
-		p.networkGVR[pass.network] = gvr
+	// A paired state is first-hand evidence of the network's identity, so
+	// it seeds the cache when the periodic refresh has nothing yet.
+	if state.gvr == "" {
+		state.gvr = gvr
+		state.gvrResolved = time.Now()
 	}
 
 	network := networkID(pass.network, gvr)
@@ -827,7 +1099,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 	// The manifest is the commit point: budget is only consumed once the
 	// capture actually landed, so a corpus-store outage cannot burn the
 	// hourly window on failed writes.
-	p.consume(pass.network, tier)
+	p.consume(state, tier)
 
 	p.metrics.ObserveCorpusBytes(pass.network, "manifest", len(data))
 	p.metrics.ObserveCapture(pass.network, branch)
@@ -856,7 +1128,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 // When the parent block's own state_root is known, only the branch-exact row
 // qualifies; without it, a slot-level fallback is accepted but the pairing
 // stays unverified and must at least be GVR-consistent with the network.
-func (p *Promoter) resolvePrestate(ctx context.Context, network string, parent parentInfo, expectedStateRoot string) ([]byte, *ManifestPrestate) {
+func (p *Promoter) resolvePrestate(ctx context.Context, network string, state *networkState, parent parentInfo, expectedStateRoot string) ([]byte, *ManifestPrestate) {
 	if !parent.known {
 		return nil, nil
 	}
@@ -895,7 +1167,7 @@ func (p *Promoter) resolvePrestate(ctx context.Context, network string, parent p
 			// whose GVR contradicts the network to avoid mixing recreated
 			// chains under one prefix.
 			gvr := normHex(peek.GenesisValidatorsRoot.String())
-			if known := p.networkGVR[network]; known != "" && known != gvr {
+			if state.gvr != "" && state.gvr != gvr {
 				p.metrics.ObserveSkip(network, SkipReasonGVRAmbiguous)
 
 				continue
@@ -931,13 +1203,12 @@ func (p *Promoter) writeState(ctx context.Context, network string, raw []byte, s
 	return nil
 }
 
-// resolveNetworkGVR resolves a network's genesis validators root from any
-// retained state, cached per network name for the process lifetime.
+// resolveNetworkGVR reads a network's genesis validators root from its
+// freshest retained state. Freshest, not any: after a devnet is recreated
+// under the same name the buffer briefly holds both chains, and the newest
+// state is the one that says which chain the name means now. Caching is the
+// caller's business - see refreshIdentity.
 func (p *Promoter) resolveNetworkGVR(ctx context.Context, network string) string {
-	if gvr := p.networkGVR[network]; gvr != "" {
-		return gvr
-	}
-
 	rows, err := p.db.ListBeaconState(ctx, &persistence.BeaconStateFilter{Network: &network}, &persistence.PaginationCursor{Limit: 5, OrderBy: "fetched_at DESC"})
 	if err != nil {
 		return ""
@@ -955,10 +1226,7 @@ func (p *Promoter) resolveNetworkGVR(ctx context.Context, network string) string
 		}
 
 		if peek, perr := peekState(raw); perr == nil {
-			gvr := normHex(peek.GenesisValidatorsRoot.String())
-			p.networkGVR[network] = gvr
-
-			return gvr
+			return normHex(peek.GenesisValidatorsRoot.String())
 		}
 	}
 

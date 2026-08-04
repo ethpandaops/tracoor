@@ -20,14 +20,54 @@ const (
 
 	captureRootChars = 12
 	networkGVRChars  = 8
+
+	// unknownComponent stands in for a path component we cannot name
+	// honestly: an unsanitisable network name, or a fork no supported
+	// version decodes.
+	unknownComponent = "unknown"
 )
 
+// safePathComponent keeps a single path segment a single path segment. The
+// network name reaches us from an agent, and the filesystem store resolves
+// "../" the way filesystems do; the corpus layout depends on these being
+// opaque names, not paths. Everything outside the layout's own alphabet
+// becomes an underscore.
+func safePathComponent(s string) string {
+	if s == "" {
+		return unknownComponent
+	}
+
+	out := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			return r
+		case r == '-', r == '_', r == '.':
+			return r
+		default:
+			return '_'
+		}
+	}, s)
+
+	// A component of dots only is "here" or "up one" to a filesystem.
+	if strings.Trim(out, ".") == "" {
+		return unknownComponent
+	}
+
+	return out
+}
+
 func statePath(sha string) string {
-	return fmt.Sprintf("%s/%s.ssz", corpusStatePrefix, sha)
+	return fmt.Sprintf("%s/%s.ssz", corpusStatePrefix, safePathComponent(sha))
 }
 
 func capturePath(network, fork, captureID, name string) string {
-	return fmt.Sprintf("%s/%s/%s/%s/%s", corpusCapturePrefix, network, fork, captureID, name)
+	return fmt.Sprintf("%s/%s/%s/%s/%s",
+		corpusCapturePrefix,
+		safePathComponent(network),
+		safePathComponent(fork),
+		safePathComponent(captureID),
+		name,
+	)
 }
 
 // captureID is <slot zero-padded to 9>-<block_root hex[0:12]>: lexical order
@@ -43,12 +83,14 @@ func captureID(slot uint64, blockRoot string) string {
 }
 
 // networkID qualifies the agent-reported network name with the first 4 bytes
-// of the genesis validators root.
+// of the genesis validators root. The name is sanitised here rather than only
+// at the path layer so that the manifest's network.name and the key it lives
+// under can never disagree.
 func networkID(configName, gvrHex string) string {
 	gvr := strings.TrimPrefix(gvrHex, "0x")
 	if len(gvr) > networkGVRChars {
 		gvr = gvr[:networkGVRChars]
 	}
 
-	return fmt.Sprintf("%s-%s", configName, gvr)
+	return fmt.Sprintf("%s-%s", safePathComponent(configName), gvr)
 }

@@ -239,6 +239,7 @@ func TestFailedWriteConsumesNoBudgetAndRetries(t *testing.T) {
 	e.seedHeadAnchor(224)
 
 	// Corpus outage: every write fails.
+	requireWriteProtectable(t)
 	require.NoError(t, os.Chmod(e.corpusDir, 0o555))
 
 	e.promoter.tick(t.Context())
@@ -262,6 +263,7 @@ func TestFailingEpochIsAbandonedAfterBoundedRetries(t *testing.T) {
 	e.seedChain(gvr, 160, 163)
 	e.seedHeadAnchor(224)
 
+	requireWriteProtectable(t)
 	require.NoError(t, os.Chmod(e.corpusDir, 0o555))
 
 	for range maxEpochAttempts {
@@ -269,7 +271,7 @@ func TestFailingEpochIsAbandonedAfterBoundedRetries(t *testing.T) {
 	}
 
 	// The epoch was abandoned and progress advanced past it.
-	assert.Equal(t, uint64(5), e.promoter.lastProcessedEpoch[testNetwork])
+	assert.Equal(t, uint64(5), e.promoter.network(testNetwork).lastProcessedEpoch)
 
 	// Even after recovery the abandoned capture is not retried (until a
 	// restart rescan); nothing was promoted.
@@ -481,6 +483,156 @@ func TestTriggerToggle(t *testing.T) {
 	assert.Empty(t, e.findManifests())
 }
 
+// A devnet recreated under the same name restarts at slot 0. The cursor only
+// ever moves forward, so without noticing the lost height the service would
+// sit above every real epoch and silently promote nothing until restart.
+func TestNetworkResetOnHeightRegression(t *testing.T) {
+	e := newEnv(t, nil)
+
+	// Chain A, epoch 5.
+	e.seedChain(fillRoot(0x11), 160, 163)
+	e.seedHeadAnchor(224)
+
+	e.promoter.tick(t.Context())
+	require.Len(t, e.findManifests(), 1)
+	require.Equal(t, uint64(5), e.promoter.network(testNetwork).lastProcessedEpoch)
+
+	// The devnet is torn down and recreated under the same name: slots
+	// restart at 0 and the reaper clears chain A.
+	e.purge()
+
+	gvrB := fillRoot(0x22)
+	e.seedChain(gvrB, 0, 1, 32, 35)
+	e.seedHeadAnchor(96) // epoch 3 -> target 1
+
+	e.promoter.tick(t.Context())
+
+	state := e.promoter.network(testNetwork)
+	assert.Equal(t, uint64(1), state.lastProcessedEpoch, "cursor must follow the chain down")
+	assert.Equal(t, normHex(gvrB.String()), state.gvr, "identity must follow the new chain")
+
+	// Chain B's captures land, under chain B's name.
+	networks := map[string]bool{}
+
+	for _, path := range e.findManifests() {
+		networks[e.readManifest(path).Network.Name] = true
+	}
+
+	assert.True(t, networks[testNetwork+"-22222222"], "chain B must be promoted, got %v", networks)
+}
+
+// When the identity changes while the buffer may still hold both chains, the
+// backlog is skipped rather than relabelled: block-only promotions take their
+// network id from the cache, so rescanning it would file the old chain's
+// blocks under the new chain's name.
+func TestIdentityChangeSkipsAmbiguousBacklog(t *testing.T) {
+	e := newEnv(t, nil)
+
+	e.seedChain(fillRoot(0x11), 160, 163)
+	e.seedHeadAnchor(224)
+
+	e.promoter.tick(t.Context())
+	require.Len(t, e.findManifests(), 1)
+
+	before := e.corpusFiles()
+
+	// A newer state from a different chain appears under the same name,
+	// while the old chain still holds the highest slots.
+	gvrB := fillRoot(0x22)
+	e.seedState(testNode, 300, slotRoot(0xb2, 300), testState(gvrB, 300), time.Now().Add(time.Hour))
+
+	// Epoch 6 has a gap-triggered, block-only candidate: exactly the shape
+	// that takes its network id from the cache.
+	e.seedBlock(testNode, 192, 6, blockRootFor(192), testBlock(t, 192, blockRootFor(163), stateRootFor(192), nil), time.Now())
+	e.seedHeadAnchor(256) // epoch 8 -> target 6
+
+	e.expireIdentity()
+	e.promoter.tick(t.Context())
+
+	state := e.promoter.network(testNetwork)
+	assert.Equal(t, normHex(gvrB.String()), state.gvr)
+	assert.Equal(t, uint64(6), state.lastProcessedEpoch, "the ambiguous backlog is skipped, not rescanned")
+	assert.Equal(t, before, e.corpusFiles(), "nothing from the old chain may be relabelled")
+}
+
+// One mis-indexed row must not drag the cursor into epochs that will never
+// exist: the epoch column is agent-computed, so it is cross-checked against
+// the head slot before it becomes the target.
+func TestImplausibleHeadEpochIsClamped(t *testing.T) {
+	e := newEnv(t, nil)
+
+	e.seedChain(fillRoot(0x11), 160, 163)
+	e.seedHeadAnchor(224)
+
+	// A row claiming an absurd epoch for a modest slot.
+	e.insertBlockRow(testNode, 225, 1_000_000, blockRootFor(225).String(), "missing/location", time.Now())
+
+	e.promoter.tick(t.Context())
+
+	// Bounded by the head slot, not by the bogus epoch.
+	assert.LessOrEqual(t, e.promoter.network(testNetwork).lastProcessedEpoch, uint64(8))
+	assert.Len(t, e.findManifests(), 1)
+}
+
+// A cold start over a long window drains across ticks instead of running one
+// unbounded tick.
+func TestEpochBacklogIsBoundedPerTick(t *testing.T) {
+	e := newEnv(t, nil)
+	gvr := fillRoot(0x11)
+
+	e.seedChain(gvr, 0)
+	e.seedHeadAnchor(uint64(maxEpochsPerTick+4) * 32)
+
+	e.promoter.tick(t.Context())
+	assert.Equal(t, uint64(maxEpochsPerTick-1), e.promoter.network(testNetwork).lastProcessedEpoch)
+
+	e.promoter.tick(t.Context())
+	assert.Equal(t, uint64(maxEpochsPerTick+2), e.promoter.network(testNetwork).lastProcessedEpoch)
+}
+
+// The baseline slot is chosen from the index, not from whichever blocks
+// happened to load, so an unfetchable block cannot slide the baseline onto a
+// neighbouring slot and promote a second baseline for the same epoch.
+func TestBaselineDoesNotSlideOnUnloadableBlock(t *testing.T) {
+	e := newEnv(t, nil)
+	gvr := fillRoot(0x11)
+
+	// Epoch 8 (8%8 == 0). The lowest indexed slot has no object behind it.
+	e.insertBlockRow(testNode, 256, 8, blockRootFor(256).String(), "missing/location", time.Now())
+	e.seedChain(gvr, 257, 258)
+	e.seedHeadAnchor(320)
+
+	e.promoter.tick(t.Context())
+
+	// No baseline at all rather than a baseline at the wrong slot.
+	for _, path := range e.findManifests() {
+		assert.NotContains(t, e.readManifest(path).Promotion.Triggers, TriggerBaseline)
+	}
+}
+
+// Reorg promotions have their own budget rather than no budget: per-slot
+// self-limiting is not a bound in aggregate.
+func TestReorgCapCeiling(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.ReorgCapPerHour = 2 })
+	gvr := fillRoot(0x11)
+	now := time.Now()
+
+	e.seedChain(gvr, 160)
+
+	// Two reorged slots, four branches, budget for two.
+	for _, slot := range []uint64{161, 162} {
+		for _, kind := range []byte{0xe1, 0xe2} {
+			e.seedBlock(testNode, slot, 5, slotRoot(kind, slot),
+				testBlock(t, slot, blockRootFor(160), slotRoot(kind, slot), nil), now)
+		}
+	}
+
+	e.seedHeadAnchor(224)
+	e.promoter.tick(t.Context())
+
+	assert.Len(t, e.findManifests(), 2)
+}
+
 func TestCaptureID(t *testing.T) {
 	id := captureID(384, "0xdeadbeefcafebabe0000000000000000000000000000000000000000000000ff")
 	assert.Equal(t, "000000384-deadbeefcafe", id)
@@ -491,4 +643,16 @@ func TestCaptureID(t *testing.T) {
 
 func TestNetworkID(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s-2093236b", testNetwork), networkID(testNetwork, "0x2093236b11223344"))
+}
+
+// The network name arrives from an agent and ends up in an object key; the
+// filesystem store resolves "../" the way filesystems do.
+func TestNetworkIDSanitisesTraversal(t *testing.T) {
+	assert.Equal(t, ".._.._etc-2093236b", networkID("../../etc", "0x2093236b11223344"))
+	assert.Equal(t, "unknown-2093236b", networkID("..", "0x2093236b11223344"))
+	assert.Equal(t, "unknown-2093236b", networkID("", "0x2093236b11223344"))
+
+	path := capturePath(networkID("../../etc", "0x2093236b"), "electra", "000000001-aa", captureManifestName)
+	assert.NotContains(t, path, "../")
+	assert.True(t, strings.HasPrefix(path, corpusCapturePrefix+"/"))
 }
