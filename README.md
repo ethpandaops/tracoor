@@ -84,6 +84,30 @@ Flags:
   -h, --help            help for server
 ```
 
+#### Promotion service (interesting states corpus)
+
+The server can optionally run a promotion service that watches the
+short-retention capture buffer with hindsight and copies "interesting"
+consensus captures — as a replayable `(parent post-state, block)` pair plus a
+`manifest.json` — into a separate, global, append-only S3 bucket that outlives
+every devnet. Interesting means: slashings, exits, deposits, execution
+requests, missed-block runs, reorgs (both branches), fork boundaries,
+low sync participation, undecodable (brand-new) forks, plus a periodic
+baseline. A per-network hourly rate cap bounds volume; the service never
+deletes anything and keeps no persistent state.
+
+The corpus layout is self-describing:
+
+```
+v1/states/<sha256-of-raw-ssz>.ssz                       # uncompressed, content-addressed
+v1/captures/<network>/<fork>/<capture_id>/input.ssz     # the SignedBeaconBlock, raw
+v1/captures/<network>/<fork>/<capture_id>/manifest.json
+```
+
+See the `services.promotion` section of the [example config](https://github.com/ethpandaops/tracoor/blob/master/example_server_config.yaml).
+It is opt-in and requires the beacon state/block retention to exceed the
+configured processing lag.
+
 ### Agent
 
 Tracoor agent requires a config file. An example file can be found [here](https://github.com/ethpandaops/tracoor/blob/master/example_agent_config.yaml).

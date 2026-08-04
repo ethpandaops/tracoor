@@ -119,6 +119,43 @@ func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, e
 	return &buff, nil
 }
 
+func (s *S3Store) SaveRaw(ctx context.Context, params *SaveParams) (string, error) {
+	if params.Data == nil {
+		return "", errors.New("data is nil")
+	}
+
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(params.Location),
+		Body:   bytes.NewBuffer(*params.Data),
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
+	if err != nil {
+		var apiErr smithy.APIError
+
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New("failed to save raw object: " + apiErr.Error())
+			}
+		}
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(RawDataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(RawDataType), len(*params.Data))
+
+	return params.Location, err
+}
+
 func (s *S3Store) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {
 	key := fmt.Sprintf("handshake/%s", node)
 

@@ -100,6 +100,17 @@ func (s *FSStore) removeFile(path string) error {
 	return os.Remove(path)
 }
 
+func (s *FSStore) SaveRaw(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
+
+	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	if err := s.saveFile(params.Data, path); err != nil {
+		return "", err
+	}
+
+	return params.Location, nil
+}
+
 func (s *FSStore) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
 	parts := strings.Split(params.Location, "/")
 
@@ -328,7 +339,7 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 	}
 
 	// Write to the destination file
-	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // path is constructed from validated basePath
+	if err := os.WriteFile(destination, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

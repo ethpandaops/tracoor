@@ -18,6 +18,40 @@ services:
       beaconBadBlobs: 30m
       executionBlockTrace: 30m
       executionBadBlocks: 30m
+  # Promote "interesting" (pre-state, block) pairs from the retention buffer
+  # into a separate, append-only corpus bucket. Opt-in.
+  # NOTE: beaconStates/beaconBlocks retention must exceed
+  # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start.
+  # promotion:
+  #   enabled: true
+  #   lagEpochs: 2
+  #   checkInterval: 30s
+  #   slotsPerEpoch: 32
+  #   secondsPerSlot: 12s
+  #   rateCapPerHour: 30
+  #   baselineEveryNEpochs: 8
+  #   gapTrigger: 2
+  #   syncParticipationFloor: 0.95
+  #   triggers:              # per-trigger toggles, all default true
+  #     slashing: true
+  #     voluntaryExit: true
+  #     blsToExecutionChange: true
+  #     deposit: true
+  #     executionRequest: true
+  #     gap: true
+  #     reorg: true
+  #     lowParticipation: true
+  #     forkBoundary: true
+  #     undecodableFork: true
+  #     baseline: true
+  #   store:                 # the corpus bucket; use write-only credentials (no delete)
+  #     type: s3
+  #     config:
+  #       region: "us-east-1"
+  #       endpoint: http://minio:9000
+  #       bucket_name: interesting-states
+  #       access_key: xxx
+  #       access_secret: xxx
   # Use the following to configure Tracoor for a custom network
   # ethereum:
   #   config:

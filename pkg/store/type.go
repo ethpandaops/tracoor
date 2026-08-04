@@ -33,4 +33,5 @@ const (
 	BeaconBadBlobDataType  DataType = "beacon_bad_blob"
 	BlockTraceDataType     DataType = "execution_block_trace"
 	BadBlockDataType       DataType = "execution_bad_block"
+	RawDataType            DataType = "raw"
 )
