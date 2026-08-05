@@ -60,6 +60,12 @@ const (
 	// simply drains over the following ticks.
 	maxEpochsPerTick = 64
 
+	// stopTimeout bounds how long Stop waits for an in-flight tick. The
+	// context the server hands to Stop is the process context, which is not
+	// cancelled during shutdown, so the bound has to come from here: a tick
+	// blocked on a slow corpus store must not hold the process open.
+	stopTimeout = 30 * time.Second
+
 	// networkIdentityTTL is how long a resolved genesis validators root is
 	// trusted before it is re-resolved. Devnets are torn down and recreated
 	// under the same config name constantly, so the GVR is refreshed rather
@@ -89,8 +95,12 @@ type Promoter struct {
 	// rescanned; idempotency makes that free.
 	networks map[string]*networkState
 
-	done     chan struct{}
-	stopped  chan struct{}
+	done chan struct{}
+
+	// running counts the run loop, so Stop waits for a tick that is
+	// actually in flight and returns immediately for a loop that was never
+	// started.
+	running  sync.WaitGroup
 	stopOnce sync.Once
 }
 
@@ -163,7 +173,6 @@ func NewPromoter(ctx context.Context, log logrus.FieldLogger, conf *Config, db *
 		metrics:  GetMetricsInstance(namespace),
 		networks: make(map[string]*networkState),
 		done:     make(chan struct{}),
-		stopped:  make(chan struct{}),
 	}, nil
 }
 
@@ -193,6 +202,8 @@ func (p *Promoter) Start(ctx context.Context, _ *grpc.Server) error {
 		return errors.Wrap(err, "failed to connect to corpus store")
 	}
 
+	p.running.Add(1)
+
 	go p.run(ctx)
 
 	return nil
@@ -201,14 +212,33 @@ func (p *Promoter) Start(ctx context.Context, _ *grpc.Server) error {
 // Stop implements service.GRPCService. It waits for an in-flight tick to
 // finish: the service only ever adds objects, but a half-written capture is
 // worth avoiding when the shutdown is orderly.
+//
+// The wait must be able to give up. Stop also runs when Start never launched
+// the loop - the corpus store was unreachable, or an earlier service failed
+// first - and it is called with the process context, which shutdown does not
+// cancel. A wait that only a running loop can satisfy would hang the process
+// with the signal handler already spent, leaving SIGKILL as the only way out.
 func (p *Promoter) Stop(ctx context.Context) error {
 	p.log.Info("Stopping promotion service")
 
 	p.stopOnce.Do(func() { close(p.done) })
 
+	// Zero when the loop never started, so this returns immediately.
+	finished := make(chan struct{})
+
+	go func() {
+		p.running.Wait()
+		close(finished)
+	}()
+
+	timeout := time.NewTimer(stopTimeout)
+	defer timeout.Stop()
+
 	select {
-	case <-p.stopped:
+	case <-finished:
 	case <-ctx.Done():
+		p.log.Warn("Context cancelled while waiting for the promotion loop to finish")
+	case <-timeout.C:
 		p.log.Warn("Timed out waiting for the promotion loop to finish")
 	}
 
@@ -216,7 +246,7 @@ func (p *Promoter) Stop(ctx context.Context) error {
 }
 
 func (p *Promoter) run(ctx context.Context) {
-	defer close(p.stopped)
+	defer p.running.Done()
 
 	// Process immediately: everything still inside the retention window is
 	// fair game, oldest first, and re-processing is idempotent.

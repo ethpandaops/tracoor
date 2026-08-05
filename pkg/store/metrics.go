@@ -9,6 +9,11 @@ import (
 type BasicMetrics struct {
 	namespace string
 
+	// registered records whether the collectors reached the prometheus
+	// registry, so a namespace first created with metrics disabled can
+	// still be registered later by a store that wants them.
+	registered bool
+
 	info               *prometheus.GaugeVec
 	itemsAdded         *prometheus.CounterVec
 	itemsAddedBytes    *prometheus.HistogramVec
@@ -35,6 +40,9 @@ func GetBasicMetricsInstance(namespace, storeType string, enabled bool) *BasicMe
 	defer mu.Unlock()
 
 	if existing, ok := instances[namespace]; ok {
+		// A namespace whose first store disabled metrics would otherwise
+		// stay unexported for every later store that wants them.
+		existing.register(enabled)
 		existing.info.WithLabelValues(storeType).Set(1)
 
 		return existing
@@ -92,23 +100,31 @@ func GetBasicMetricsInstance(namespace, storeType string, enabled bool) *BasicMe
 		}, []string{labelType}),
 	}
 
-	if enabled {
-		prometheus.MustRegister(instance.info)
-		prometheus.MustRegister(instance.itemsAdded)
-		prometheus.MustRegister(instance.itemsAddedBytes)
-		prometheus.MustRegister(instance.itemsRemoved)
-		prometheus.MustRegister(instance.itemsRetreived)
-		prometheus.MustRegister(instance.itemsUrlsRetreived)
-		prometheus.MustRegister(instance.itemsStored)
-		prometheus.MustRegister(instance.cacheHit)
-		prometheus.MustRegister(instance.cacheMiss)
-	}
-
+	instance.register(enabled)
 	instance.info.WithLabelValues(storeType).Set(1)
 
 	instances[namespace] = instance
 
 	return instance
+}
+
+// register exports the collectors, at most once. Callers hold mu.
+func (m *BasicMetrics) register(enabled bool) {
+	if !enabled || m.registered {
+		return
+	}
+
+	prometheus.MustRegister(m.info)
+	prometheus.MustRegister(m.itemsAdded)
+	prometheus.MustRegister(m.itemsAddedBytes)
+	prometheus.MustRegister(m.itemsRemoved)
+	prometheus.MustRegister(m.itemsRetreived)
+	prometheus.MustRegister(m.itemsUrlsRetreived)
+	prometheus.MustRegister(m.itemsStored)
+	prometheus.MustRegister(m.cacheHit)
+	prometheus.MustRegister(m.cacheMiss)
+
+	m.registered = true
 }
 
 func (m *BasicMetrics) ObserveItemAdded(itemType string) {

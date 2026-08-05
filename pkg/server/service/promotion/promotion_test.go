@@ -1,6 +1,7 @@
 package promotion
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -631,6 +632,53 @@ func TestReorgCapCeiling(t *testing.T) {
 	e.promoter.tick(t.Context())
 
 	assert.Len(t, e.findManifests(), 2)
+}
+
+// Stop must return whether or not the run loop was ever started: it also runs
+// when Start failed on an unreachable corpus store, or when an earlier
+// service failed first, and the context it is handed is the process context,
+// which shutdown does not cancel. Waiting on something only a running loop
+// can satisfy would hang the process past its own signal handler.
+func TestStopWithoutStartDoesNotHang(t *testing.T) {
+	e := newEnv(t, nil)
+
+	done := make(chan error, 1)
+
+	go func() { done <- e.promoter.Stop(context.Background()) }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop hung with no run loop to wait for")
+	}
+
+	// Stopping twice must not panic on a re-closed channel.
+	require.NoError(t, e.promoter.Stop(context.Background()))
+}
+
+// Stop waits for an in-flight tick, then returns.
+func TestStopWaitsForRunningLoop(t *testing.T) {
+	e := newEnv(t, nil)
+
+	e.seedChain(fillRoot(0x11), 160, 163)
+	e.seedHeadAnchor(224)
+
+	require.NoError(t, e.promoter.Start(t.Context(), nil))
+
+	done := make(chan error, 1)
+
+	go func() { done <- e.promoter.Stop(context.Background()) }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(stopTimeout + 5*time.Second):
+		t.Fatal("Stop outlived its own timeout")
+	}
+
+	// The first tick ran to completion before Stop returned.
+	assert.Len(t, e.findManifests(), 1)
 }
 
 func TestCaptureID(t *testing.T) {
