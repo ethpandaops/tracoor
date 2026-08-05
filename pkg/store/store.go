@@ -35,6 +35,9 @@ type Store interface {
 	// Copy copies a file from one location to another
 	Copy(ctx context.Context, params *CopyParams) error
 
+	// SaveRaw saves arbitrary bytes to the store at the given location
+	SaveRaw(ctx context.Context, params *SaveParams) (string, error)
+
 	// StorageHandshakeTokenExists checks if a storage handshake token exists in the store
 	StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error)
 	// SaveStorageHandshakeToken saves a storage handshake token to the store

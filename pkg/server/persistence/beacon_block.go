@@ -16,15 +16,18 @@ type BeaconBlock struct {
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
-	Epoch                int64
+	Slot int64 `gorm:"index:idx_beacon_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
+	// The promotion service walks the index one (network, epoch) at a time,
+	// so this pair is indexed; an unindexed epoch turns each of those
+	// listings into a full table scan.
+	Epoch                int64     `gorm:"index:idx_beacon_block_network_epoch,where:deleted_at IS NULL,priority:2"`
 	BlockRoot            string    `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:3"`
 	FetchedAt            time.Time `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_block_fetchedat,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
 	BeaconImplementation string
 	NodeVersion          string `gorm:"not null;default:''"`
 	ContentEncoding      string `gorm:"not null;default:''"`
 	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	Network              string `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:2;index:idx_beacon_block_network_epoch,where:deleted_at IS NULL,priority:1"`
 }
 
 type BeaconBlockFilter struct {
