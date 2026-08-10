@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -57,6 +58,23 @@ type Server struct {
 
 const namespace = "tracoor_server"
 
+// shutdownTimeout bounds the teardown of the server's components once the
+// pre-stop sleep has elapsed. Shutdown is reached by way of a cancelled
+// context, so the steps that can block need a deadline of their own.
+const shutdownTimeout = 15 * time.Second
+
+// isCleanShutdown reports whether err is what a shutdown we asked for looks
+// like, rather than a failure the caller should report. Listeners that are
+// closed on purpose surface ErrServerClosed/ErrServerStopped, and components
+// unwinding on a cancelled context surface context.Canceled; none of those mean
+// anything went wrong.
+func isCleanShutdown(err error) bool {
+	return err == nil ||
+		errors.Is(err, http.ErrServerClosed) ||
+		errors.Is(err, grpc.ErrServerStopped) ||
+		errors.Is(err, context.Canceled)
+}
+
 func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Server, error) {
 	if err := conf.Validate(); err != nil {
 		return nil, err
@@ -105,10 +123,8 @@ func (x *Server) Start(ctx context.Context) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		if err := x.startMetrics(ctx); err != nil {
-			if err != http.ErrServerClosed {
-				return err
-			}
+		if err := x.startMetrics(ctx); !isCleanShutdown(err) {
+			return err
 		}
 
 		return nil
@@ -116,10 +132,8 @@ func (x *Server) Start(ctx context.Context) error {
 
 	if x.config.PProfAddr != nil {
 		g.Go(func() error {
-			if err := x.startPProf(ctx); err != nil {
-				if err != http.ErrServerClosed {
-					return err
-				}
+			if err := x.startPProf(ctx); !isCleanShutdown(err) {
+				return err
 			}
 
 			return nil
@@ -127,14 +141,14 @@ func (x *Server) Start(ctx context.Context) error {
 	}
 
 	g.Go(func() error {
-		if err := x.startGrpcServer(ctx); err != nil {
+		if err := x.startGrpcServer(ctx); !isCleanShutdown(err) {
 			return err
 		}
 
 		return nil
 	})
 	g.Go(func() error {
-		if err := x.startGrpcGateway(ctx); err != nil {
+		if err := x.startGrpcGateway(ctx); !isCleanShutdown(err) {
 			return err
 		}
 
@@ -173,9 +187,10 @@ func (x *Server) Start(ctx context.Context) error {
 	// Signal that the server has fully started
 	close(x.Started)
 
-	err := g.Wait()
-
-	if err != context.Canceled {
+	// A shutdown we asked for is not an error: the http listeners report
+	// ErrServerClosed and the errgroup reports the cancelled context. Reporting
+	// either would make every clean stop look like a crash to the caller.
+	if err := g.Wait(); !isCleanShutdown(err) {
 		return err
 	}
 
@@ -191,32 +206,48 @@ func (x *Server) stop(ctx context.Context) error {
 		x.grpcServer.GracefulStop()
 	}
 
+	// ctx is the context whose cancellation brought us here, so every remaining
+	// step needs one that outlives it - otherwise each Shutdown returns
+	// immediately and the listeners stay up.
+	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+
+	// Every step runs even if an earlier one fails. Leaving the metrics or pprof
+	// listener bound because the gateway stumbled only hides the original
+	// problem behind a port clash on the next start.
+	var errs []error
+
 	for _, s := range x.services {
-		if err := s.Stop(ctx); err != nil {
-			return err
+		if err := s.Stop(stopCtx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to stop service: %w", err))
 		}
 	}
 
-	if err := x.db.Stop(ctx); err != nil {
-		return err
+	if err := x.db.Stop(stopCtx); err != nil {
+		errs = append(errs, fmt.Errorf("failed to stop indexer: %w", err))
 	}
 
-	if x.gatewayServer != nil {
-		if err := x.gatewayServer.Shutdown(ctx); err != nil {
-			return err
+	httpServers := []struct {
+		name   string
+		server *http.Server
+	}{
+		{name: "gateway", server: x.gatewayServer},
+		{name: "pprof", server: x.pprofServer},
+		{name: "metrics", server: x.metricsServer},
+	}
+
+	for _, s := range httpServers {
+		if s.server == nil {
+			continue
+		}
+
+		if err := s.server.Shutdown(stopCtx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to stop %s server: %w", s.name, err))
 		}
 	}
 
-	if x.pprofServer != nil {
-		if err := x.pprofServer.Shutdown(ctx); err != nil {
-			return err
-		}
-	}
-
-	if x.metricsServer != nil {
-		if err := x.metricsServer.Shutdown(ctx); err != nil {
-			return err
-		}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	x.log.Info("Server stopped")
