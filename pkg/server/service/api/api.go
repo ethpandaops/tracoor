@@ -103,18 +103,9 @@ func (i *API) GetConfig(ctx context.Context, req *api.GetConfigRequest) (*api.Ge
 }
 
 func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateRequest) (*api.ListBeaconStateResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconStateRequest{
@@ -236,18 +227,9 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 }
 
 func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockRequest) (*api.ListBeaconBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBlockRequest{
@@ -369,18 +351,9 @@ func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniq
 }
 
 func (i *API) ListExecutionPayloadEnvelope(ctx context.Context, req *api.ListExecutionPayloadEnvelopeRequest) (*api.ListExecutionPayloadEnvelopeResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: "fetched_at DESC",
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListExecutionPayloadEnvelopeRequest{
@@ -502,18 +475,9 @@ func (i *API) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req 
 }
 
 func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBlockRequest) (*api.ListBeaconBadBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBadBlockRequest{
@@ -635,18 +599,9 @@ func (i *API) ListUniqueBeaconBadBlockValues(ctx context.Context, req *api.ListU
 }
 
 func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobRequest) (*api.ListBeaconBadBlobResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBadBlobRequest{
@@ -774,18 +729,9 @@ func (i *API) ListUniqueBeaconBadBlobValues(ctx context.Context, req *api.ListUn
 }
 
 func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutionBlockTraceRequest) (*api.ListExecutionBlockTraceResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListExecutionBlockTraceRequest{
@@ -899,18 +845,9 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 }
 
 func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionBadBlockRequest) (*api.ListExecutionBadBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListExecutionBadBlockRequest{

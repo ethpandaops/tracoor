@@ -108,14 +108,19 @@ func (p *PermanentStore) IsEnabled() bool {
 	return p.enabled
 }
 
-// QueueBlock adds a block to the queue for processing.
+// QueueBlock adds a block to the queue for processing. Every path that does not hand the block
+// to a worker closes ProcessedChan itself, so a caller waiting on it is never stranded.
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	// Check if the permanent store is enabled
 	if !p.IsEnabled() {
+		closeProcessed(block)
+
 		return
 	}
 
 	if p.stopped {
+		closeProcessed(block)
+
 		return
 	}
 
@@ -127,11 +132,19 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			KeyLocation:  block.Location,
 		}).Debug("Queued block for permanent storage")
 	default:
+		closeProcessed(block)
+
 		p.log.WithFields(logrus.Fields{
 			KeyBlockRoot: block.BlockRoot,
 			KeyNetwork:   block.Network,
 			KeyLocation:  block.Location,
 		}).Warn("Failed to queue block for permanent storage, queue is full")
+	}
+}
+
+func closeProcessed(block PermanentStoreBlock) {
+	if block.ProcessedChan != nil {
+		close(block.ProcessedChan)
 	}
 }
 
@@ -149,6 +162,8 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 			// Skip empty blocks
 			if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
+				closeProcessed(block)
+
 				continue
 			}
 
@@ -169,11 +184,7 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
 
 	// Close the processed channel so that the caller can wait for the block to be processed
-	defer func() {
-		if block.ProcessedChan != nil {
-			close(block.ProcessedChan)
-		}
-	}()
+	defer closeProcessed(block)
 
 	// Check if we've already processed this block
 	if _, ok := p.cache.Get(cacheKey); ok {

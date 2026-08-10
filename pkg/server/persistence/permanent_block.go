@@ -85,16 +85,18 @@ func (i *Indexer) ListPermanentBlock(ctx context.Context, filter *PermanentBlock
 	}
 
 	if pagination != nil {
+		query = pagination.ApplyOffsetLimit(query)
+
+		// PermanentBlock has no fetched_at column, so the default ordering does not apply here.
 		if pagination.OrderBy != "" {
-			query = query.Order(pagination.OrderBy)
-		}
+			ordered, oerr := pagination.ApplyOrderBy(query)
+			if oerr != nil {
+				i.metrics.ObserveOperationError(operation)
 
-		if pagination.Limit > 0 {
-			query = query.Limit(pagination.Limit)
-		}
+				return nil, oerr
+			}
 
-		if pagination.Offset > 0 {
-			query = query.Offset(pagination.Offset)
+			query = ordered
 		}
 	}
 

@@ -255,12 +255,18 @@ func DBExecutionBadBlockToProtoExecutionBadBlock(eb *persistence.ExecutionBadBlo
 	}
 }
 
-func ProtoPaginationCursorToDBPaginationCursor(pc *indexer.PaginationCursor) *persistence.PaginationCursor {
-	return &persistence.PaginationCursor{
+func ProtoPaginationCursorToDBPaginationCursor(pc *indexer.PaginationCursor) (*persistence.PaginationCursor, error) {
+	cursor := &persistence.PaginationCursor{
 		Offset:  int(pc.GetOffset()),
 		Limit:   int(pc.GetLimit()),
 		OrderBy: pc.GetOrderBy(),
 	}
+
+	if err := cursor.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cursor, nil
 }
 
 func DBPaginationCursorToProtoPaginationCursor(pc *persistence.PaginationCursor) *indexer.PaginationCursor {

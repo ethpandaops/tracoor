@@ -11,6 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// permanentStoreWaitTimeout bounds how long a purge waits for the permanent store to finish
+// with a block. It sits above the permanent store's own lock retry window so that a block
+// contended by another replica is not abandoned before that window expires.
+const permanentStoreWaitTimeout = 45 * time.Second
+
 func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 	i.log.WithFields(logrus.Fields{
 		"beacon_state":               i.config.Retention.BeaconStates.Duration,
@@ -120,20 +125,27 @@ func (i *Indexer) purgeOldBeaconBlocks(ctx context.Context) error {
 	i.log.WithField("before", before).Debugf("Purging %d old beacon blocks", len(blocks))
 
 	for _, block := range blocks {
-		// Check if the block needs to be processed by the permanent store
-		b := PermanentStoreBlock{
-			Location:      block.Location,
-			BlockRoot:     block.BlockRoot,
-			Network:       block.Network,
-			ProcessedChan: make(chan struct{}),
-			//nolint:gosec // This is a valid conversion
-			Slot: phase0.Slot(block.Slot),
+		// A block may need copying to its permanent location before we delete the original.
+		if i.permanentStore.IsEnabled() {
+			b := PermanentStoreBlock{
+				Location:      block.Location,
+				BlockRoot:     block.BlockRoot,
+				Network:       block.Network,
+				ProcessedChan: make(chan struct{}),
+				//nolint:gosec // This is a valid conversion
+				Slot: phase0.Slot(block.Slot),
+			}
+
+			i.permanentStore.QueueBlock(b)
+
+			select {
+			case <-b.ProcessedChan:
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(permanentStoreWaitTimeout):
+				i.log.WithField("block_root", block.BlockRoot).Warn("Timed out waiting for permanent store")
+			}
 		}
-
-		i.permanentStore.QueueBlock(b)
-
-		// Wait for the block to be processed
-		<-b.ProcessedChan
 
 		// Delete from the store first
 		if err := i.store.DeleteBeaconBlock(ctx, block.Location); err != nil {

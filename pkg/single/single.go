@@ -2,6 +2,7 @@ package single
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/ethpandaops/tracoor/pkg/agent"
@@ -28,10 +29,13 @@ func (s *Single) Start(ctx context.Context) error {
 
 	sserver, err := server.NewServer(ctx, s.log.WithField("container", "server"), s.config.Server)
 	if err != nil {
-		s.log.Fatal(err)
+		return fmt.Errorf("failed to create server: %w", err)
 	}
 
 	var wg sync.WaitGroup
+
+	// Written before wg.Done and read after wg.Wait, so no further synchronisation is needed.
+	var serverErr error
 
 	// Start server
 	wg.Add(1)
@@ -42,7 +46,9 @@ func (s *Single) Start(ctx context.Context) error {
 		s.log.Info("Starting server")
 
 		if err := sserver.Start(ctx); err != nil {
-			s.log.Fatal(err)
+			serverErr = fmt.Errorf("server exited with an error: %w", err)
+
+			s.log.WithError(err).Error("Server exited with an error")
 		}
 
 		s.log.Info("tracoor server exited.")
@@ -62,16 +68,23 @@ func (s *Single) Start(ctx context.Context) error {
 			go func(cfg *agent.Config) {
 				defer wg.Done()
 
-				a, err := agent.New(ctx, s.log.WithField("container", "agent").WithField("name", cfg.Name), cfg)
+				log := s.log.WithField("container", "agent").WithField("name", cfg.Name)
+
+				// One agent failing must not take the server or the other agents with it.
+				a, err := agent.New(ctx, log, cfg)
 				if err != nil {
-					s.log.Fatal(err)
+					log.WithError(err).Error("Failed to create agent")
+
+					return
 				}
 
 				if err := a.Start(ctx); err != nil {
-					s.log.Fatal(err)
+					log.WithError(err).Error("Agent exited with an error")
+
+					return
 				}
 
-				s.log.Info("tracoor agent exited!")
+				log.Info("tracoor agent exited!")
 			}(cfg)
 		}
 	}()
@@ -80,5 +93,5 @@ func (s *Single) Start(ctx context.Context) error {
 
 	s.log.Info("tracoor single exited!")
 
-	return nil
+	return serverErr
 }

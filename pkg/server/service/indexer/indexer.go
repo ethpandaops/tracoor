@@ -301,7 +301,12 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconStates, err := i.db.ListBeaconState(ctx, filter, pagination)
@@ -567,7 +572,12 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlocks, err := i.db.ListBeaconBlock(ctx, filter, pagination)
@@ -821,11 +831,16 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	envelopes, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, pagination)
@@ -1083,7 +1098,12 @@ func (i *Indexer) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeaco
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, pagination)
@@ -1348,7 +1368,12 @@ func (i *Indexer) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeacon
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, pagination)
@@ -1569,7 +1594,12 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	executionBlockTraces, err := i.db.ListExecutionBlockTrace(ctx, filter, pagination)
@@ -1779,7 +1809,12 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	executionBadBlocks, err := i.db.ListExecutionBadBlock(ctx, filter, pagination)

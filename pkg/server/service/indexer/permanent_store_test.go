@@ -611,3 +611,69 @@ func TestPermanentStoreLocation(t *testing.T) {
 		assert.Equal(t, int64(blockInfo.Slot), blocks[0].Slot)
 	}
 }
+
+func TestQueueBlockAlwaysClosesProcessedChan(t *testing.T) {
+	newStore := func(t *testing.T, enabled bool) *PermanentStore {
+		t.Helper()
+
+		permanentStore, err := NewPermanentStore(logrus.New(), nil, nil, uuid.New().String(), &PermanentStoreConfig{
+			Blocks: BlockConfig{
+				Enabled: enabled,
+			},
+		})
+		require.NoError(t, err)
+
+		return permanentStore
+	}
+
+	newBlock := func() PermanentStoreBlock {
+		return PermanentStoreBlock{
+			Location:      blockLocation,
+			BlockRoot:     "0x1234",
+			Network:       testNetwork,
+			Slot:          123,
+			ProcessedChan: make(chan struct{}),
+		}
+	}
+
+	requireClosed := func(t *testing.T, block PermanentStoreBlock) {
+		t.Helper()
+
+		select {
+		case <-block.ProcessedChan:
+		case <-time.After(time.Second):
+			t.Fatal("ProcessedChan was never closed")
+		}
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		permanentStore := newStore(t, false)
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+
+	t.Run("stopped", func(t *testing.T) {
+		permanentStore := newStore(t, true)
+		permanentStore.stopped = true
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+
+	t.Run("queue full", func(t *testing.T) {
+		permanentStore := newStore(t, true)
+
+		// Nothing is draining the queue, so filling it forces the queue-full path.
+		for len(permanentStore.queue) < cap(permanentStore.queue) {
+			permanentStore.queue <- PermanentStoreBlock{}
+		}
+
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+}

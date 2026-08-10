@@ -215,7 +215,14 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 	if page != nil {
 		query = page.ApplyOffsetLimit(query)
 
-		query = page.ApplyOrderBy(query)
+		ordered, err := page.ApplyOrderBy(query)
+		if err != nil {
+			i.metrics.ObserveOperationError(operation)
+
+			return nil, err
+		}
+
+		query = ordered
 	}
 
 	query, err := filter.ApplyToQuery(query)

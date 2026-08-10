@@ -37,6 +37,10 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *O
 		db, err = gorm.Open(dialect, &gorm.Config{})
 	case "sqlite":
 		db, err = gorm.Open(sqlite.Open(config.DSN), &gorm.Config{})
+		if err != nil {
+			return nil, err
+		}
+
 		db.Exec("PRAGMA synchronous = OFF;")
 		db.Exec("PRAGMA journal_mode = WAL;")
 		db.Exec("PRAGMA cache_size = 100000;")
