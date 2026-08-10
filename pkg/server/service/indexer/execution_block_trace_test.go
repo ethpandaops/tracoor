@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -270,7 +271,7 @@ func TestIndexerExecutionBlockTraceDownloading(t *testing.T) {
 		}
 
 		location, err := index.Store().SaveExecutionBlockTrace(ctx, &store.SaveParams{
-			Data:            &compressedData,
+			Data:            bytes.NewReader(compressedData),
 			Location:        testDataLocation,
 			ContentEncoding: compression.Gzip.ContentEncoding,
 		})

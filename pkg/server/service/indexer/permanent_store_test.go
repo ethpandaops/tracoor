@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -86,7 +87,7 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
@@ -148,7 +149,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
@@ -232,7 +233,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Save the first block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData1,
+		Data:     bytes.NewReader(blockData1),
 	})
 	require.NoError(t, err)
 
@@ -242,7 +243,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Save the second block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation2,
-		Data:     &blockData2,
+		Data:     bytes.NewReader(blockData2),
 	})
 	require.NoError(t, err)
 
@@ -370,7 +371,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	// Save the block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
@@ -451,7 +452,7 @@ func TestPermanentStoreStop(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
@@ -577,7 +578,7 @@ func TestPermanentStoreLocation(t *testing.T) {
 	data := []byte("test data")
 	params := &store.SaveParams{
 		Location: blockInfo.Location,
-		Data:     &data,
+		Data:     bytes.NewReader(data),
 	}
 	_, err := mockStore.SaveBeaconBlock(ctx, params)
 	require.NoError(t, err)

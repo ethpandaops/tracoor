@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,16 +39,9 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		return nil
 	}
 
-	// Held until the upload finishes, not just the fetch. Block traces are the
-	// largest payload the agent handles.
-	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to acquire fetch slot")
-	}
-
-	defer releaseFetchSlot()
-
-	// Fetch the execution block trace from the execution node.
+	// Fetch the execution block trace from the execution node. Traces arrive as
+	// a JSON-RPC envelope the result has to be pulled out of, so unlike the
+	// consensus artifacts they are still buffered whole.
 	data, err := s.node.Execution().GetRawDebugBlockTrace(ctx, blockHash, s.node.Execution().Metadata().Client(ctx))
 	if err != nil {
 		return err
@@ -55,7 +49,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 
 	now := time.Now()
 
-	compressedData, err := s.compressor.Compress(data, compression.Gzip)
+	compressedData, err := s.compressor.Compress(data, compression.Default)
 	if err != nil {
 		return errors.Wrapf(err, "failed to compress execution block trace")
 	}
@@ -75,9 +69,9 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 
 	// Upload the execution block trace to the store.
 	location, err = s.store.SaveExecutionBlockTrace(ctx, &store.SaveParams{
-		Data:            &compressedData,
+		Data:            bytes.NewReader(compressedData),
 		Location:        location,
-		ContentEncoding: compression.Gzip.ContentEncoding,
+		ContentEncoding: compression.Default.ContentEncoding,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to save execution block trace to store")
@@ -89,7 +83,7 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 		BlockNumber:             wrapperspb.Int64(int64(blockNumber)), //nolint:gosec // safe.
 		BlockHash:               wrapperspb.String(blockHash),
 		FetchedAt:               timestamppb.New(now),
-		ContentEncoding:         wrapperspb.String(compression.Gzip.ContentEncoding),
+		ContentEncoding:         wrapperspb.String(compression.Default.ContentEncoding),
 		Location:                wrapperspb.String(location),
 		Network:                 wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
 		ExecutionImplementation: wrapperspb.String(s.node.Execution().Metadata().Client(ctx)),
@@ -110,15 +104,6 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 }
 
 func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
-	// Held across the indexing pass below, as the decoded slice is retained until
-	// it completes.
-	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to acquire fetch slot")
-	}
-
-	defer releaseFetchSlot()
-
 	// Fetch the bad blocks from the execution node.
 	blocks, err := s.node.Execution().GetBadBlocks(ctx)
 	if err != nil {
@@ -173,7 +158,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 	}
 
 	// Compress it
-	compressedBlockData, err := s.compressor.Compress(&rawBlockData, compression.Gzip)
+	compressedBlockData, err := s.compressor.Compress(&rawBlockData, compression.Default)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to compress execution bad block")
 
@@ -190,9 +175,9 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 
 	// Upload the execution block trace to the store.
 	location, err = s.store.SaveExecutionBadBlock(ctx, &store.SaveParams{
-		Data:            &compressedBlockData,
+		Data:            bytes.NewReader(compressedBlockData),
 		Location:        location,
-		ContentEncoding: compression.Gzip.ContentEncoding,
+		ContentEncoding: compression.Default.ContentEncoding,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to save execution bad block to store")
@@ -203,7 +188,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 		BlockHash:               wrapperspb.String(block.Hash),
 		FetchedAt:               timestamppb.New(time.Now()),
 		Location:                wrapperspb.String(location),
-		ContentEncoding:         wrapperspb.String(compression.Gzip.ContentEncoding),
+		ContentEncoding:         wrapperspb.String(compression.Default.ContentEncoding),
 		Network:                 wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
 		ExecutionImplementation: wrapperspb.String(s.node.Execution().Metadata().Client(ctx)),
 		NodeVersion:             wrapperspb.String(s.node.Execution().Metadata().ClientVersion()),

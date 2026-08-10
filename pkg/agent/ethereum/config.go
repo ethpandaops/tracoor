@@ -34,14 +34,6 @@ type Config struct {
 	// blocks, so a trace beyond that window is a guaranteed failure. The default
 	// follows geth's `reexec` default of 128 blocks.
 	ExecutionBlockTraceAgeThresholdBlocks uint64 `yaml:"executionBlockTraceAgeThresholdBlocks" default:"128"`
-
-	// MaxConcurrentFetches bounds how many fetches of any kind - states, blocks,
-	// envelopes, block traces, bad blocks and bad blobs - may be in flight at once
-	// across every agent in the process. Each holds its whole response in memory,
-	// so this caps peak usage independently of how many agents are configured.
-	// A single shared budget is deliberate: per-path budgets bound each path but
-	// not the total. Applied process-wide by whichever agent starts first.
-	MaxConcurrentFetches int `yaml:"maxConcurrentFetches" default:"10"`
 }
 
 const defaultExecutionBlockTraceAgeThresholdBlocks = 128
@@ -52,14 +44,6 @@ func (c *Config) GetExecutionBlockTraceAgeThresholdBlocks() uint64 {
 	}
 
 	return c.ExecutionBlockTraceAgeThresholdBlocks
-}
-
-func (c *Config) GetMaxConcurrentFetches() int {
-	if c.MaxConcurrentFetches <= 0 {
-		return 0
-	}
-
-	return c.MaxConcurrentFetches
 }
 
 func (c *Config) Validate() error {

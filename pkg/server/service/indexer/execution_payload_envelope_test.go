@@ -2,6 +2,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ func TestIndexerExecutionPayloadEnvelopeDownloading(t *testing.T) {
 		}
 
 		location, err := index.Store().SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
-			Data:            &compressedData,
+			Data:            bytes.NewReader(compressedData),
 			Location:        "data.json",
 			ContentEncoding: compression.Gzip.ContentEncoding,
 		})

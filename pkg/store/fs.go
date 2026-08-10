@@ -1,9 +1,11 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,14 +73,56 @@ func (s *FSStore) ensureDir(path string) error {
 	return nil
 }
 
-func (s *FSStore) saveFile(data *[]byte, path string) error {
+// saveFile streams data into a temporary file alongside path and renames it
+// into place once the whole body has been written. Publishing is therefore
+// atomic: a reader that fails part way through leaves the temporary file to be
+// removed and nothing at path, so no other process can observe a truncated
+// object as a complete one.
+func (s *FSStore) saveFile(data io.Reader, path string) error {
+	if data == nil {
+		return errors.New("data is nil")
+	}
+
 	if err := s.ensureDir(path); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(path, *data, 0o600); err != nil {
-		return err
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
+
+	tmpPath := tmp.Name()
+
+	// Every exit short of a completed rename has to take the temporary file
+	// with it, or a failed save leaves litter beside the real object.
+	renamed := false
+
+	defer func() {
+		if renamed {
+			return
+		}
+
+		_ = tmp.Close()
+
+		if rerr := os.Remove(tmpPath); rerr != nil && !os.IsNotExist(rerr) {
+			s.log.WithError(rerr).WithField("path", tmpPath).Warn("Failed to remove temporary file")
+		}
+	}()
+
+	if _, err := io.Copy(tmp, data); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("failed to publish %s: %w", path, err)
+	}
+
+	renamed = true
 
 	return nil
 }
@@ -317,9 +361,8 @@ func (s *FSStore) StorageHandshakeTokenExists(ctx context.Context, node string) 
 
 func (s *FSStore) SaveStorageHandshakeToken(ctx context.Context, node, data string) error {
 	location := s.constructLocation(s.basePath, "handshake_tokens", node)
-	dataBytes := []byte(data)
 
-	if err := s.saveFile(&dataBytes, location); err != nil {
+	if err := s.saveFile(bytes.NewReader([]byte(data)), location); err != nil {
 		return err
 	}
 

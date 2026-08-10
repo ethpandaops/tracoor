@@ -3,13 +3,18 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/ethpandaops/tracoor/pkg/yaml"
 	"github.com/sirupsen/logrus"
 )
 
 type SaveParams struct {
-	Data            *[]byte
+	// Data is streamed to the backend rather than buffered, so the caller may
+	// hand over a pipe whose length is not known up front. A reader that fails
+	// part way through must leave nothing published: every implementation
+	// either aborts the transfer or discards the partial object.
+	Data            io.Reader
 	Location        string
 	ContentEncoding string
 }

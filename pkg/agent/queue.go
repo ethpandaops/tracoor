@@ -3,29 +3,44 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
+// Each request carries the pending-set key its producer claimed, so the worker
+// that finishes it releases exactly that claim rather than deriving the key a
+// second time.
+
 type BeaconStateRequest struct {
 	Slot phase0.Slot
+
+	key string
 }
 
 type BeaconBlockRequest struct {
 	Slot phase0.Slot
+
+	key string
 }
 
 type ExecutionPayloadEnvelopeRequest struct {
 	Slot phase0.Slot
+
+	key string
 }
 
 type BeaconBadBlockRequest struct {
 	Path string
+
+	key string
 }
 
 type BeaconBadBlobRequest struct {
 	Path string
+
+	key string
 }
 
 // ExecutionBlockTraceRequest identifies the beacon block whose execution
@@ -34,18 +49,24 @@ type BeaconBadBlobRequest struct {
 // the queue worker rather than in the beacon event callback that queues it.
 type ExecutionBlockTraceRequest struct {
 	BlockID string
+
+	key string
 }
 
 type ExecutionBadBlockRequest struct {
+	key string
 }
 
 // enqueue hands an item to a queue, giving up if the agent is shutting down.
 // The queues block when full, so without the cancellation case a shutdown would
-// be held open by whichever producer happened to be mid-send.
-func enqueue[T any](ctx context.Context, queue chan<- T, item T) {
+// be held open by whichever producer happened to be mid-send. It reports
+// whether the item was accepted.
+func enqueue[T any](ctx context.Context, queue chan<- T, item T) bool {
 	select {
 	case queue <- item:
+		return true
 	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -79,9 +100,14 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	enqueue(ctx, s.beaconStateQueue, &BeaconStateRequest{
-		Slot: slot,
-	})
+	key := pendingKey(BeaconStateQueue, slotIdentifier(slot))
+	if !s.claimQueueItem(BeaconStateQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.beaconStateQueue, &BeaconStateRequest{Slot: slot, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
@@ -89,9 +115,14 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	enqueue(ctx, s.beaconBlockQueue, &BeaconBlockRequest{
-		Slot: slot,
-	})
+	key := pendingKey(BeaconBlockQueue, slotIdentifier(slot))
+	if !s.claimQueueItem(BeaconBlockQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.beaconBlockQueue, &BeaconBlockRequest{Slot: slot, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) {
@@ -99,9 +130,14 @@ func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0
 		return
 	}
 
-	enqueue(ctx, s.executionPayloadEnvelopeQueue, &ExecutionPayloadEnvelopeRequest{
-		Slot: slot,
-	})
+	key := pendingKey(ExecutionPayloadEnvelopeQueue, slotIdentifier(slot))
+	if !s.claimQueueItem(ExecutionPayloadEnvelopeQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.executionPayloadEnvelopeQueue, &ExecutionPayloadEnvelopeRequest{Slot: slot, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
@@ -109,9 +145,14 @@ func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
 		return
 	}
 
-	enqueue(ctx, s.beaconBadBlockQueue, &BeaconBadBlockRequest{
-		Path: path,
-	})
+	key := pendingKey(BeaconBadBlockQueue, path)
+	if !s.claimQueueItem(BeaconBadBlockQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.beaconBadBlockQueue, &BeaconBadBlockRequest{Path: path, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
@@ -119,9 +160,14 @@ func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
 		return
 	}
 
-	enqueue(ctx, s.beaconBadBlobQueue, &BeaconBadBlobRequest{
-		Path: path,
-	})
+	key := pendingKey(BeaconBadBlobQueue, path)
+	if !s.claimQueueItem(BeaconBadBlobQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.beaconBadBlobQueue, &BeaconBadBlobRequest{Path: path, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) {
@@ -129,9 +175,14 @@ func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) 
 		return
 	}
 
-	enqueue(ctx, s.executionBlockTraceQueue, &ExecutionBlockTraceRequest{
-		BlockID: blockID,
-	})
+	key := pendingKey(ExecutionBlockTraceQueue, blockID)
+	if !s.claimQueueItem(ExecutionBlockTraceQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.executionBlockTraceQueue, &ExecutionBlockTraceRequest{BlockID: blockID, key: key}) {
+		s.releaseQueueItem(key)
+	}
 }
 
 func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
@@ -139,7 +190,20 @@ func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
 		return
 	}
 
-	enqueue(ctx, s.executionBadBlockQueue, &ExecutionBadBlockRequest{})
+	// The execution node only ever reports its current bad blocks, so there is
+	// one item to have outstanding, not one per identifier.
+	key := pendingKey(ExecutionBadBlockQueue, "")
+	if !s.claimQueueItem(ExecutionBadBlockQueue, key) {
+		return
+	}
+
+	if !enqueue(ctx, s.executionBadBlockQueue, &ExecutionBadBlockRequest{key: key}) {
+		s.releaseQueueItem(key)
+	}
+}
+
+func slotIdentifier(slot phase0.Slot) string {
+	return strconv.FormatUint(uint64(slot), 10)
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
@@ -148,6 +212,8 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.beaconStateQueue, func(stateRequest *BeaconStateRequest) {
+		defer s.releaseQueueItem(stateRequest.key)
+
 		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue), s.Config.Name)
 
 		start := time.Now()
@@ -188,6 +254,8 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.beaconBlockQueue, func(blockRequest *BeaconBlockRequest) {
+		defer s.releaseQueueItem(blockRequest.key)
+
 		s.metrics.SetQueueSize(BeaconBlockQueue, len(s.beaconBlockQueue), s.Config.Name)
 
 		start := time.Now()
@@ -212,6 +280,8 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.executionPayloadEnvelopeQueue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
+		defer s.releaseQueueItem(envelopeRequest.key)
+
 		s.metrics.SetQueueSize(ExecutionPayloadEnvelopeQueue, len(s.executionPayloadEnvelopeQueue), s.Config.Name)
 
 		start := time.Now()
@@ -236,6 +306,8 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.beaconBadBlockQueue, func(badBlockRequest *BeaconBadBlockRequest) {
+		defer s.releaseQueueItem(badBlockRequest.key)
+
 		s.metrics.SetQueueSize(BeaconBadBlockQueue, len(s.beaconBadBlockQueue), s.Config.Name)
 
 		start := time.Now()
@@ -262,6 +334,8 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.beaconBadBlobQueue, func(badBlobRequest *BeaconBadBlobRequest) {
+		defer s.releaseQueueItem(badBlobRequest.key)
+
 		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue), s.Config.Name)
 
 		start := time.Now()
@@ -288,6 +362,8 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 	}
 
 	drainQueue(ctx, s.executionBlockTraceQueue, func(traceRequest *ExecutionBlockTraceRequest) {
+		defer s.releaseQueueItem(traceRequest.key)
+
 		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue), s.Config.Name)
 
 		start := time.Now()
@@ -320,7 +396,9 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.executionBadBlockQueue, func(_ *ExecutionBadBlockRequest) {
+	drainQueue(ctx, s.executionBadBlockQueue, func(badBlockRequest *ExecutionBadBlockRequest) {
+		defer s.releaseQueueItem(badBlockRequest.key)
+
 		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue), s.Config.Name)
 
 		start := time.Now()

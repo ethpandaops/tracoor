@@ -1,8 +1,13 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ethpandaops/tracoor/pkg/store"
@@ -37,7 +42,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "beacon_state/location.json"
 		data := []byte(`{"abc": "def"}`)
 		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -51,7 +56,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "beacon_state/location.json"
 		data := []byte(`{"abc": "def"}`)
 		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -68,7 +73,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -82,7 +87,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -99,7 +104,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationExecutionPayloadEnvelope
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -113,7 +118,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationExecutionPayloadEnvelope
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -130,7 +135,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationBadBeaconBlock
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -144,7 +149,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationBadBeaconBlock
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -161,7 +166,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "beacon_bad_blob/location.json"
 		data := []byte(`{"bad_blob": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlob(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -175,7 +180,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "beacon_bad_blob/location.json"
 		data := []byte(`{"bad_blob": "data"}`)
 		_, err := fsStore.SaveBeaconBadBlob(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -192,7 +197,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "execution_block_trace/location.json"
 		data := []byte(`{"trace": "data"}`)
 		_, err := fsStore.SaveExecutionBlockTrace(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -206,7 +211,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "execution_block_trace/location.json"
 		data := []byte(`{"trace": "data"}`)
 		_, err := fsStore.SaveExecutionBlockTrace(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -223,7 +228,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "execution_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveExecutionBadBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -237,7 +242,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := "execution_bad_block/location.json"
 		data := []byte(`{"bad_block": "data"}`)
 		_, err := fsStore.SaveExecutionBadBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -290,7 +295,7 @@ func TestFSStoreOperations(t *testing.T) {
 		location := locationBeaconBlock
 		data := []byte(`{"block": "data"}`)
 		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
-			Data:     &data,
+			Data:     bytes.NewReader(data),
 			Location: location,
 		})
 		require.NoError(t, err)
@@ -304,5 +309,129 @@ func TestFSStoreOperations(t *testing.T) {
 		exists, err := fsStore.Exists(ctx, "beacon_block/location_copy.json")
 		require.NoError(t, err)
 		require.True(t, exists)
+	})
+}
+
+// errAfterReader serves n bytes and then fails, standing in for a payload whose
+// source dies part way through the transfer.
+type errAfterReader struct {
+	remaining int
+	err       error
+}
+
+func (r *errAfterReader) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		return 0, r.err
+	}
+
+	if len(p) > r.remaining {
+		p = p[:r.remaining]
+	}
+
+	for i := range p {
+		p[i] = 'x'
+	}
+
+	r.remaining -= len(p)
+
+	return len(p), nil
+}
+
+// visibleFiles lists the directory entries a reader of the store would see,
+// which is every entry including any temporary file left behind.
+func visibleFiles(t *testing.T, dir string) []string {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		require.NoError(t, err)
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+
+	return names
+}
+
+func TestFSStorePublishesAtomically(t *testing.T) {
+	basePath, err := os.MkdirTemp("", "fsstore_atomic_test")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(basePath)
+
+	log := logrus.New()
+	fsStore, err := store.NewFSStore("test", log, &store.FSStoreConfig{BasePath: basePath}, nil)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	location := "beacon_state/atomic.ssz"
+	dir := filepath.Join(basePath, "beacon_state")
+
+	t.Run("FailedReadPublishesNothing", func(t *testing.T) {
+		readErr := errors.New("source died")
+
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     &errAfterReader{remaining: 1024, err: readErr},
+			Location: location,
+		})
+		require.ErrorIs(t, err, readErr)
+
+		exists, err := fsStore.Exists(ctx, location)
+		require.NoError(t, err)
+		require.False(t, exists, "a failed save must not publish the location")
+
+		require.Empty(t, visibleFiles(t, dir), "a failed save must not leave a temporary file behind")
+	})
+
+	t.Run("OverwriteKeepsThePreviousBytesUntilTheNewOnesAreComplete", func(t *testing.T) {
+		original := []byte("original-payload")
+
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     bytes.NewReader(original),
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		_, err = fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     io.MultiReader(strings.NewReader("partial"), &errAfterReader{err: errors.New("source died")}),
+			Location: location,
+		})
+		require.Error(t, err)
+
+		saved, err := fsStore.GetBeaconState(ctx, location)
+		require.NoError(t, err)
+		require.Equal(t, original, *saved, "a failed overwrite must leave the previous object intact")
+
+		require.Equal(t, []string{"atomic.ssz"}, visibleFiles(t, dir))
+	})
+
+	t.Run("SuccessfulSaveLeavesOnlyTheFinalObject", func(t *testing.T) {
+		payload := []byte("final-payload")
+
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     bytes.NewReader(payload),
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		saved, err := fsStore.GetBeaconState(ctx, location)
+		require.NoError(t, err)
+		require.Equal(t, payload, *saved)
+
+		require.Equal(t, []string{"atomic.ssz"}, visibleFiles(t, dir))
+	})
+
+	t.Run("NilDataIsRejected", func(t *testing.T) {
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Location: "beacon_state/nil.ssz",
+		})
+		require.Error(t, err)
 	})
 }

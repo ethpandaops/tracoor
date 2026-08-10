@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	goerrors "errors"
 	"fmt"
@@ -79,41 +80,19 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		stateID = fmt.Sprintf("%d", slot)
 	}
 
-	// Held until the upload finishes, not just the fetch, as the raw state and its
-	// compressed copy are both live until then.
-	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to acquire fetch slot")
-	}
-
-	defer releaseFetchSlot()
-
-	// Fetch the state
-	state, err := s.node.Beacon().Node().FetchRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
+	// Open the state and stream it straight through to the store. States are
+	// the largest artifact the agent handles, so nothing about them is ever
+	// held whole in memory.
+	raw, err := s.node.Beacon().Node().OpenRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
 	if err != nil {
 		return err
 	}
 
 	s.log.WithField("location", location).Debug("Saving beacon state")
 
-	// Compress it
-	compressedState, err := s.compressor.Compress(&state, compression.Gzip)
+	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveBeaconState, location)
 	if err != nil {
-		return errors.Wrap(err, "failed to compress beacon state")
-	}
-
-	// Drop the raw state before the upload so only the compressed copy is held
-	// for the duration of the store write.
-	state = nil
-
-	// Upload the state to the store
-	location, err = s.store.SaveBeaconState(ctx, &store.SaveParams{
-		Data:            &compressedState,
-		Location:        location,
-		ContentEncoding: compression.Gzip.ContentEncoding,
-	})
-	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to store beacon state")
 	}
 
 	spec, err := s.node.Beacon().Node().Spec()
@@ -128,7 +107,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
 		StateRoot:       wrapperspb.String(rootAsString),
 		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
 		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 		BeaconImplementation: wrapperspb.String(
 			s.node.Beacon().Metadata().Client(ctx),
@@ -146,6 +125,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	s.log.
 		WithField("state_root", rootAsString).
 		WithField("slot", slot).
+		WithField("raw_size", result.RawSize).
+		WithField("compressed_size", result.CompressedSize).
 		Debug("Indexed beacon state")
 
 	return nil
@@ -202,40 +183,17 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	// root.
 	blockID := blockRootAsString
 
-	// Held until the upload finishes, not just the fetch.
-	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to acquire fetch slot")
-	}
-
-	defer releaseFetchSlot()
-
-	// Fetch the block
-	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, blockID, string(mime.ContentTypeOctet))
+	// Open the block and stream it straight through to the store.
+	raw, err := s.node.Beacon().Node().OpenRawBlock(ctx, blockID, string(mime.ContentTypeOctet))
 	if err != nil {
 		return err
 	}
-
-	// Compress it
-	compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Gzip)
-	if err != nil {
-		return errors.Wrap(err, "failed to compress beacon block")
-	}
-
-	// Drop the raw block before the upload so only the compressed copy is held
-	// for the duration of the store write.
-	blockRaw = nil
 
 	s.log.WithField("location", location).Debug("Saving beacon block")
 
-	// Upload the block to the store
-	location, err = s.store.SaveBeaconBlock(ctx, &store.SaveParams{
-		Data:            &compressedBlock,
-		Location:        location,
-		ContentEncoding: compression.Gzip.ContentEncoding,
-	})
+	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveBeaconBlock, location)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to store beacon block")
 	}
 
 	spec, err := s.node.Beacon().Node().Spec()
@@ -250,7 +208,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 		Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
 		BlockRoot:       wrapperspb.String(blockRootAsString),
 		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
 		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 		BeaconImplementation: wrapperspb.String(
 			s.node.Beacon().Metadata().Client(ctx),
@@ -268,6 +226,8 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	s.log.
 		WithField("block_root", blockRootAsString).
 		WithField("slot", slot).
+		WithField("raw_size", result.RawSize).
+		WithField("compressed_size", result.CompressedSize).
 		Debug("Indexed beacon block")
 
 	return nil
@@ -355,16 +315,7 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	now := time.Now()
 
-	// Held only while a fetch is in flight and, on success, until the upload
-	// finishes.
-	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to acquire fetch slot")
-	}
-
-	defer releaseFetchSlot()
-
-	envelopeRaw, err := s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
+	raw, err := s.node.Beacon().Node().OpenRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
 	if err != nil {
 		if goerrors.Is(err, api.ErrNotFound) {
 			return fmt.Errorf("%w: execution payload envelope for %s has not been revealed", errItemNotAvailable, blockRootAsString)
@@ -373,26 +324,11 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 		return errors.Wrap(err, "failed to fetch execution payload envelope")
 	}
 
-	// Compress it
-	compressedEnvelope, err := s.compressor.Compress(&envelopeRaw, compression.Gzip)
-	if err != nil {
-		return errors.Wrap(err, "failed to compress execution payload envelope")
-	}
-
-	// Drop the raw envelope before the upload so only the compressed copy is held
-	// for the duration of the store write.
-	envelopeRaw = nil
-
 	s.log.WithField("location", location).Debug("Saving execution payload envelope")
 
-	// Upload the envelope to the store
-	location, err = s.store.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
-		Data:            &compressedEnvelope,
-		Location:        location,
-		ContentEncoding: compression.Gzip.ContentEncoding,
-	})
+	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveExecutionPayloadEnvelope, location)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to store execution payload envelope")
 	}
 
 	req := &indexer.CreateExecutionPayloadEnvelopeRequest{
@@ -402,7 +338,7 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 		Epoch:           wrapperspb.UInt64(epoch),
 		BlockRoot:       wrapperspb.String(blockRootAsString),
 		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
 		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 		BeaconImplementation: wrapperspb.String(
 			s.node.Beacon().Metadata().Client(ctx),
@@ -420,6 +356,8 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 	s.log.
 		WithField("block_root", blockRootAsString).
 		WithField("slot", slot).
+		WithField("raw_size", result.RawSize).
+		WithField("compressed_size", result.CompressedSize).
 		Debug("Indexed execution payload envelope")
 
 	return nil
@@ -530,7 +468,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 			if !exists {
 				now := time.Now()
 
-				compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Gzip)
+				compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Default)
 				if err != nil {
 					return errors.Wrap(err, "failed to compress beacon bad block")
 				}
@@ -538,9 +476,9 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				s.log.WithField("location", location).Debug("Saving beacon bad block")
 
 				location, err = s.store.SaveBeaconBadBlock(ctx, &store.SaveParams{
-					Data:            &compressedBlock,
+					Data:            bytes.NewReader(compressedBlock),
 					Location:        location,
-					ContentEncoding: compression.Gzip.ContentEncoding,
+					ContentEncoding: compression.Default.ContentEncoding,
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
@@ -570,7 +508,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 					Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
 					BlockRoot:       wrapperspb.String(blockRoot),
 					Location:        wrapperspb.String(location),
-					ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+					ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
 					NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 					BeaconImplementation: wrapperspb.String(
 						s.node.Beacon().Metadata().Client(ctx),
@@ -745,7 +683,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				now := time.Now()
 
 				// Compress it
-				compressedBlob, err := s.compressor.Compress(&blobRaw, compression.Gzip)
+				compressedBlob, err := s.compressor.Compress(&blobRaw, compression.Default)
 				if err != nil {
 					return errors.Wrap(err, "failed to compress beacon bad block")
 				}
@@ -753,9 +691,9 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				s.log.WithField("location", location).Debug("Saving beacon bad blob")
 
 				location, err = s.store.SaveBeaconBadBlob(ctx, &store.SaveParams{
-					Data:            &compressedBlob,
+					Data:            bytes.NewReader(compressedBlob),
 					Location:        location,
-					ContentEncoding: compression.Gzip.ContentEncoding,
+					ContentEncoding: compression.Default.ContentEncoding,
 				})
 				if err != nil {
 					s.log.WithFields(logrus.Fields{
@@ -788,7 +726,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 					BlockRoot:       wrapperspb.String(blockRoot),
 					Index:           wrapperspb.UInt64(index),
 					Location:        wrapperspb.String(location),
-					ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+					ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
 					NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
 					BeaconImplementation: wrapperspb.String(
 						s.node.Beacon().Metadata().Client(ctx),

@@ -55,6 +55,10 @@ type agent struct {
 
 	breaker *circuitBreaker
 
+	// pending collapses duplicate work: a reorg re-derives the same slots for
+	// every artifact kind, and the queues block on send.
+	pending *pendingItems
+
 	// workers tracks every background loop the agent owns so a shutdown can
 	// wait for them instead of abandoning them mid-fetch.
 	workers workerGroup
@@ -108,6 +112,7 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		executionBadBlockQueue:        make(chan *ExecutionBadBlockRequest, 1000),
 		compressor:                    compression.NewCompressor(),
 		breaker:                       newCircuitBreaker(),
+		pending:                       newPendingItems(),
 	}, nil
 }
 
