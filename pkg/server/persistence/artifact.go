@@ -173,7 +173,7 @@ func (i *Indexer) listExpiring(ctx context.Context, operation Operation, model a
 	result := i.db.WithContext(ctx).
 		Model(model).
 		Select(projection).
-		Where("fetched_at <= ?", before).
+		Where("fetched_at <= ?", utcBound(before)).
 		Order("fetched_at ASC").
 		Limit(limit).
 		Scan(&rows)
@@ -231,7 +231,7 @@ func (i *Indexer) CountExpiring(ctx context.Context, kind string, before time.Ti
 
 	var count int64
 
-	if err := i.db.WithContext(ctx).Model(model).Where("fetched_at <= ?", before).Count(&count).Error; err != nil {
+	if err := i.db.WithContext(ctx).Model(model).Where("fetched_at <= ?", utcBound(before)).Count(&count).Error; err != nil {
 		return 0, err
 	}
 
@@ -292,6 +292,49 @@ func (i *Indexer) DeleteArtifacts(ctx context.Context, kind string, ids []string
 	}
 
 	return deleted, nil
+}
+
+// LocationsStillReferenced narrows a set of locations to the ones rows of this kind still
+// point at.
+//
+// An unlinked row usually owns its object outright, but not always: a copy stored because it
+// disagreed with the canonical payload is addressed by its content alone, with no node in the
+// path, so every node that served those same bytes wrote the same object and every one of
+// their rows is unlinked. Deleting on the strength of one page would empty a location the rest
+// of that group still advertises.
+func (i *Indexer) LocationsStillReferenced(ctx context.Context, kind string, locations []string) (map[string]struct{}, error) {
+	referenced := make(map[string]struct{}, len(locations))
+
+	if len(locations) == 0 {
+		return referenced, nil
+	}
+
+	model, err := artifactModel(kind)
+	if err != nil {
+		return nil, err
+	}
+
+	for start := 0; start < len(locations); start += lookupChunkSize {
+		end := start + lookupChunkSize
+		if end > len(locations) {
+			end = len(locations)
+		}
+
+		var found []string
+
+		if err := i.db.WithContext(ctx).Model(model).
+			Where("location IN ?", locations[start:end]).
+			Distinct().
+			Pluck("location", &found).Error; err != nil {
+			return nil, err
+		}
+
+		for _, location := range found {
+			referenced[location] = struct{}{}
+		}
+	}
+
+	return referenced, nil
 }
 
 // BlobLink is the linkage evidence for one artifact row: which blob it belongs to and where

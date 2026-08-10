@@ -10,6 +10,9 @@ type RetentionConfig struct {
 	BeaconBadBlobs            human.Duration `yaml:"beaconBadBlobs" default:"312480m"`  // 6 months
 	ExecutionBlockTraces      human.Duration `yaml:"executionBlockTraces" default:"30m"`
 	ExecutionBadBlocks        human.Duration `yaml:"executionBadBlocks" default:"312480m"` // 6 months
+	// PayloadDivergences bounds the divergence log. It is deliberately long: the record of a
+	// node serving the wrong bytes is the finding, and it outlives the payload it describes.
+	PayloadDivergences human.Duration `yaml:"payloadDivergences" default:"312480m"` // 6 months
 }
 
 type Config struct {

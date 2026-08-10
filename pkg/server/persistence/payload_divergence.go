@@ -36,6 +36,14 @@ type PayloadDivergence struct {
 	Location string `gorm:"not null;default:''"`
 }
 
+// BeforeSave keeps observed_at in UTC. Half these rows arrive with a timestamp from the agent
+// and half are stamped here; both have to compare against the same cutoff.
+func (d *PayloadDivergence) BeforeSave(*gorm.DB) error {
+	d.ObservedAt = utcBound(d.ObservedAt)
+
+	return nil
+}
+
 type PayloadDivergenceFilter struct {
 	Network  *string
 	Kind     *string
@@ -77,14 +85,15 @@ func (f *PayloadDivergenceFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error)
 		query = query.Where("dedup_key = ?", f.DedupKey)
 	}
 
-	// Bound as time values rather than formatted strings: the drivers store timestamps in
-	// their own textual shape, so a hand-formatted literal does not compare reliably.
+	// Bound as normalised time values rather than formatted strings: the drivers store
+	// timestamps in their own textual shape, so neither a hand-formatted literal nor a bound
+	// carrying the caller's zone compares reliably.
 	if f.Before != nil {
-		query = query.Where("observed_at <= ?", *f.Before)
+		query = query.Where("observed_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("observed_at >= ?", *f.After)
+		query = query.Where("observed_at >= ?", utcBound(*f.After))
 	}
 
 	return query, nil
@@ -107,6 +116,69 @@ func (i *Indexer) InsertPayloadDivergence(ctx context.Context, divergence *Paylo
 	}
 
 	return result.Error
+}
+
+// DeleteExpiredPayloadDivergences removes divergence records older than the cutoff, a bounded
+// page at a time. Divergences are written by every node on every mismatch, so a client bug or
+// a fork turns this into a high-rate stream that would otherwise never be trimmed.
+//
+// The ids are collected first because a delete with a limit is not portable.
+func (i *Indexer) DeleteExpiredPayloadDivergences(ctx context.Context, before time.Time, limit int) (int64, error) {
+	var ids []string
+
+	if err := i.db.WithContext(ctx).Model(&PayloadDivergence{}).
+		Where("observed_at <= ?", utcBound(before)).
+		Order("observed_at ASC").
+		Limit(limit).
+		Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	result := i.db.WithContext(ctx).Where("id IN ?", ids).Delete(&PayloadDivergence{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
+// CountExpiringPayloadDivergences reports how many divergence records are past the cutoff.
+func (i *Indexer) CountExpiringPayloadDivergences(ctx context.Context, before time.Time) (int64, error) {
+	var count int64
+
+	if err := i.db.WithContext(ctx).Model(&PayloadDivergence{}).
+		Where("observed_at <= ?", utcBound(before)).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// SlotsWithDivergence returns the slots inside a window for which some node served bytes that
+// disagreed with the canonical payload. It is the evidence that separates a slot two nodes
+// disagree about because the chain reorganised from one they disagree about because a node is
+// serving something wrong.
+func (i *Indexer) SlotsWithDivergence(ctx context.Context, network, kind string, fromSlot int64) (map[int64]struct{}, error) {
+	var slots []int64
+
+	if err := i.db.WithContext(ctx).Model(&PayloadDivergence{}).
+		Where("network = ? AND kind = ? AND slot >= ?", network, kind, fromSlot).
+		Distinct().
+		Pluck("slot", &slots).Error; err != nil {
+		return nil, err
+	}
+
+	found := make(map[int64]struct{}, len(slots))
+	for _, slot := range slots {
+		found[slot] = struct{}{}
+	}
+
+	return found, nil
 }
 
 // ListPayloadDivergence lists divergences newest first unless the cursor orders otherwise.

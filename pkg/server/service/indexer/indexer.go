@@ -66,8 +66,16 @@ type Indexer struct {
 	// reaper carries object deletes that the store refused, between retention passes.
 	reaper *objectReaper
 
-	// disagreements keeps the root-disagreement warning to one per slot.
+	// disagreements keeps the root-disagreement report to one per distinct observation.
 	disagreements *disagreementReporter
+
+	// blobs carries the collection failure counts that decide when a payload the collector
+	// cannot evaluate stops being retried.
+	blobs *blobQuarantine
+
+	// archiveBudget bounds how long one page of blocks may spend waiting on the permanent
+	// store before the rest of the page is left for the next cycle.
+	archiveBudget time.Duration
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
@@ -89,6 +97,8 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		metrics:        NewMetrics(metricsNamespace),
 		reaper:         newObjectReaper(),
 		disagreements:  newDisagreementReporter(),
+		blobs:          newBlobQuarantine(),
+		archiveBudget:  permanentStoreArchiveBudget,
 	}
 
 	return i, nil
@@ -1974,7 +1984,7 @@ func (i *Indexer) CreateBlob(ctx context.Context, req *indexer.CreateBlobRequest
 		RawSize:         req.GetRawSize().GetValue(),
 		CompressedSize:  req.GetCompressedSize().GetValue(),
 		State:           persistence.BlobStateReady,
-		CreatedAt:       time.Now(),
+		CreatedAt:       time.Now().UTC(),
 	}
 
 	// The winner is whichever row is in the table afterwards: a concurrent creator with
@@ -2018,7 +2028,7 @@ func (i *Indexer) CreatePayloadDivergence(ctx context.Context, req *indexer.Crea
 
 	row := ProtoPayloadDivergenceToDBPayloadDivergence(divergence)
 	if req.GetObservedAt() == nil {
-		row.ObservedAt = time.Now()
+		row.ObservedAt = time.Now().UTC()
 	}
 
 	// Attempt 1 is the first observation; an unset attempt means exactly that.

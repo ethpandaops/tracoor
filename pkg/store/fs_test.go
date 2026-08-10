@@ -503,3 +503,49 @@ func TestFSStoreDeleteMany(t *testing.T) {
 		require.False(t, exists, "a poisoned location must not stop the rest of the batch")
 	})
 }
+
+// Copy publishes the same way a save does: the destination appears complete or not at all, and
+// the payload is streamed rather than held in memory.
+func TestFSStoreCopyPublishesAtomically(t *testing.T) {
+	basePath, err := os.MkdirTemp("", "fsstore_copy_test")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(basePath)
+
+	log := logrus.New()
+	fsStore, err := store.NewFSStore("test", log, &store.FSStoreConfig{BasePath: basePath}, nil)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	source := "beacon_block/source.ssz"
+	destination := "permanent/mainnet/copied.ssz"
+	payload := []byte("payload-to-copy")
+
+	_, err = fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
+		Data:     bytes.NewReader(payload),
+		Location: source,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, fsStore.Copy(ctx, &store.CopyParams{Source: source, Destination: destination}))
+
+	copied, err := fsStore.GetBeaconBlock(ctx, destination)
+	require.NoError(t, err)
+	require.Equal(t, payload, *copied)
+
+	require.Equal(t, []string{"copied.ssz"}, visibleFiles(t, filepath.Join(basePath, "permanent", "mainnet")),
+		"a copy must not leave a temporary file behind")
+
+	t.Run("AMissingSourcePublishesNothing", func(t *testing.T) {
+		err := fsStore.Copy(ctx, &store.CopyParams{
+			Source:      "beacon_block/absent.ssz",
+			Destination: "permanent/mainnet/absent.ssz",
+		})
+		require.Error(t, err)
+
+		exists, err := fsStore.Exists(ctx, "permanent/mainnet/absent.ssz")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+}

@@ -10,6 +10,7 @@ const (
 	labelKind    = "kind"
 	labelReason  = "reason"
 	labelNetwork = "network"
+	labelCause   = "cause"
 )
 
 // Metrics covers what retention does and what it declines to do. The skip reasons matter as
@@ -63,8 +64,8 @@ func NewMetrics(namespace string) *Metrics {
 			rootDivergence: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "root_divergence_total",
-				Help:      "Slots observed with more than one root",
-			}, []string{labelNetwork, labelKind}),
+				Help:      "Distinct slot observations with more than one root, by what explains them",
+			}, []string{labelNetwork, labelKind, labelCause}),
 		}
 
 		prometheus.MustRegister(
@@ -102,6 +103,6 @@ func (m *Metrics) ObserveBlobGCSkipped(reason string) {
 	m.blobGCSkipped.WithLabelValues(reason).Inc()
 }
 
-func (m *Metrics) ObserveRootDivergence(network, kind string) {
-	m.rootDivergence.WithLabelValues(network, kind).Inc()
+func (m *Metrics) ObserveRootDivergence(network, kind, cause string) {
+	m.rootDivergence.WithLabelValues(network, kind, cause).Inc()
 }

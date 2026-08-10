@@ -53,7 +53,7 @@ var expectedIndexes = map[string][]string{
 		"ix_execution_bad_blocks_fetched_at",
 	},
 	"blobs": {
-		"ix_blobs_content_hash",
+		"ix_blobs_kind_network_content_hash",
 		"ix_blobs_state_created_at",
 	},
 	"payload_divergences": {

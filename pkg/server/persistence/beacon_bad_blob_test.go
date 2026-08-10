@@ -10,7 +10,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func generateRandomBeaconBadBlob() *BeaconBadBlob {
@@ -330,4 +333,37 @@ func TestBeaconBadBlobIndividualFilters(t *testing.T) {
 			})
 		}
 	})
+}
+
+// index is a reserved word and has to be quoted, but backticks are MySQL's quoting: SQLite
+// tolerates them and Postgres rejects them outright. The predicate has to be rendered by
+// whichever dialect is in use, so it is checked against both.
+func TestBeaconBadBlobIndexFilterQuotesPerDialect(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	index := uint64(7)
+
+	render := func(db *gorm.DB) string {
+		return db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+			filter := &BeaconBadBlobFilter{Index: &index}
+
+			query, aerr := filter.ApplyToQuery(tx.Model(&BeaconBadBlob{}))
+			require.NoError(t, aerr)
+
+			var rows []*BeaconBadBlob
+
+			return query.Find(&rows)
+		})
+	}
+
+	require.Equal(t, "SELECT * FROM `beacon_bad_blobs` WHERE `index` = 7", render(indexer.db))
+
+	conn, _, err := sqlmock.New()
+	require.NoError(t, err)
+
+	pg, err := gorm.Open(postgres.New(postgres.Config{Conn: conn}), &gorm.Config{DryRun: true})
+	require.NoError(t, err)
+
+	require.Equal(t, `SELECT * FROM "beacon_bad_blobs" WHERE "index" = 7`, render(pg))
 }

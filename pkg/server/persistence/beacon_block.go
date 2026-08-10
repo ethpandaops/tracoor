@@ -32,6 +32,17 @@ type BeaconBlock struct {
 	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:1;index:ix_beacon_blocks_network_node_fetched_at,priority:1;index:ix_beacon_blocks_network_fetched_at,priority:1"`
 }
 
+// BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
+// the value itself carries, so a row written by a process in another zone would neither order
+// nor compare against the rest of the table.
+func (a *BeaconBlock) BeforeSave(*gorm.DB) error {
+	a.FetchedAt = utcBound(a.FetchedAt)
+	a.VerifiedAt = utcBoundPtr(a.VerifiedAt)
+	a.ContentMatchedAt = utcBoundPtr(a.ContentMatchedAt)
+
+	return nil
+}
+
 type BeaconBlockFilter struct {
 	ID                   *string
 	Node                 *string
@@ -100,11 +111,11 @@ func (f *BeaconBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", *f.Before)
+		query = query.Where("fetched_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", *f.After)
+		query = query.Where("fetched_at >= ?", utcBound(*f.After))
 	}
 
 	if f.Slot != nil {

@@ -11,6 +11,9 @@ import (
 // PermanentBlock represents a permanently stored block in the database.
 // This provides a mapping between slot, block_root, and network for
 // blocks that have been copied to permanent storage.
+//
+// It has no retention on purpose: it is the index of what was kept for ever, so a row that
+// expired would leave a permanent object nothing points at.
 type PermanentBlock struct {
 	gorm.Model
 	// We have to use int64 here as SQLite doesn't support uint64

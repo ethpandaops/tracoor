@@ -23,11 +23,19 @@ type DistributedLock struct {
 	ExpiresAt time.Time `gorm:"not null;index:ix_distributed_locks_expires_at"`
 }
 
+// BeforeSave keeps the lease in UTC, so a lock taken by one process is honoured by another
+// whatever zone either of them runs in.
+func (l *DistributedLock) BeforeSave(*gorm.DB) error {
+	l.ExpiresAt = utcBound(l.ExpiresAt)
+
+	return nil
+}
+
 // AcquireLock attempts to acquire the lock with the given key, taking it over when the
 // current holder's lease has expired and extending it when the caller already owns it.
 // A lock held by someone else is reported as (false, nil), not an error.
 func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error) {
-	now := time.Now()
+	now := time.Now().UTC()
 	expiresAt := now.Add(ttl)
 
 	result := i.db.WithContext(ctx).Clauses(clause.OnConflict{
@@ -93,7 +101,7 @@ func (i *Indexer) ReleaseLock(ctx context.Context, key, owner string) error {
 // cleanupExpiredLocks removes all expired locks from the database. Acquisition does not
 // depend on it; it only keeps abandoned rows from accumulating.
 func (i *Indexer) cleanupExpiredLocks(ctx context.Context) error {
-	result := i.db.WithContext(ctx).Where("expires_at < ?", time.Now()).Delete(&DistributedLock{})
+	result := i.db.WithContext(ctx).Where("expires_at < ?", time.Now().UTC()).Delete(&DistributedLock{})
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "failed to cleanup expired locks")
 	}

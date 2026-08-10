@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type BeaconBadBlob struct {
@@ -31,6 +32,17 @@ type BeaconBadBlob struct {
 	ContentMatchedAt *time.Time
 	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:1;index:ix_beacon_bad_blobs_network_node_fetched_at,priority:1;index:ix_beacon_bad_blobs_network_fetched_at,priority:1"`
 	Index            int64  `gorm:"not null;default:0;uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:4"`
+}
+
+// BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
+// the value itself carries, so a row written by a process in another zone would neither order
+// nor compare against the rest of the table.
+func (a *BeaconBadBlob) BeforeSave(*gorm.DB) error {
+	a.FetchedAt = utcBound(a.FetchedAt)
+	a.VerifiedAt = utcBoundPtr(a.VerifiedAt)
+	a.ContentMatchedAt = utcBoundPtr(a.ContentMatchedAt)
+
+	return nil
 }
 
 type BeaconBadBlobFilter struct {
@@ -106,11 +118,11 @@ func (f *BeaconBadBlobFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", *f.Before)
+		query = query.Where("fetched_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", *f.After)
+		query = query.Where("fetched_at >= ?", utcBound(*f.After))
 	}
 
 	if f.Slot != nil {
@@ -142,7 +154,9 @@ func (f *BeaconBadBlobFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	}
 
 	if f.Index != nil {
-		query = query.Where("`index` = ?", f.Index)
+		// index is a reserved word, so the identifier has to be quoted — but each engine
+		// quotes it differently. Handing gorm a column lets the dialect do it.
+		query = query.Where(clause.Eq{Column: clause.Column{Name: "index"}, Value: *f.Index})
 	}
 
 	return query, nil

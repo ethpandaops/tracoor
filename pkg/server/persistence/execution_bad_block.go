@@ -29,6 +29,17 @@ type ExecutionBadBlock struct {
 	BlockExtraData   sql.NullString
 }
 
+// BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
+// the value itself carries, so a row written by a process in another zone would neither order
+// nor compare against the rest of the table.
+func (a *ExecutionBadBlock) BeforeSave(*gorm.DB) error {
+	a.FetchedAt = utcBound(a.FetchedAt)
+	a.VerifiedAt = utcBoundPtr(a.VerifiedAt)
+	a.ContentMatchedAt = utcBoundPtr(a.ContentMatchedAt)
+
+	return nil
+}
+
 type ExecutionBadBlockFilter struct {
 	ID                      *string
 	Node                    *string
@@ -97,11 +108,11 @@ func (f *ExecutionBadBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error)
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", *f.Before)
+		query = query.Where("fetched_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", *f.After)
+		query = query.Where("fetched_at >= ?", utcBound(*f.After))
 	}
 
 	if f.BlockHash != nil {

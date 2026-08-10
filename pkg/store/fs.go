@@ -427,18 +427,20 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 	source := filepath.Join(s.basePath, params.Source)
 	destination := filepath.Join(s.basePath, params.Destination)
 
-	if err := s.ensureDir(destination); err != nil {
-		return err
-	}
-
-	// Read the source file
-	data, err := os.ReadFile(source)
+	from, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	// Write to the destination file
-	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // path is constructed from validated basePath
+	defer func() {
+		if cerr := from.Close(); cerr != nil {
+			s.log.WithError(cerr).WithField("path", source).Warn("Failed to close source file")
+		}
+	}()
+
+	// Streamed and published by rename, for the same reason a save is: a payload can be tens
+	// of megabytes, and a reader must never find a half-written object at the destination.
+	if err := s.saveFile(from, destination); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

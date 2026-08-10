@@ -92,7 +92,14 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *O
 
 	// Statements are reused across the process: every query this package issues comes from a
 	// fixed set of shapes, so caching the prepared form is a pure win on both engines.
-	gormConfig := &gorm.Config{PrepareStmt: true}
+	//
+	// NowFunc is UTC for the same reason every bound timestamp is: the SQLite driver stores a
+	// time.Time as text carrying its own offset, so a timestamp gorm fills in from the host
+	// clock would not order against the UTC values this package writes.
+	gormConfig := &gorm.Config{
+		PrepareStmt: true,
+		NowFunc:     func() time.Time { return time.Now().UTC() },
+	}
 
 	switch config.DriverName {
 	case "postgres":

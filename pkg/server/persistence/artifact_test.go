@@ -287,7 +287,7 @@ func TestTombstoneBlobRepairsADriftedCounter(t *testing.T) {
 	// A row that references the payload while the counter claims nobody does.
 	require.NoError(t, indexer.InsertBeaconState(ctx, newTestState(network, 60, "root-f", "node-a", location, hash, time.Now())))
 
-	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10)
+	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10, 0)
 	require.NoError(t, err)
 	require.Len(t, candidates, 1)
 
@@ -314,11 +314,11 @@ func TestBlobCollectionRespectsTheGracePeriod(t *testing.T) {
 	_, err = indexer.InsertBlob(ctx, blob)
 	require.NoError(t, err)
 
-	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(-10*time.Minute), 10)
+	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(-10*time.Minute), 10, 0)
 	require.NoError(t, err)
 	require.Empty(t, candidates, "a payload younger than the grace period is not a candidate")
 
-	candidates, err = indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10)
+	candidates, err = indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10, 0)
 	require.NoError(t, err)
 	require.Len(t, candidates, 1)
 
@@ -349,7 +349,7 @@ func TestResurrectedBlobOutlivesItsCollector(t *testing.T) {
 	_, err = indexer.InsertBlob(ctx, newTestBlob(network, dedupKey, hash, location))
 	require.NoError(t, err)
 
-	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10)
+	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().Add(time.Minute), 10, 0)
 	require.NoError(t, err)
 	require.Len(t, candidates, 1)
 
@@ -398,4 +398,50 @@ func TestFindRootDisagreements(t *testing.T) {
 	}
 
 	require.Equal(t, map[int64]int64{100: 2}, found)
+}
+
+// The retention cutoff is built from the process clock, so it carries whatever zone the host
+// is configured for, while every stored timestamp is UTC. SQLite's driver renders a time.Time
+// as text carrying that value's own offset and compares those strings byte for byte, so a
+// bound that reaches the query in a non-UTC zone is compared by wall-clock digits instead of
+// by instant: on a +10 host a five-minute-old row looks ten hours expired.
+func TestExpiryCutoffIsIndependentOfTheProcessZone(t *testing.T) {
+	local := time.Local
+	time.Local = time.FixedZone("test", 10*60*60)
+
+	t.Cleanup(func() { time.Local = local })
+
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	network := generateRandomString(6)
+	now := time.Now().UTC()
+
+	fresh := newTestState(network, 1, "root-fresh", "node-a", "loc-fresh", "", now.Add(-5*time.Minute))
+	stale := newTestState(network, 2, "root-stale", "node-a", "loc-stale", "", now.Add(-2*time.Hour))
+
+	require.NoError(t, indexer.InsertBeaconState(ctx, fresh))
+	require.NoError(t, indexer.InsertBeaconState(ctx, stale))
+
+	// Exactly what retention hands the query: now in the host's zone, less the window.
+	before := time.Now().Add(-30 * time.Minute)
+
+	rows, err := indexer.ListExpiringBeaconStates(ctx, before, 100)
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "only the row fetched outside the window has expired")
+	require.Equal(t, stale.ID, rows[0].ID)
+
+	count, err := indexer.CountExpiring(ctx, KindBeaconState, before)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count, "the backlog gauge reads the same cutoff")
+
+	filter := &BeaconStateFilter{}
+	filter.AddNetwork(network)
+	filter.AddBefore(before)
+
+	filtered, err := indexer.ListBeaconState(ctx, filter, &PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, filtered, 1, "the list filters compare the same way")
+	require.Equal(t, stale.ID, filtered[0].ID)
 }

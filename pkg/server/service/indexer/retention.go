@@ -18,6 +18,13 @@ import (
 // contended by another replica is not abandoned before that window expires.
 const permanentStoreWaitTimeout = 45 * time.Second
 
+// permanentStoreArchiveBudget bounds how long one page may spend in total handing blocks to
+// the permanent store. Without it a page of rows against a contended store waits the per-block
+// timeout hundreds of times over, and because the cycle is sequential nothing else purges, no
+// payloads are collected and no expired locks are cleaned for hours. Rows that do not get
+// their turn inside the budget keep their objects and are offered again next cycle.
+const permanentStoreArchiveBudget = 30 * time.Second
+
 const (
 	// retentionInterval is the pause between passes once there is nothing left to purge.
 	retentionInterval = time.Minute
@@ -36,15 +43,32 @@ const (
 	rootDisagreementSlots = 64
 	// maxReportedDisagreements bounds the set of already-warned slots.
 	maxReportedDisagreements = 10000
+	// maxBlobCollectAttempts is how often a payload that cannot be evaluated is retried before
+	// it is quarantined and reported. It mirrors the object reaper's allowance.
+	maxBlobCollectAttempts = 3
+	// kindPayloadDivergence labels the divergence log in the retention metrics. It is not an
+	// artifact kind, but it is purged on the same cadence and reported the same way.
+	kindPayloadDivergence = "payload_divergence"
 )
 
 // Blob collection skip reasons.
 const (
-	skipReasonReferenced = "referenced"
-	skipReasonRaced      = "raced"
-	skipReasonStoreError = "store_error"
-	skipReasonResurrect  = "resurrected"
-	skipReasonError      = "error"
+	skipReasonReferenced  = "referenced"
+	skipReasonRaced       = "raced"
+	skipReasonStoreError  = "store_error"
+	skipReasonResurrect   = "resurrected"
+	skipReasonError       = "error"
+	skipReasonQuarantined = "quarantined"
+)
+
+// Why a slot ended up with more than one root.
+const (
+	// causeReorg is the ordinary explanation: the chain reorganised and nodes recorded both
+	// sides of it. Expected on a healthy network.
+	causeReorg = "reorg"
+	// causeDivergence means some node also served bytes that disagreed with the canonical
+	// payload for that slot. That is not a fork; that is a node to go and look at.
+	causeDivergence = "divergence"
 )
 
 // objectReaper owns the locations whose object outlived its row. Rows are deleted before
@@ -115,8 +139,62 @@ func (r *objectReaper) settle(attempted, failed []string) []string {
 	return quarantined
 }
 
-// disagreementReporter remembers which (kind, network, slot) has already been warned about, so
-// a disagreement that persists for hours is logged once rather than every cycle.
+// blobQuarantine bounds how often a payload that cannot be evaluated is retried.
+//
+// The reference re-derivation parses the blob's kind and dedupe key, so a row written with a
+// shape it does not understand fails every time it is looked at. Candidates come back oldest
+// first and a failed one does not go away, so without an allowance such a row is re-attempted
+// for ever and never stops being reported.
+type blobQuarantine struct {
+	mu       sync.Mutex
+	failures map[string]int
+}
+
+func newBlobQuarantine() *blobQuarantine {
+	return &blobQuarantine{failures: make(map[string]int)}
+}
+
+func blobQuarantineKey(c *persistence.BlobCandidate) string {
+	return c.Kind + "\x00" + c.Network + "\x00" + c.DedupKey
+}
+
+// quarantined reports whether a payload has already used up its attempts.
+func (q *blobQuarantine) quarantined(key string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	return q.failures[key] >= maxBlobCollectAttempts
+}
+
+// fail counts a failed evaluation and reports whether this attempt was the one that exhausted
+// the allowance, so the caller can report it exactly once.
+func (q *blobQuarantine) fail(key string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	// A store outage must not let the list grow without end. Dropping it costs at most one
+	// repeated report per quarantined payload.
+	if len(q.failures) >= maxQuarantineEntries {
+		q.failures = make(map[string]int)
+	}
+
+	q.failures[key]++
+
+	return q.failures[key] == maxBlobCollectAttempts
+}
+
+// forget drops a payload's history once it has been evaluated without error.
+func (q *blobQuarantine) forget(key string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	delete(q.failures, key)
+}
+
+// disagreementReporter remembers which (kind, network, slot, root count) has already been
+// reported, so a disagreement that persists for hours is counted and logged once rather than
+// once per cycle. The root count is part of the key: a slot that grows a third root is a new
+// observation, not the same one again.
 type disagreementReporter struct {
 	mu   sync.Mutex
 	seen map[string]struct{}
@@ -126,11 +204,11 @@ func newDisagreementReporter() *disagreementReporter {
 	return &disagreementReporter{seen: make(map[string]struct{})}
 }
 
-func (d *disagreementReporter) firstTime(kind, network string, slot int64) bool {
+func (d *disagreementReporter) firstTime(kind, network string, slot, roots int64) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	key := kind + "/" + network + "/" + strconv.FormatInt(slot, 10)
+	key := kind + "/" + network + "/" + strconv.FormatInt(slot, 10) + "/" + strconv.FormatInt(roots, 10)
 
 	if _, ok := d.seen[key]; ok {
 		return false
@@ -153,8 +231,9 @@ type purgeSpec struct {
 	retention time.Duration
 	list      func(ctx context.Context, before time.Time, limit int) ([]*persistence.ExpiringArtifact, error)
 	// prepare runs before a page is deleted, for the one kind that has somewhere else to be
-	// first.
-	prepare func(ctx context.Context, rows []*persistence.ExpiringArtifact) error
+	// first. It returns the rows that may now be purged, which is not always all of them: a
+	// row whose block did not get its turn keeps its object and is offered again next cycle.
+	prepare func(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, error)
 }
 
 func (i *Indexer) purgeSpecs() []purgeSpec {
@@ -207,6 +286,7 @@ func (i *Indexer) startRetentionWatchers(ctx context.Context) {
 		persistence.KindBeaconBadBlob:            i.config.Retention.BeaconBadBlobs.Duration,
 		persistence.KindExecutionBlockTrace:      i.config.Retention.ExecutionBlockTraces.Duration,
 		persistence.KindExecutionBadBlock:        i.config.Retention.ExecutionBadBlocks.Duration,
+		kindPayloadDivergence:                    i.config.Retention.PayloadDivergences.Duration,
 		"blob_gc_grace":                          i.config.BlobGCGracePeriod.Duration,
 	}).Info("Starting retention watcher")
 
@@ -230,6 +310,10 @@ func (i *Indexer) runRetentionCycle(ctx context.Context) {
 		}
 	}
 
+	if err := i.purgePayloadDivergences(ctx); err != nil {
+		i.log.WithError(err).Error("Failed to purge expired payload divergences")
+	}
+
 	if err := i.purgeOrphanedBlobs(ctx); err != nil {
 		i.log.WithError(err).Error("Failed to collect orphaned payloads")
 	}
@@ -245,7 +329,7 @@ func (i *Indexer) runRetentionCycle(ctx context.Context) {
 // left. Rows go first and objects follow: a crash between the two strands an object, which is
 // recoverable, rather than an index entry pointing at nothing, which is not.
 func (i *Indexer) purgeArtifacts(ctx context.Context, spec purgeSpec) error {
-	before := time.Now().Add(-spec.retention)
+	before := time.Now().UTC().Add(-spec.retention)
 	start := time.Now()
 
 	var purged int64
@@ -264,18 +348,27 @@ func (i *Indexer) purgeArtifacts(ctx context.Context, spec purgeSpec) error {
 			break
 		}
 
+		purgeable := rows
+
 		if spec.prepare != nil {
-			if perr := spec.prepare(ctx, rows); perr != nil {
-				return perr
+			purgeable, err = spec.prepare(ctx, rows)
+			if err != nil {
+				return err
 			}
 		}
 
-		deleted, err := i.purgePage(ctx, spec.kind, rows)
+		deleted, err := i.purgePage(ctx, spec.kind, purgeable)
 		if err != nil {
 			return err
 		}
 
 		purged += deleted
+
+		// A page that prepare could not clear in full has to stop the pass: the rows it held
+		// back are the same ones the next page would read.
+		if len(purgeable) < len(rows) {
+			break
+		}
 
 		if len(rows) < purgePageSize {
 			break
@@ -314,6 +407,7 @@ func (i *Indexer) purgePage(ctx context.Context, kind string, rows []*persistenc
 
 	ids := make([]string, 0, len(rows))
 	unlinked := make([]string, 0, len(rows))
+	unlinkedSeen := make(map[string]struct{}, len(rows))
 	counts := make(map[string]*persistence.BlobRefDecrement)
 
 	for _, row := range rows {
@@ -321,7 +415,9 @@ func (i *Indexer) purgePage(ctx context.Context, kind string, rows []*persistenc
 
 		dedupKey, isLinked := linked[row.ID]
 		if !isLinked {
-			if row.Location != "" {
+			if _, seen := unlinkedSeen[row.Location]; row.Location != "" && !seen {
+				unlinkedSeen[row.Location] = struct{}{}
+
 				unlinked = append(unlinked, row.Location)
 			}
 
@@ -364,17 +460,50 @@ func (i *Indexer) purgePage(ctx context.Context, kind string, rows []*persistenc
 			chunkDecrements = nil
 		}
 
-		count, err := i.db.DeleteArtifacts(ctx, kind, ids[start:end], chunkDecrements)
-		if err != nil {
-			return deleted, err
+		count, derr := i.db.DeleteArtifacts(ctx, kind, ids[start:end], chunkDecrements)
+		if derr != nil {
+			return deleted, derr
 		}
 
 		deleted += count
 	}
 
-	i.deleteObjects(ctx, unlinked)
+	orphaned, err := i.unreferencedLocations(ctx, kind, unlinked)
+	if err != nil {
+		return deleted, err
+	}
+
+	i.deleteObjects(ctx, orphaned)
 
 	return deleted, nil
+}
+
+// unreferencedLocations drops from a page's owned locations any that a surviving row still
+// points at. Ownership is per row until the location turns out to be shared, which is exactly
+// what a divergent copy is: content-addressed, no node in the path, one object written by
+// every node that served those bytes. The rows are already gone by the time this runs, so
+// anything the query still finds is a sibling that outlived this page.
+func (i *Indexer) unreferencedLocations(ctx context.Context, kind string, locations []string) ([]string, error) {
+	if len(locations) == 0 {
+		return nil, nil
+	}
+
+	referenced, err := i.db.LocationsStillReferenced(ctx, kind, locations)
+	if err != nil {
+		return nil, err
+	}
+
+	orphaned := make([]string, 0, len(locations))
+
+	for _, location := range locations {
+		if _, ok := referenced[location]; ok {
+			continue
+		}
+
+		orphaned = append(orphaned, location)
+	}
+
+	return orphaned, nil
 }
 
 // resolveLinks decides which rows in a page merely reference a shared payload. The rule is the
@@ -494,13 +623,30 @@ func (i *Indexer) deleteObjects(ctx context.Context, locations []string) {
 }
 
 // archiveBlocksBeforePurge gives the permanent store its chance at a block before the block's
-// object goes away.
-func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) error {
+// object goes away, and returns the rows that had their turn.
+//
+// The whole page shares one budget. A row that is not reached inside it is left out of the
+// purge entirely rather than deleted unarchived, so the only cost of a slow permanent store is
+// that these blocks wait for the next cycle — not that every other kind waits for them.
+func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, error) {
 	if !i.permanentStore.IsEnabled() {
-		return nil
+		return rows, nil
 	}
 
-	for _, row := range rows {
+	deadline := time.Now().Add(i.archiveBudget)
+
+	archived := make([]*persistence.ExpiringArtifact, 0, len(rows))
+
+	for index, row := range rows {
+		if remaining := time.Until(deadline); remaining <= 0 {
+			i.log.WithFields(logrus.Fields{
+				"remaining": len(rows) - index,
+				"budget":    i.archiveBudget,
+			}).Warn("Permanent store archiving ran out of budget; the rest of the page keeps its objects for now")
+
+			break
+		}
+
 		block := PermanentStoreBlock{
 			Location:      row.Location,
 			BlockRoot:     row.Identifier,
@@ -512,16 +658,24 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 
 		i.permanentStore.QueueBlock(block)
 
+		wait := time.NewTimer(min(permanentStoreWaitTimeout, time.Until(deadline)))
+
 		select {
 		case <-block.ProcessedChan:
 		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(permanentStoreWaitTimeout):
+			wait.Stop()
+
+			return nil, ctx.Err()
+		case <-wait.C:
 			i.log.WithField(KeyBlockRoot, row.Identifier).Warn("Timed out waiting for permanent store")
 		}
+
+		wait.Stop()
+
+		archived = append(archived, row)
 	}
 
-	return nil
+	return archived, nil
 }
 
 // purgeOrphanedBlobs collects payloads nothing references any more.
@@ -532,14 +686,18 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 // because that part cannot be rolled back. The row disappears last, and only if its generation
 // is still the one that was tombstoned.
 func (i *Indexer) purgeOrphanedBlobs(ctx context.Context) error {
-	cutoff := time.Now().Add(-i.config.BlobGCGracePeriod.Duration)
+	cutoff := time.Now().UTC().Add(-i.config.BlobGCGracePeriod.Duration)
+
+	// Candidates that were looked at and left in place are still candidates, and they sort
+	// ahead of everything else. Stepping over them is what lets a later page be reached at all.
+	offset := 0
 
 	for page := 0; page < maxPagesPerPass; page++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		candidates, err := i.db.ListCollectableBlobs(ctx, cutoff, purgePageSize)
+		candidates, err := i.db.ListCollectableBlobs(ctx, cutoff, purgePageSize, offset)
 		if err != nil {
 			return err
 		}
@@ -549,7 +707,9 @@ func (i *Indexer) purgeOrphanedBlobs(ctx context.Context) error {
 		}
 
 		for _, candidate := range candidates {
-			i.collectBlob(ctx, candidate)
+			if !i.collectBlob(ctx, candidate) {
+				offset++
+			}
 		}
 
 		if len(candidates) < purgePageSize {
@@ -560,31 +720,48 @@ func (i *Indexer) purgeOrphanedBlobs(ctx context.Context) error {
 	return nil
 }
 
-func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCandidate) {
+// collectBlob evaluates one candidate and reports whether it left the candidate set.
+func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCandidate) bool {
 	logFields := logrus.Fields{
 		KeyKind:     candidate.Kind,
 		KeyNetwork:  candidate.Network,
 		KeyDedupKey: candidate.DedupKey,
 	}
 
+	quarantineKey := blobQuarantineKey(candidate)
+
+	if i.blobs.quarantined(quarantineKey) {
+		i.metrics.ObserveBlobGCSkipped(skipReasonQuarantined)
+
+		return false
+	}
+
 	outcome, err := i.db.TombstoneBlob(ctx, candidate)
 	if err != nil {
 		i.metrics.ObserveBlobGCSkipped(skipReasonError)
-		i.log.WithError(err).WithFields(logFields).Error("Failed to tombstone payload")
 
-		return
+		if i.blobs.fail(quarantineKey) {
+			i.log.WithError(err).WithFields(logFields).
+				Error("Giving up on collecting this payload; it will be skipped until the process restarts")
+		} else {
+			i.log.WithError(err).WithFields(logFields).Error("Failed to tombstone payload")
+		}
+
+		return false
 	}
+
+	i.blobs.forget(quarantineKey)
 
 	switch outcome {
 	case persistence.BlobTombstoneReferenced:
 		i.metrics.ObserveBlobGCSkipped(skipReasonReferenced)
 		i.log.WithFields(logFields).Debug("Payload is still referenced; repaired its reference count")
 
-		return
+		return true
 	case persistence.BlobTombstoneRaced:
 		i.metrics.ObserveBlobGCSkipped(skipReasonRaced)
 
-		return
+		return false
 	case persistence.BlobTombstoneMarked:
 	}
 
@@ -594,7 +771,8 @@ func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCa
 		i.metrics.ObserveBlobGCSkipped(skipReasonStoreError)
 		i.log.WithError(derr).WithFields(logFields).Warn("Failed to delete payload object; leaving it tombstoned for the next pass")
 
-		return
+		// The row is tombstoned, so it is no longer offered as a candidate either way.
+		return true
 	}
 
 	removed, err := i.db.DeleteTombstonedBlob(ctx, candidate)
@@ -602,7 +780,7 @@ func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCa
 		i.metrics.ObserveBlobGCSkipped(skipReasonError)
 		i.log.WithError(err).WithFields(logFields).Error("Failed to remove tombstoned payload")
 
-		return
+		return true
 	}
 
 	if !removed {
@@ -610,16 +788,64 @@ func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCa
 		// generation now and is not ours to remove.
 		i.metrics.ObserveBlobGCSkipped(skipReasonResurrect)
 
-		return
+		return true
 	}
 
 	i.metrics.ObserveBlobCollected()
 	i.log.WithFields(logFields).Debug("Collected orphaned payload")
+
+	return true
+}
+
+// purgePayloadDivergences trims the divergence log. It has no objects and no references, so it
+// is a plain paged delete on the indexed timestamp.
+func (i *Indexer) purgePayloadDivergences(ctx context.Context) error {
+	before := time.Now().UTC().Add(-i.config.Retention.PayloadDivergences.Duration)
+	start := time.Now()
+
+	var purged int64
+
+	for page := 0; page < maxPagesPerPass; page++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		deleted, err := i.db.DeleteExpiredPayloadDivergences(ctx, before, purgePageSize)
+		if err != nil {
+			return err
+		}
+
+		purged += deleted
+
+		if deleted < purgePageSize {
+			break
+		}
+	}
+
+	i.metrics.ObservePurgeDuration(kindPayloadDivergence, time.Since(start).Seconds())
+
+	if purged > 0 {
+		i.metrics.ObserveRowsPurged(kindPayloadDivergence, purged)
+	}
+
+	backlog, err := i.db.CountExpiringPayloadDivergences(ctx, before)
+	if err != nil {
+		return err
+	}
+
+	i.metrics.SetPurgeBacklog(kindPayloadDivergence, backlog)
+
+	return nil
 }
 
 // detectRootDisagreements looks for recent slots where the network did not settle on a single
-// root. Two roots for one slot is either a fork or a node serving something wrong, and both are
-// worth knowing about the moment they appear.
+// root.
+//
+// The counter is advanced once per distinct observation, not once per pass: the detector runs
+// every cycle over a window many minutes wide, so counting every pass would make the metric a
+// measure of the cadence rather than of events. Each observation is also given a cause, because
+// two roots for a slot is the ordinary result of a reorg and must not be confused with a node
+// serving bytes nobody else agrees with.
 func (i *Indexer) detectRootDisagreements(ctx context.Context) {
 	for _, kind := range []string{persistence.KindBeaconState, persistence.KindBeaconBlock} {
 		disagreements, err := i.db.FindRootDisagreements(ctx, kind, rootDisagreementSlots)
@@ -629,19 +855,64 @@ func (i *Indexer) detectRootDisagreements(ctx context.Context) {
 			continue
 		}
 
-		for _, d := range disagreements {
-			i.metrics.ObserveRootDivergence(d.Network, kind)
+		unexplained := i.divergentSlots(ctx, kind, disagreements)
 
-			if !i.disagreements.firstTime(kind, d.Network, d.Slot) {
+		for _, d := range disagreements {
+			if !i.disagreements.firstTime(kind, d.Network, d.Slot, d.Roots) {
 				continue
 			}
+
+			cause := causeReorg
+
+			if slots, ok := unexplained[d.Network]; ok {
+				if _, found := slots[d.Slot]; found {
+					cause = causeDivergence
+				}
+			}
+
+			i.metrics.ObserveRootDivergence(d.Network, kind, cause)
 
 			i.log.WithFields(logrus.Fields{
 				KeyKind:    kind,
 				KeyNetwork: d.Network,
 				KeySlot:    d.Slot,
 				"roots":    d.Roots,
+				"cause":    cause,
 			}).Warn("Nodes disagree on the root for this slot")
 		}
 	}
+}
+
+// divergentSlots returns, per network, the slots a node was caught serving bytes that did not
+// match the canonical payload. A reorg produces distinct roots and therefore distinct dedupe
+// keys, so it never leaves a divergence record; anything that does is a node to look at. The
+// lookup only runs when there is a disagreement to explain.
+func (i *Indexer) divergentSlots(ctx context.Context, kind string, disagreements []*persistence.RootDisagreement) map[string]map[int64]struct{} {
+	from := make(map[string]int64, len(disagreements))
+
+	for _, d := range disagreements {
+		if lowest, ok := from[d.Network]; !ok || d.Slot < lowest {
+			from[d.Network] = d.Slot
+		}
+	}
+
+	divergent := make(map[string]map[int64]struct{}, len(from))
+
+	for network, lowest := range from {
+		slots, err := i.db.SlotsWithDivergence(ctx, network, kind, lowest)
+		if err != nil {
+			// Without the evidence the disagreement is simply unexplained, which is the
+			// ordinary case. Reporting it as a divergence on a failed lookup would page.
+			i.log.WithError(err).WithFields(logrus.Fields{
+				KeyKind:    kind,
+				KeyNetwork: network,
+			}).Warn("Failed to look up payload divergences for a disagreeing slot")
+
+			continue
+		}
+
+		divergent[network] = slots
+	}
+
+	return divergent
 }

@@ -25,11 +25,14 @@ var ErrBlobNotFound = errors.New("blob not found")
 // Blob is the deduplicated payload. Keyed on what the lookup actually asks
 // for: the dedup key is known before the fetch, the content hash is not.
 type Blob struct {
-	Kind     string `gorm:"primaryKey;size:32"`
-	Network  string `gorm:"primaryKey"`
+	// The content-hash index carries kind and network ahead of the hash: retention resolves a
+	// trace's payload by hash within a (kind, network), and neither planner can combine those
+	// equalities with a hash-only index, so a narrower one degrades to a full scan.
+	Kind     string `gorm:"primaryKey;size:32;index:ix_blobs_kind_network_content_hash,priority:1"`
+	Network  string `gorm:"primaryKey;index:ix_blobs_kind_network_content_hash,priority:2"`
 	DedupKey string `gorm:"primaryKey"`
 
-	ContentHash     string `gorm:"not null;default:'';size:64;index:ix_blobs_content_hash"`
+	ContentHash     string `gorm:"not null;default:'';size:64;index:ix_blobs_kind_network_content_hash,priority:3"`
 	Location        string `gorm:"not null;default:''"`
 	ContentEncoding string `gorm:"not null;default:''"`
 	RawSize         int64  `gorm:"not null;default:0"`
@@ -43,6 +46,14 @@ type Blob struct {
 	Generation int64  `gorm:"not null;default:0"`
 
 	CreatedAt time.Time `gorm:"not null;index:ix_blobs_state_created_at,priority:2"`
+}
+
+// BeforeSave keeps created_at in UTC, which is what the collector's grace-period cutoff is
+// compared against.
+func (b *Blob) BeforeSave(*gorm.DB) error {
+	b.CreatedAt = utcBound(b.CreatedAt)
+
+	return nil
 }
 
 // BlobCandidate is a blob that looks collectable: no references, old enough that no agent can
@@ -73,15 +84,25 @@ const (
 // ListCollectableBlobs returns blobs whose reference count has reached zero and that are older
 // than the grace period. The count is only a hint: every candidate is re-checked against the
 // artifact tables before anything is deleted.
-func (i *Indexer) ListCollectableBlobs(ctx context.Context, createdBefore time.Time, limit int) ([]*BlobCandidate, error) {
+//
+// The offset is how the caller steps over candidates it has already decided it cannot collect.
+// The order is oldest first and a candidate that is not collected does not go away, so without
+// it a single unevaluable row would occupy the head of every page for ever and nothing behind
+// it would ever be reached.
+func (i *Indexer) ListCollectableBlobs(ctx context.Context, createdBefore time.Time, limit, offset int) ([]*BlobCandidate, error) {
 	var candidates []*BlobCandidate
 
-	if err := i.db.WithContext(ctx).Model(&Blob{}).
+	query := i.db.WithContext(ctx).Model(&Blob{}).
 		Select("kind, network, dedup_key, location, generation").
-		Where("state = ? AND ref_count <= 0 AND created_at < ?", BlobStateReady, createdBefore).
+		Where("state = ? AND ref_count <= 0 AND created_at < ?", BlobStateReady, utcBound(createdBefore)).
 		Order("created_at ASC").
-		Limit(limit).
-		Scan(&candidates).Error; err != nil {
+		Limit(limit)
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	if err := query.Scan(&candidates).Error; err != nil {
 		return nil, err
 	}
 
@@ -178,7 +199,7 @@ func (i *Indexer) InsertBlob(ctx context.Context, blob *Blob) (*Blob, error) {
 	i.metrics.ObserveOperation(operation)
 
 	if blob.CreatedAt.IsZero() {
-		blob.CreatedAt = time.Now()
+		blob.CreatedAt = time.Now().UTC()
 	}
 
 	if blob.State == "" {
@@ -249,7 +270,7 @@ func (i *Indexer) resurrectBlob(ctx context.Context, tombstone, wanted *Blob) (*
 	revived.ContentEncoding = wanted.ContentEncoding
 	revived.RawSize = wanted.RawSize
 	revived.CompressedSize = wanted.CompressedSize
-	revived.CreatedAt = time.Now()
+	revived.CreatedAt = time.Now().UTC()
 	revived.Location = wanted.Location
 
 	if revived.Location == tombstone.Location {
