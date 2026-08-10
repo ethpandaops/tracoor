@@ -20,7 +20,7 @@ import (
 )
 
 func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumber uint64, blockHash string) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.ExecutionBlockTrace())
 	defer cancel()
 
 	network := string(s.node.Beacon().Metadata().Network.Name)
@@ -154,7 +154,7 @@ func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
 }
 
 func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.BadBlock) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.ExecutionBadBlock())
 	defer cancel()
 
 	// Check if we've already indexed this execution bad blocks.

@@ -21,6 +21,9 @@ type SharedConfig struct {
 	// ShutdownTimeoutSeconds bounds how long each agent waits for its in-flight
 	// fetches and uploads once a shutdown starts. One value covers every agent.
 	ShutdownTimeoutSeconds int `yaml:"shutdownTimeoutSeconds" default:"10"`
+	// FetchTimeouts bounds one fetch attempt per artifact kind. One set of
+	// values covers every agent; an agent may still set its own.
+	FetchTimeouts agent.FetchTimeouts `yaml:"fetchTimeouts"`
 }
 
 type Config struct {
@@ -78,6 +81,28 @@ func (c *Config) ApplyShared() error {
 		// the shared value only fills in the agents that did not set one.
 		if agent.ShutdownTimeoutSeconds == 0 {
 			agent.ShutdownTimeoutSeconds = c.Shared.ShutdownTimeoutSeconds
+		}
+
+		// Per-field, so an agent overriding one artifact's deadline still
+		// inherits the shared values for the rest.
+		if agent.FetchTimeouts.BeaconStateSeconds == 0 {
+			agent.FetchTimeouts.BeaconStateSeconds = c.Shared.FetchTimeouts.BeaconStateSeconds
+		}
+
+		if agent.FetchTimeouts.BeaconBlockSeconds == 0 {
+			agent.FetchTimeouts.BeaconBlockSeconds = c.Shared.FetchTimeouts.BeaconBlockSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionPayloadEnvelopeSeconds == 0 {
+			agent.FetchTimeouts.ExecutionPayloadEnvelopeSeconds = c.Shared.FetchTimeouts.ExecutionPayloadEnvelopeSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionBlockTraceSeconds == 0 {
+			agent.FetchTimeouts.ExecutionBlockTraceSeconds = c.Shared.FetchTimeouts.ExecutionBlockTraceSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionBadBlockSeconds == 0 {
+			agent.FetchTimeouts.ExecutionBadBlockSeconds = c.Shared.FetchTimeouts.ExecutionBadBlockSeconds
 		}
 	}
 

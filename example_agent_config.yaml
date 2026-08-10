@@ -5,6 +5,17 @@ pprofAddr: ":6065"
 # Keep it below the orchestrator's termination grace period.
 shutdownTimeoutSeconds: 10
 
+# Deadline for one fetch attempt, per artifact kind. The defaults suit an agent
+# running near its node; over a WAN link beacon states need minutes, not
+# seconds. Keep beaconStateSeconds under the state availability window
+# (~6 minutes on the tightest clients).
+# fetchTimeouts:
+#   beaconStateSeconds: 30
+#   beaconBlockSeconds: 30
+#   executionPayloadEnvelopeSeconds: 60
+#   executionBlockTraceSeconds: 60
+#   executionBadBlockSeconds: 60
+
 name: example-agent
 
 ethereum:

@@ -101,7 +101,7 @@ func (f *stateRootPinnedFetcher) confirm(ctx context.Context) error {
 }
 
 func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.BeaconState())
 	defer cancel()
 
 	root, err := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
@@ -236,7 +236,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 }
 
 func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.BeaconBlock())
 	defer cancel()
 
 	blockRoot, err := s.node.Beacon().Node().FetchBlockRoot(ctx, fmt.Sprintf("%d", slot))
@@ -362,7 +362,7 @@ func getBadBlocksFilePattern(client string) (*string, error) {
 // that is never revealed leaves the slot without an envelope, which is not an
 // error worth chasing.
 func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.ExecutionPayloadEnvelope())
 	defer cancel()
 
 	spec, err := s.node.Beacon().Node().Spec()
