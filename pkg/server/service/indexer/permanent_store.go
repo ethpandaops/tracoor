@@ -368,12 +368,24 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 // recordPermanentBlock records the block in the PermanentBlock table.
 func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block PermanentStoreBlock) error {
 	// Record the block directly since we already checked earlier if it exists
-	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
+	err := p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
 		//nolint:gosec // At the mercy of the database
 		Slot:      int64(block.Slot),
 		BlockRoot: block.BlockRoot,
 		Network:   block.Network,
 	})
+
+	// A unique constraint violation here means another caller already
+	// recorded this exact block -- for example two processBlock calls
+	// racing past the earlier existence checks while a slow copy is still
+	// in flight, which the distributed lock's fixed 30s TTL doesn't fully
+	// rule out. The row we wanted to exist now exists either way, so this
+	// is success, not failure.
+	if err != nil && persistence.IsUniqueConstraintError(err) {
+		return nil
+	}
+
+	return err
 }
 
 // GetPermanentLocation returns the permanent location for a block.
