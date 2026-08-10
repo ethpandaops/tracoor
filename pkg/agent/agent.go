@@ -100,6 +100,10 @@ const (
 	labelReason   = "reason"
 )
 
+// blockSettleDelay is how long after a block event the slot's artifacts are
+// fetched, giving the beacon node time to make the state and block queryable.
+const blockSettleDelay = 2 * time.Second
+
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -239,11 +243,23 @@ func (s *agent) Start(ctx context.Context) error {
 				return nil
 			}
 
-			time.Sleep(2000 * time.Millisecond)
+			// The settle delay runs on a tracked worker rather than in this
+			// callback: the beacon library dispatches events synchronously, so
+			// sleeping here would hold up every later event from this node.
+			s.workers.Go(func() {
+				timer := time.NewTimer(blockSettleDelay)
+				defer timer.Stop()
 
-			s.enqueueBeaconState(ctx, event.Slot)
-			s.enqueueBeaconBlock(ctx, event.Slot)
-			s.enqueueExecutionPayloadEnvelope(ctx, event.Slot)
+				select {
+				case <-ctx.Done():
+					return
+				case <-timer.C:
+				}
+
+				s.enqueueBeaconState(ctx, event.Slot)
+				s.enqueueBeaconBlock(ctx, event.Slot)
+				s.enqueueExecutionPayloadEnvelope(ctx, event.Slot)
+			})
 
 			return nil
 		})
