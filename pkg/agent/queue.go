@@ -39,14 +39,49 @@ type ExecutionBlockTraceRequest struct {
 type ExecutionBadBlockRequest struct {
 }
 
+// enqueue hands an item to a queue, giving up if the agent is shutting down.
+// The queues block when full, so without the cancellation case a shutdown would
+// be held open by whichever producer happened to be mid-send.
+func enqueue[T any](ctx context.Context, queue chan<- T, item T) {
+	select {
+	case queue <- item:
+	case <-ctx.Done():
+	}
+}
+
+// drainQueue runs handler over a queue until it closes or the agent is shutting
+// down. Cancellation is checked ahead of the queue so a backlog cannot hold a
+// shutdown open: anything left behind is re-derived from the chain next time
+// there is a reason to.
+func drainQueue[T any](ctx context.Context, queue <-chan T, handler func(item T)) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case item, ok := <-queue:
+			if !ok {
+				return
+			}
+
+			handler(item)
+		}
+	}
+}
+
 func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 	if !s.Config.Ethereum.Features.GetFetchBeaconState() || !s.allowArtifact(BeaconStateQueue) {
 		return
 	}
 
-	s.beaconStateQueue <- &BeaconStateRequest{
+	enqueue(ctx, s.beaconStateQueue, &BeaconStateRequest{
 		Slot: slot,
-	}
+	})
 }
 
 func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
@@ -54,9 +89,9 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	s.beaconBlockQueue <- &BeaconBlockRequest{
+	enqueue(ctx, s.beaconBlockQueue, &BeaconBlockRequest{
 		Slot: slot,
-	}
+	})
 }
 
 func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) {
@@ -64,9 +99,9 @@ func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0
 		return
 	}
 
-	s.executionPayloadEnvelopeQueue <- &ExecutionPayloadEnvelopeRequest{
+	enqueue(ctx, s.executionPayloadEnvelopeQueue, &ExecutionPayloadEnvelopeRequest{
 		Slot: slot,
-	}
+	})
 }
 
 func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
@@ -74,9 +109,9 @@ func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
 		return
 	}
 
-	s.beaconBadBlockQueue <- &BeaconBadBlockRequest{
+	enqueue(ctx, s.beaconBadBlockQueue, &BeaconBadBlockRequest{
 		Path: path,
-	}
+	})
 }
 
 func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
@@ -84,9 +119,9 @@ func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
 		return
 	}
 
-	s.beaconBadBlobQueue <- &BeaconBadBlobRequest{
+	enqueue(ctx, s.beaconBadBlobQueue, &BeaconBadBlobRequest{
 		Path: path,
-	}
+	})
 }
 
 func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) {
@@ -94,9 +129,9 @@ func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) 
 		return
 	}
 
-	s.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
+	enqueue(ctx, s.executionBlockTraceQueue, &ExecutionBlockTraceRequest{
 		BlockID: blockID,
-	}
+	})
 }
 
 func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
@@ -104,7 +139,7 @@ func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
 		return
 	}
 
-	s.executionBadBlockQueue <- &ExecutionBadBlockRequest{}
+	enqueue(ctx, s.executionBadBlockQueue, &ExecutionBadBlockRequest{})
 }
 
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
@@ -112,7 +147,7 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		return
 	}
 
-	for stateRequest := range s.beaconStateQueue {
+	drainQueue(ctx, s.beaconStateQueue, func(stateRequest *BeaconStateRequest) {
 		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue), s.Config.Name)
 
 		start := time.Now()
@@ -121,7 +156,7 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		if err != nil {
 			s.log.WithError(err).Error("Failed to get current time")
 
-			continue
+			return
 		}
 
 		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(stateRequest.Slot))
@@ -144,7 +179,7 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processBeaconBlockQueue(ctx context.Context) {
@@ -152,7 +187,7 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 		return
 	}
 
-	for blockRequest := range s.beaconBlockQueue {
+	drainQueue(ctx, s.beaconBlockQueue, func(blockRequest *BeaconBlockRequest) {
 		s.metrics.SetQueueSize(BeaconBlockQueue, len(s.beaconBlockQueue), s.Config.Name)
 
 		start := time.Now()
@@ -168,7 +203,7 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
@@ -176,7 +211,7 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 		return
 	}
 
-	for envelopeRequest := range s.executionPayloadEnvelopeQueue {
+	drainQueue(ctx, s.executionPayloadEnvelopeQueue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
 		s.metrics.SetQueueSize(ExecutionPayloadEnvelopeQueue, len(s.executionPayloadEnvelopeQueue), s.Config.Name)
 
 		start := time.Now()
@@ -192,7 +227,7 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
@@ -200,7 +235,7 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	for badBlockRequest := range s.beaconBadBlockQueue {
+	drainQueue(ctx, s.beaconBadBlockQueue, func(badBlockRequest *BeaconBadBlockRequest) {
 		s.metrics.SetQueueSize(BeaconBadBlockQueue, len(s.beaconBadBlockQueue), s.Config.Name)
 
 		start := time.Now()
@@ -210,7 +245,7 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 				WithError(err).
 				Error("Failed to fetch and index beacon bad blocks")
 
-			continue
+			return
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -218,7 +253,7 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
@@ -226,7 +261,7 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 		return
 	}
 
-	for badBlobRequest := range s.beaconBadBlobQueue {
+	drainQueue(ctx, s.beaconBadBlobQueue, func(badBlobRequest *BeaconBadBlobRequest) {
 		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue), s.Config.Name)
 
 		start := time.Now()
@@ -236,7 +271,7 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 				WithError(err).
 				Error("Failed to fetch and index beacon bad blocks")
 
-			continue
+			return
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -244,7 +279,7 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
@@ -252,7 +287,7 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 		return
 	}
 
-	for traceRequest := range s.executionBlockTraceQueue {
+	drainQueue(ctx, s.executionBlockTraceQueue, func(traceRequest *ExecutionBlockTraceRequest) {
 		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue), s.Config.Name)
 
 		start := time.Now()
@@ -277,7 +312,7 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }
 
 func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
@@ -285,7 +320,7 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	for range s.executionBadBlockQueue {
+	drainQueue(ctx, s.executionBadBlockQueue, func(_ *ExecutionBadBlockRequest) {
 		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue), s.Config.Name)
 
 		start := time.Now()
@@ -295,7 +330,7 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 				WithError(err).
 				Error("Failed to fetch and index execution bad blocks")
 
-			continue
+			return
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -303,5 +338,5 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 			time.Since(start),
 			s.Config.Name,
 		)
-	}
+	})
 }

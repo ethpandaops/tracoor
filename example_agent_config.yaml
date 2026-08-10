@@ -1,6 +1,9 @@
 logging: "info"
 metricsAddr: ":9092"
 pprofAddr: ":6065"
+# How long to wait for in-flight fetches and uploads after a shutdown signal.
+# Keep it below the orchestrator's termination grace period.
+shutdownTimeoutSeconds: 10
 
 name: example-agent
 

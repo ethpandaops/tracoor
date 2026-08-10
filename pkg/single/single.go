@@ -59,7 +59,13 @@ func (s *Single) Start(ctx context.Context) error {
 
 	// Wait for the server to start before starting agents
 	go func() {
-		<-sserver.Started
+		select {
+		case <-ctx.Done():
+			// Shut down before the server ever came up, so there is nothing to
+			// start the agents against.
+			return
+		case <-sserver.Started:
+		}
 
 		// Start all the agents
 		for _, cfg := range s.config.Agents {

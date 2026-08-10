@@ -69,6 +69,9 @@ agents:
 shared:
   metricsAddr: ":9091"
   logging: "debug"
+  # How long each agent waits for in-flight fetches and uploads after a
+  # shutdown signal. Keep it below the orchestrator's termination grace period.
+  shutdownTimeoutSeconds: 10
   indexer:
     address: localhost:8081
   store:

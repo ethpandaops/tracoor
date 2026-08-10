@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	//nolint:gosec // only exposed if pprofAddr config is set
@@ -57,6 +54,10 @@ type agent struct {
 	compressor *compression.Compressor
 
 	breaker *circuitBreaker
+
+	// workers tracks every background loop the agent owns so a shutdown can
+	// wait for them instead of abandoning them mid-fetch.
+	workers workerGroup
 }
 
 const (
@@ -131,8 +132,8 @@ func (s *agent) Start(ctx context.Context) error {
 	s.node.OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
-		go s.processExecutionBlockTraceQueue(ctx)
-		go s.processExecutionBadBlockQueue(ctx)
+		s.workers.Go(func() { s.processExecutionBlockTraceQueue(ctx) })
+		s.workers.Go(func() { s.processExecutionBadBlockQueue(ctx) })
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() {
@@ -170,11 +171,11 @@ func (s *agent) Start(ctx context.Context) error {
 	s.node.Beacon().OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
 
-		go s.processBeaconStateQueue(ctx)
-		go s.processBeaconBlockQueue(ctx)
-		go s.processExecutionPayloadEnvelopeQueue(ctx)
-		go s.processBeaconBadBlockQueue(ctx)
-		go s.processBeaconBadBlobQueue(ctx)
+		s.workers.Go(func() { s.processBeaconStateQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBlockQueue(ctx) })
+		s.workers.Go(func() { s.processExecutionPayloadEnvelopeQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBadBlockQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBadBlobQueue(ctx) })
 
 		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
 			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
@@ -303,11 +304,11 @@ func (s *agent) Start(ctx context.Context) error {
 		return err
 	}
 
-	cancel := make(chan os.Signal, 1)
-	signal.Notify(cancel, syscall.SIGTERM, syscall.SIGINT)
+	<-ctx.Done()
 
-	sig := <-cancel
-	s.log.Printf("Caught signal: %v", sig)
+	s.log.Info("Shutting down tracoor agent")
+
+	s.shutdown(ctx)
 
 	return nil
 }
@@ -370,8 +371,21 @@ func (s *agent) ServePProf(ctx context.Context) error {
 	go func() {
 		s.log.Infof("Serving pprof at %s", *s.Config.PProfAddr)
 
-		if err := pprofServer.ListenAndServe(); err != nil {
+		if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.log.Fatal(err)
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+
+		// The shutdown is triggered by ctx being cancelled, so it cannot itself
+		// run under ctx.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pprofShutdownTimeout)
+		defer cancel()
+
+		if err := pprofServer.Shutdown(shutdownCtx); err != nil {
+			s.log.WithError(err).Debug("Failed to stop the pprof server")
 		}
 	}()
 

@@ -18,6 +18,9 @@ type SharedConfig struct {
 	Store *store.Config `yaml:"store"`
 	// MetricsAddr is the address to serve metrics on.
 	MetricsAddr string `yaml:"metricsAddr" default:"localhost:8080"`
+	// ShutdownTimeoutSeconds bounds how long each agent waits for its in-flight
+	// fetches and uploads once a shutdown starts. One value covers every agent.
+	ShutdownTimeoutSeconds int `yaml:"shutdownTimeoutSeconds" default:"10"`
 }
 
 type Config struct {
@@ -53,6 +56,13 @@ func (c *Config) ApplyShared() error {
 		agent.Store = c.Shared.Store
 		agent.LoggingLevel = c.Shared.LoggingLevel
 		agent.MetricsAddr = c.Shared.MetricsAddr
+
+		// Unlike the fields above, an agent may want its own grace period — a
+		// node behind slow storage drains at a different rate to the rest — so
+		// the shared value only fills in the agents that did not set one.
+		if agent.ShutdownTimeoutSeconds == 0 {
+			agent.ShutdownTimeoutSeconds = c.Shared.ShutdownTimeoutSeconds
+		}
 	}
 
 	return nil
