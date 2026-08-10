@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -251,7 +250,24 @@ type DistinctBeaconStateValueResults struct {
 	BeaconImplementation []string
 }
 
-//nolint:errcheck // casting fine here.
+// beaconStateDistinct declares how each requested field's distinct values are resolved.
+// Loose-scannable fields lead an index right after network: node via
+// ix_beacon_states_network_node_fetched_at(network, node, fetched_at), slot via
+// ux_beacon_states_dedupe(network, slot, state_root, node), and network leads both.
+var beaconStateDistinct = distinctTable{
+	name: "beacon_states",
+	fields: map[string]distinctStrategy{
+		KeyNode:                 distinctLooseScan,
+		KeySlot:                 distinctLooseScan,
+		KeyNetwork:              distinctLooseScan,
+		KeyEpoch:                distinctFullScan,
+		KeyStateRoot:            distinctFullScan,
+		KeyNodeVersion:          distinctFullScan,
+		KeyLocation:             distinctFullScan,
+		KeyBeaconImplementation: distinctFullScan,
+	},
+}
+
 func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string, network string) (*DistinctBeaconStateValueResults, error) {
 	operation := OperationDistinctValues
 
@@ -267,75 +283,41 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 		Network:              make([]string, 0),
 		BeaconImplementation: make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&BeaconState{})
 
-	if network != "" {
-		query = query.Where("network = ?", network)
-	}
+	seen := make(map[string]bool, len(fields))
 
-	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
-
-	rows, err := query.Rows()
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
-	}
-	defer rows.Close()
-
-	valueSets := make(map[string]map[interface{}]bool)
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
-	}
-
-	var values []interface{}
-	for rows.Next() {
-		values = make([]interface{}, len(fields))
-		valuePtrs := make([]interface{}, len(fields))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
+		if seen[field] {
+			continue
 		}
 
-		err := rows.Scan(valuePtrs...)
+		seen[field] = true
+
+		values, err := i.distinctFieldValues(ctx, beaconStateDistinct, field, network)
 		if err != nil {
 			i.metrics.ObserveOperationError(operation)
 
 			return nil, err
 		}
 
-		for i, field := range fields {
-			if !valueSets[field][values[i]] {
-				switch field {
-				case KeyNode:
-					results.Node = append(results.Node, values[i].(string))
-				case KeySlot:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Slot = append(results.Slot, uint64(values[i].(int64)))
-				case KeyEpoch:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Epoch = append(results.Epoch, uint64(values[i].(int64)))
-				case KeyStateRoot:
-					results.StateRoot = append(results.StateRoot, values[i].(string))
-				case KeyNodeVersion:
-					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case KeyLocation:
-					results.Location = append(results.Location, values[i].(string))
-				case KeyNetwork:
-					results.Network = append(results.Network, values[i].(string))
-				case KeyBeaconImplementation:
-					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
-				}
-
-				valueSets[field][values[i]] = true
-			}
+		switch field {
+		case KeyNode:
+			results.Node = distinctStrings(values)
+		case KeySlot:
+			results.Slot = distinctUint64s(values)
+		case KeyEpoch:
+			results.Epoch = distinctUint64s(values)
+		case KeyStateRoot:
+			results.StateRoot = distinctStrings(values)
+		case KeyNodeVersion:
+			results.NodeVersion = distinctStrings(values)
+		case KeyLocation:
+			results.Location = distinctStrings(values)
+		case KeyNetwork:
+			results.Network = distinctStrings(values)
+		case KeyBeaconImplementation:
+			results.BeaconImplementation = distinctStrings(values)
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
 	}
 
 	return results, nil

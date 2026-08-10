@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -265,7 +264,26 @@ type DistinctBeaconBadBlobValueResults struct {
 	Index                []uint64
 }
 
-//nolint:errcheck // casting fine here.
+// beaconBadBlobDistinct declares how each requested field's distinct values are resolved.
+// Loose-scannable fields lead an index right after network: node via
+// ix_beacon_bad_blobs_network_node_fetched_at(network, node, fetched_at), slot via
+// ux_beacon_bad_blobs_dedupe(network, slot, block_root, index, node), and network leads
+// both. The blob index sits too deep in the dedupe index to loose-scan.
+var beaconBadBlobDistinct = distinctTable{
+	name: "beacon_bad_blobs",
+	fields: map[string]distinctStrategy{
+		KeyNode:                 distinctLooseScan,
+		KeySlot:                 distinctLooseScan,
+		KeyNetwork:              distinctLooseScan,
+		KeyEpoch:                distinctFullScan,
+		KeyBlockRoot:            distinctFullScan,
+		KeyNodeVersion:          distinctFullScan,
+		KeyLocation:             distinctFullScan,
+		KeyBeaconImplementation: distinctFullScan,
+		KeyIndex:                distinctFullScan,
+	},
+}
+
 func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []string, network string) (*DistinctBeaconBadBlobValueResults, error) {
 	operation := OperationDistinctValues
 
@@ -282,78 +300,43 @@ func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []stri
 		BeaconImplementation: make([]string, 0),
 		Index:                make([]uint64, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&BeaconBadBlob{})
 
-	if network != "" {
-		query = query.Where("network = ?", network)
-	}
+	seen := make(map[string]bool, len(fields))
 
-	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
-
-	rows, err := query.Rows()
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
-	}
-	defer rows.Close()
-
-	valueSets := make(map[string]map[interface{}]bool)
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
-	}
-
-	var values []interface{}
-	for rows.Next() {
-		values = make([]interface{}, len(fields))
-		valuePtrs := make([]interface{}, len(fields))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
+		if seen[field] {
+			continue
 		}
 
-		err := rows.Scan(valuePtrs...)
+		seen[field] = true
+
+		values, err := i.distinctFieldValues(ctx, beaconBadBlobDistinct, field, network)
 		if err != nil {
 			i.metrics.ObserveOperationError(operation)
 
 			return nil, err
 		}
 
-		for i, field := range fields {
-			if !valueSets[field][values[i]] {
-				switch field {
-				case KeyNode:
-					results.Node = append(results.Node, values[i].(string))
-				case KeySlot:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Slot = append(results.Slot, uint64(values[i].(int64)))
-				case KeyEpoch:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Epoch = append(results.Epoch, uint64(values[i].(int64)))
-				case KeyBlockRoot:
-					results.BlockRoot = append(results.BlockRoot, values[i].(string))
-				case KeyNodeVersion:
-					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case KeyLocation:
-					results.Location = append(results.Location, values[i].(string))
-				case KeyNetwork:
-					results.Network = append(results.Network, values[i].(string))
-				case KeyBeaconImplementation:
-					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
-				case "index":
-					//nolint:gosec // not worried about int64 overflow here
-					results.Index = append(results.Index, uint64(values[i].(int64)))
-				}
-
-				valueSets[field][values[i]] = true
-			}
+		switch field {
+		case KeyNode:
+			results.Node = distinctStrings(values)
+		case KeySlot:
+			results.Slot = distinctUint64s(values)
+		case KeyEpoch:
+			results.Epoch = distinctUint64s(values)
+		case KeyBlockRoot:
+			results.BlockRoot = distinctStrings(values)
+		case KeyNodeVersion:
+			results.NodeVersion = distinctStrings(values)
+		case KeyLocation:
+			results.Location = distinctStrings(values)
+		case KeyNetwork:
+			results.Network = distinctStrings(values)
+		case KeyBeaconImplementation:
+			results.BeaconImplementation = distinctStrings(values)
+		case KeyIndex:
+			results.Index = distinctUint64s(values)
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
 	}
 
 	return results, nil

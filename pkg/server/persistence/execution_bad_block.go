@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -248,7 +247,24 @@ type DistinctExecutionBadBlockValueResults struct {
 	BlockExtraData          []string
 }
 
-//nolint:errcheck // casting fine here.
+// executionBadBlockDistinct declares how each requested field's distinct values are
+// resolved. Loose-scannable fields lead an index right after network: node via
+// ix_execution_bad_blocks_network_node_fetched_at(network, node, fetched_at), block_hash
+// via ux_execution_bad_blocks_dedupe(network, block_hash, node), and network leads both.
+var executionBadBlockDistinct = distinctTable{
+	name: "execution_bad_blocks",
+	fields: map[string]distinctStrategy{
+		KeyNode:                    distinctLooseScan,
+		KeyBlockHash:               distinctLooseScan,
+		KeyNetwork:                 distinctLooseScan,
+		KeyBlockNumber:             distinctFullScan,
+		KeyLocation:                distinctFullScan,
+		KeyExecutionImplementation: distinctFullScan,
+		KeyNodeVersion:             distinctFullScan,
+		KeyBlockExtraData:          distinctFullScan,
+	},
+}
+
 func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []string, network string) (*DistinctExecutionBadBlockValueResults, error) {
 	operation := OperationDistinctValues
 
@@ -264,73 +280,41 @@ func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []
 		NodeVersion:             make([]string, 0),
 		BlockExtraData:          make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&ExecutionBadBlock{})
 
-	if network != "" {
-		query = query.Where("network = ?", network)
-	}
+	seen := make(map[string]bool, len(fields))
 
-	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
-
-	rows, err := query.Rows()
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
-	}
-	defer rows.Close()
-
-	valueSets := make(map[string]map[interface{}]bool)
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
-	}
-
-	var values []interface{}
-	for rows.Next() {
-		values = make([]interface{}, len(fields))
-		valuePtrs := make([]interface{}, len(fields))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
+		if seen[field] {
+			continue
 		}
 
-		err := rows.Scan(valuePtrs...)
+		seen[field] = true
+
+		values, err := i.distinctFieldValues(ctx, executionBadBlockDistinct, field, network)
 		if err != nil {
 			i.metrics.ObserveOperationError(operation)
 
 			return nil, err
 		}
 
-		for i, field := range fields {
-			if !valueSets[field][values[i]] {
-				switch field {
-				case KeyNode:
-					results.Node = append(results.Node, values[i].(string))
-				case KeyBlockHash:
-					results.BlockHash = append(results.BlockHash, values[i].(string))
-				case KeyBlockNumber:
-					results.BlockNumber = append(results.BlockNumber, values[i].(int64))
-				case KeyLocation:
-					results.Location = append(results.Location, values[i].(string))
-				case KeyNetwork:
-					results.Network = append(results.Network, values[i].(string))
-				case KeyExecutionImplementation:
-					results.ExecutionImplementation = append(results.ExecutionImplementation, values[i].(string))
-				case KeyNodeVersion:
-					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case "block_extra_data":
-					results.BlockExtraData = append(results.BlockExtraData, values[i].(string))
-				}
-
-				valueSets[field][values[i]] = true
-			}
+		switch field {
+		case KeyNode:
+			results.Node = distinctStrings(values)
+		case KeyBlockHash:
+			results.BlockHash = distinctStrings(values)
+		case KeyBlockNumber:
+			results.BlockNumber = distinctInt64s(values)
+		case KeyLocation:
+			results.Location = distinctStrings(values)
+		case KeyNetwork:
+			results.Network = distinctStrings(values)
+		case KeyExecutionImplementation:
+			results.ExecutionImplementation = distinctStrings(values)
+		case KeyNodeVersion:
+			results.NodeVersion = distinctStrings(values)
+		case KeyBlockExtraData:
+			results.BlockExtraData = distinctStrings(values)
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
 	}
 
 	return results, nil
