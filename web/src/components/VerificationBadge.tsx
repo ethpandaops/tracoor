@@ -111,17 +111,17 @@ export default function VerificationBadge({
   const soleButExpected = verdict === 'sole' && scope === 'client';
   const Icon = soleButExpected ? ShieldCheckIcon : chipIcons[verdict];
 
-  // The chip is just icon + count; the words live in the popover. 'sole' is the count 1
-  // rendered amber, not a special label.
+  // The chip is just icon + count; the words live in the title and popover. States with no
+  // count to show (node-local kinds, unverified rows) are icon-only, so every table wears
+  // the same compact chip.
   const chipLabel = (() => {
     switch (verdict) {
       case 'agreement':
       case 'sole':
         return `${agreementCount}`;
       case 'unknown':
-        return 'verified';
       case 'unverified':
-        return 'unverified';
+        return '';
     }
   })();
 
@@ -143,7 +143,7 @@ export default function VerificationBadge({
         )}
       >
         <Icon className="h-4 w-4" aria-hidden="true" />
-        {chipLabel}
+        {chipLabel && <span>{chipLabel}</span>}
       </PopoverButton>
       <PopoverPanel
         transition
