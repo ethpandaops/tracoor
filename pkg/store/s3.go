@@ -31,6 +31,13 @@ const (
 	uploadConcurrency = 4
 )
 
+const (
+	// s3DeleteBatchSize is the hard limit DeleteObjects imposes on keys per request.
+	s3DeleteBatchSize = 1000
+	// s3NoSuchKeyCode is the per-key error code for an object that is already gone.
+	s3NoSuchKeyCode = "NoSuchKey"
+)
+
 type S3Store struct {
 	s3Client *s3.Client
 
@@ -797,6 +804,82 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 
 	// If not an API error, return the original error
 	return fmt.Errorf("failed to copy object: %w", err)
+}
+
+// DeleteMany removes objects in bulk. Keys are sent in DeleteObjects batches; a batch that
+// fails wholesale and individual per-key errors both surface as failed locations rather than
+// aborting the remaining batches, because retention deletes a mixed bag of objects and one
+// poisoned key must not keep the rest alive forever.
+func (s *S3Store) DeleteMany(ctx context.Context, locations []string) error {
+	if len(locations) == 0 {
+		return nil
+	}
+
+	var (
+		failed   []string
+		firstErr error
+	)
+
+	for start := 0; start < len(locations); start += s3DeleteBatchSize {
+		end := start + s3DeleteBatchSize
+		if end > len(locations) {
+			end = len(locations)
+		}
+
+		chunk := locations[start:end]
+
+		objects := make([]s3types.ObjectIdentifier, 0, len(chunk))
+		for _, location := range chunk {
+			objects = append(objects, s3types.ObjectIdentifier{Key: aws.String(location)})
+		}
+
+		out, err := s.s3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.config.BucketName),
+			Delete: &s3types.Delete{
+				Objects: objects,
+				// Quiet still reports errors, it only drops the per-key success entries.
+				Quiet: aws.Bool(true),
+			},
+		})
+		if err != nil {
+			failed = append(failed, chunk...)
+
+			if firstErr == nil {
+				firstErr = err
+			}
+
+			continue
+		}
+
+		removed := len(chunk)
+
+		for _, e := range out.Errors {
+			key := aws.ToString(e.Key)
+
+			// A key that is already gone is the outcome we wanted.
+			if aws.ToString(e.Code) == s3NoSuchKeyCode {
+				continue
+			}
+
+			removed--
+
+			failed = append(failed, key)
+
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %s", key, aws.ToString(e.Message))
+			}
+		}
+
+		for i := 0; i < removed; i++ {
+			s.basicMetrics.ObserveItemRemoved(string(UnknownDataType))
+		}
+	}
+
+	if len(failed) > 0 {
+		return &DeleteManyError{Failed: failed, Err: firstErr}
+	}
+
+	return nil
 }
 
 func (s *S3Store) PreferURLs() bool {

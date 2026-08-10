@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"strings"
 	"time"
 
@@ -88,24 +87,6 @@ func (f *ExecutionBadBlockFilter) AddBlockExtraData(data string) {
 	f.BlockExtraData = &data
 }
 
-func (f *ExecutionBadBlockFilter) Validate() error {
-	if f.ID == nil &&
-		f.Node == nil &&
-		f.Before == nil &&
-		f.After == nil &&
-		f.BlockHash == nil &&
-		f.BlockNumber == nil &&
-		f.ExecutionImplementation == nil &&
-		f.NodeVersion == nil &&
-		f.Location == nil &&
-		f.Network == nil &&
-		f.BlockExtraData == nil {
-		return errors.New("no filter specified")
-	}
-
-	return nil
-}
-
 func (f *ExecutionBadBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	if f.ID != nil {
 		query = query.Where("id = ?", f.ID)
@@ -116,11 +97,11 @@ func (f *ExecutionBadBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error)
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", timestampFormatForDB(*f.Before))
+		query = query.Where("fetched_at <= ?", *f.Before)
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", timestampFormatForDB(*f.After))
+		query = query.Where("fetched_at >= ?", *f.After)
 	}
 
 	if f.BlockHash != nil {

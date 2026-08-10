@@ -6,8 +6,6 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
-	"os/signal"
-	"syscall"
 	"time"
 
 	//nolint:gosec // only exposed if pprofAddr config is set
@@ -96,9 +94,6 @@ func NewServer(ctx context.Context, log logrus.FieldLogger, conf *Config) (*Serv
 }
 
 func (x *Server) Start(ctx context.Context) error {
-	nctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
 	if err := x.startCrons(ctx); err != nil {
 		x.log.WithError(err).Fatal("Failed to start crons")
 	}
@@ -107,7 +102,7 @@ func (x *Server) Start(ctx context.Context) error {
 		return err
 	}
 
-	g, gCtx := errgroup.WithContext(nctx)
+	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		if err := x.startMetrics(ctx); err != nil {

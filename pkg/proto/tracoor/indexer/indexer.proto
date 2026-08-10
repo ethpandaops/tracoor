@@ -519,6 +519,8 @@ message CountExecutionBlockTraceRequest {
   google.protobuf.Timestamp after = 7;
   string execution_implementation = 8;
   string node_version = 9;
+  // A count must accept every filter the matching list accepts, or the two disagree.
+  string id = 10;
 }
 
 message CountExecutionBlockTraceResponse {
@@ -924,6 +926,8 @@ message CountExecutionBadBlockRequest {
   string execution_implementation = 8;
   string node_version = 9;
   string block_extra_data = 10;
+  // A count must accept every filter the matching list accepts, or the two disagree.
+  string id = 11;
 }
 
 message CountExecutionBadBlockResponse {

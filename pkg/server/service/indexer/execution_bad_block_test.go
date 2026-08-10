@@ -45,7 +45,7 @@ func TestIndexerExecutionBadBlockCount(t *testing.T) {
 	}()
 
 	t.Run("Counting", func(t *testing.T) {
-		_, err := index.CreateExecutionBadBlock(ctx, createRandomExecutionBadBlockRequest())
+		_, err := createExecutionBadBlock(ctx, index, createRandomExecutionBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
@@ -77,14 +77,14 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 	}()
 
 	t.Run("Creating", func(t *testing.T) {
-		_, err := index.CreateExecutionBadBlock(ctx, createRandomExecutionBadBlockRequest())
+		_, err := createExecutionBadBlock(ctx, index, createRandomExecutionBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
 	})
 
 	t.Run("Creating returns a valid ID", func(t *testing.T) {
-		rsp, err := index.CreateExecutionBadBlock(ctx, createRandomExecutionBadBlockRequest())
+		rsp, err := createExecutionBadBlock(ctx, index, createRandomExecutionBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomExecutionBadBlockRequest()
 
-		rsp, err := index.CreateExecutionBadBlock(ctx, req)
+		rsp, err := createExecutionBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
@@ -106,7 +106,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 			t.Fatalf("expected ID to not be empty")
 		}
 
-		_, err = index.CreateExecutionBadBlock(ctx, req)
+		_, err = createExecutionBadBlock(ctx, index, req)
 		if err == nil {
 			t.Fatal("expected duplicate execution bad block to be rejected")
 		}
@@ -115,7 +115,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 	t.Run("Basic Listing", func(t *testing.T) {
 		req := createRandomExecutionBadBlockRequest()
 
-		resp, err := index.CreateExecutionBadBlock(ctx, req)
+		resp, err := createExecutionBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
@@ -133,7 +133,7 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 	t.Run("Can list by filters", func(t *testing.T) {
 		req := createRandomExecutionBadBlockRequest()
 
-		_, err := index.CreateExecutionBadBlock(ctx, req)
+		_, err := createExecutionBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}
@@ -282,7 +282,7 @@ func TestIndexerExecutionBadBlockDownloading(t *testing.T) {
 		req := createRandomExecutionBadBlockRequest()
 		req.Location = wrapperspb.String(location)
 
-		resp, err := index.CreateExecutionBadBlock(ctx, req)
+		resp, err := createExecutionBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution bad block: %v", err)
 		}

@@ -47,7 +47,7 @@ func TestIndexerBeaconBadBlockCount(t *testing.T) {
 	}()
 
 	t.Run("Counting", func(t *testing.T) {
-		_, err := index.CreateBeaconBadBlock(ctx, createRandomBeaconBadBlockRequest())
+		_, err := createBeaconBadBlock(ctx, index, createRandomBeaconBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestIndexerBeaconBadBlockDownloading(t *testing.T) {
 		req := createRandomBeaconBadBlockRequest()
 		req.Location = wrapperspb.String(location)
 
-		resp, err := index.CreateBeaconBadBlock(ctx, req)
+		resp, err := createBeaconBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -163,14 +163,14 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 	}()
 
 	t.Run("Creating", func(t *testing.T) {
-		_, err := index.CreateBeaconBadBlock(ctx, createRandomBeaconBadBlockRequest())
+		_, err := createBeaconBadBlock(ctx, index, createRandomBeaconBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
 	})
 
 	t.Run("Creating returns a valid ID", func(t *testing.T) {
-		rsp, err := index.CreateBeaconBadBlock(ctx, createRandomBeaconBadBlockRequest())
+		rsp, err := createBeaconBadBlock(ctx, index, createRandomBeaconBadBlockRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -183,7 +183,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomBeaconBadBlockRequest()
 
-		rsp, err := index.CreateBeaconBadBlock(ctx, req)
+		rsp, err := createBeaconBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -192,7 +192,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 			t.Fatalf("expected ID to not be empty")
 		}
 
-		_, err = index.CreateBeaconBadBlock(ctx, req)
+		_, err = createBeaconBadBlock(ctx, index, req)
 		if err == nil {
 			t.Fatal("expected duplicate beacon bad block to be rejected")
 		}
@@ -201,7 +201,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 	t.Run("Basic Listing", func(t *testing.T) {
 		req := createRandomBeaconBadBlockRequest()
 
-		resp, err := index.CreateBeaconBadBlock(ctx, req)
+		resp, err := createBeaconBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -219,7 +219,7 @@ func TestIndexerBeaconBadBlock(t *testing.T) {
 	t.Run("Can list by filters", func(t *testing.T) {
 		req := createRandomBeaconBadBlockRequest()
 
-		resp, err := index.CreateBeaconBadBlock(ctx, req)
+		resp, err := createBeaconBadBlock(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}

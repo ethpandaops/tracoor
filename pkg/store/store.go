@@ -40,6 +40,12 @@ type Store interface {
 	// Copy copies a file from one location to another
 	Copy(ctx context.Context, params *CopyParams) error
 
+	// DeleteMany removes objects in bulk regardless of their data type. A location that is
+	// already absent counts as removed. When some locations cannot be removed the returned
+	// error is a *DeleteManyError naming exactly those, so the caller can retry or
+	// quarantine them without re-deleting the rest.
+	DeleteMany(ctx context.Context, locations []string) error
+
 	// StorageHandshakeTokenExists checks if a storage handshake token exists in the store
 	StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error)
 	// SaveStorageHandshakeToken saves a storage handshake token to the store

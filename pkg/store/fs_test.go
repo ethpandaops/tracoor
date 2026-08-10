@@ -435,3 +435,71 @@ func TestFSStorePublishesAtomically(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestFSStoreDeleteMany(t *testing.T) {
+	dir, err := os.MkdirTemp("", "fsstore_delete_many")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+
+	fsStore, err := store.NewFSStore("test", logrus.New(), &store.FSStoreConfig{BasePath: dir}, nil)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	locations := []string{
+		"beacon_state/one.ssz",
+		"beacon_state/two.ssz",
+		"beacon_state/three.ssz",
+	}
+
+	for _, location := range locations {
+		_, serr := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     bytes.NewReader([]byte("payload")),
+			Location: location,
+		})
+		require.NoError(t, serr)
+	}
+
+	t.Run("RemovesEveryLocation", func(t *testing.T) {
+		require.NoError(t, fsStore.DeleteMany(ctx, locations))
+
+		for _, location := range locations {
+			exists, eerr := fsStore.Exists(ctx, location)
+			require.NoError(t, eerr)
+			require.False(t, exists)
+		}
+	})
+
+	t.Run("AbsentLocationsAreNotAFailure", func(t *testing.T) {
+		require.NoError(t, fsStore.DeleteMany(ctx, []string{"beacon_state/never-existed.ssz"}))
+	})
+
+	t.Run("EmptyInputIsANoOp", func(t *testing.T) {
+		require.NoError(t, fsStore.DeleteMany(ctx, nil))
+	})
+
+	t.Run("ReportsTheLocationsItCouldNotRemove", func(t *testing.T) {
+		// A directory in place of an object cannot be unlinked, which is the closest a
+		// filesystem gets to a poisoned key.
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "beacon_state", "stuck.ssz", "child"), 0o755))
+
+		_, serr := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     bytes.NewReader([]byte("payload")),
+			Location: "beacon_state/fine.ssz",
+		})
+		require.NoError(t, serr)
+
+		derr := fsStore.DeleteMany(ctx, []string{"beacon_state/stuck.ssz", "beacon_state/fine.ssz"})
+		require.Error(t, derr)
+
+		var partial *store.DeleteManyError
+
+		require.ErrorAs(t, derr, &partial)
+		require.Equal(t, []string{"beacon_state/stuck.ssz"}, partial.Failed)
+
+		exists, eerr := fsStore.Exists(ctx, "beacon_state/fine.ssz")
+		require.NoError(t, eerr)
+		require.False(t, exists, "a poisoned location must not stop the rest of the batch")
+	})
+}

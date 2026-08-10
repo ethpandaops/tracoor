@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	ServiceType                = "tracoor.indexer"
+	ServiceType      = "tracoor.indexer"
+	metricsNamespace = "tracoor_indexer"
+
 	KeyNode                    = "node"
 	KeyBlockRoot               = "block_root"
 	KeyBlockHash               = "block_hash"
@@ -58,6 +60,14 @@ type Indexer struct {
 	ethereumConfig *ethereum.Config
 
 	permanentStore *PermanentStore
+
+	metrics *Metrics
+
+	// reaper carries object deletes that the store refused, between retention passes.
+	reaper *objectReaper
+
+	// disagreements keeps the root-disagreement warning to one per slot.
+	disagreements *disagreementReporter
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
@@ -76,6 +86,9 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		config:         conf,
 		ethereumConfig: ethereumConfig,
 		permanentStore: permanentStore,
+		metrics:        NewMetrics(metricsNamespace),
+		reaper:         newObjectReaper(),
+		disagreements:  newDisagreementReporter(),
 	}
 
 	return i, nil
@@ -142,6 +155,71 @@ func (i *Indexer) GetConfig(ctx context.Context, req *indexer.GetConfigRequest) 
 	}, nil
 }
 
+// gateOnStore confirms the object is really there before an index entry claims it exists.
+//
+// The check is skipped for exactly one case: the write is taking a reference on a ready blob
+// stored at the same location. That blob row was written by an agent that had just uploaded
+// the object and it is a stronger, cheaper statement than a HEAD request, which every node
+// observing the same payload would otherwise repeat.
+func (i *Indexer) gateOnStore(ctx context.Context, p *persistence.InsertArtifactParams) error {
+	if p.DedupKey != "" && p.ContentHash != "" {
+		blob, err := i.db.GetBlob(ctx, p.Kind, p.Network, p.DedupKey)
+
+		switch {
+		case err == nil && blob.Location == p.Location:
+			return nil
+		case err != nil && !errors.Is(err, persistence.ErrBlobNotFound):
+			return status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	exists, err := i.store.Exists(ctx, p.Location)
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField(KeyLocation, p.Location).
+			WithField(KeyKind, p.Kind).
+			Error("Failed to index an artifact because the store could not be reached. Check that the agent and server are pointed at the same storage backend.")
+
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	if !exists {
+		return status.Error(codes.FailedPrecondition, "object not present in store")
+	}
+
+	return nil
+}
+
+// indexArtifact runs the write path shared by all seven kinds: gate on the store, insert
+// against the unique index, take a blob reference if the row is linking one. subject names the
+// kind in the errors the agent sees.
+func (i *Indexer) indexArtifact(ctx context.Context, p *persistence.InsertArtifactParams, subject string, logFields logrus.Fields) error {
+	if err := i.gateOnStore(ctx, p); err != nil {
+		return err
+	}
+
+	outcome, err := i.db.InsertArtifact(ctx, p)
+	if err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index " + subject)
+
+		return status.Error(codes.Internal, "failed to index "+subject)
+	}
+
+	switch outcome {
+	case persistence.ArtifactInsertDuplicate:
+		return status.Error(codes.AlreadyExists, subject+" already indexed")
+	case persistence.ArtifactInsertUnlinkable:
+		// Distinguishable on purpose: the agent's payload is not in the store any more, so it
+		// re-fetches and re-uploads rather than retrying the same write.
+		return status.Error(codes.FailedPrecondition, "blob not linkable")
+	case persistence.ArtifactInsertLinked, persistence.ArtifactInsertUnlinked:
+		return nil
+	}
+
+	return nil
+}
+
 func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -172,37 +250,6 @@ func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.Get
 func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeaconStateRequest) (*indexer.CreateBeaconStateResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	// Check the store for the state
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon state because the state could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the state is already indexed
-		filter := &persistence.BeaconStateFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddStateRoot(req.GetStateRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(states) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon state already indexed")
-		}
 	}
 
 	// Create the state
@@ -240,10 +287,18 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index state")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconStateToDBBeaconState(state),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyStateRoot, KeyNode},
+		Kind:            persistence.KindBeaconState,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index state")
+	if err := i.indexArtifact(ctx, params, "beacon state", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", state.GetId().GetValue()).Debug("Indexed beacon state")
@@ -440,37 +495,6 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the block
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon block because the block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the block is already indexed
-		filter := &persistence.BeaconBlockFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(blocks) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
-		}
-	}
-
 	// Create the block
 	block := &indexer.BeaconBlock{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -506,10 +530,18 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index block")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBlockToDBBeaconBlock(block),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindBeaconBlock,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index block")
+	if err := i.indexArtifact(ctx, params, "beacon block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed beacon block")
@@ -714,37 +746,6 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the envelope
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index an execution payload envelope because it could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the envelope is already indexed
-		filter := &persistence.ExecutionPayloadEnvelopeFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		existing, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(existing) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "execution payload envelope already indexed")
-		}
-	}
-
 	// Create the envelope
 	envelope := &indexer.ExecutionPayloadEnvelope{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -780,10 +781,18 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertExecutionPayloadEnvelope(ctx, ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(envelope)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index execution payload envelope")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(envelope),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindExecutionPayloadEnvelope,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index execution payload envelope")
+	if err := i.indexArtifact(ctx, params, "execution payload envelope", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", envelope.GetId().GetValue()).Debug("Indexed execution payload envelope")
@@ -980,37 +989,6 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the bad block
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon block because the bad block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the bad block is already indexed
-		filter := &persistence.BeaconBadBlockFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		badBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(badBlocks) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
-		}
-	}
-
 	// Create the bad block
 	badBlock := &indexer.BeaconBadBlock{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -1045,10 +1023,18 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBadBlock(ctx, ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad block")
+	// A bad block never joins the deduplicated set: its bytes are the evidence of a fault and
+	// are kept per node, so it carries no dedupe key and owns its object outright.
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindBeaconBadBlock,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index bad block")
+	if err := i.indexArtifact(ctx, params, "beacon bad block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", badBlock.GetId().GetValue()).Debug("Indexed beacon block")
@@ -1245,38 +1231,6 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the bad blob
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon blob because the bad blob could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the bad blob is already indexed
-		filter := &persistence.BeaconBadBlobFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddIndex(req.GetIndex().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		badBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(badBlobs) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon blob already indexed")
-		}
-	}
-
 	// Create the bad blob
 	badBlob := &indexer.BeaconBadBlob{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -1313,10 +1267,16 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		KeyIndex:                req.GetIndex().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBadBlob(ctx, ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad blob")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyIndex, KeyNode},
+		Kind:            persistence.KindBeaconBadBlob,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index bad blob")
+	if err := i.indexArtifact(ctx, params, "beacon bad blob", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", badBlob.GetId().GetValue()).Debug("Indexed beacon blob")
@@ -1544,16 +1504,26 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if err := i.db.InsertExecutionBlockTrace(ctx, ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace)); err != nil {
-		return nil, status.Error(codes.Internal, "failed to insert execution block trace")
-	}
-
 	logFields := logrus.Fields{
 		KeyNode:        req.GetNode().GetValue(),
 		KeyNetwork:     req.GetNetwork().GetValue(),
 		KeyNodeVersion: req.GetNodeVersion().GetValue(),
 		KeyLocation:    req.GetLocation().GetValue(),
 		KeyFetchedAt:   req.GetFetchedAt().AsTime(),
+	}
+
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace),
+		ConflictColumns: []string{KeyNetwork, KeyBlockHash, KeyNode},
+		Kind:            persistence.KindExecutionBlockTrace,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
+
+	if err := i.indexArtifact(ctx, params, "execution block trace", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", trace.GetId().GetValue()).Debug("Indexed execution block trace")
@@ -1638,6 +1608,10 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 
 func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.CountExecutionBlockTraceRequest) (*indexer.CountExecutionBlockTraceResponse, error) {
 	filter := &persistence.ExecutionBlockTraceFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
 
 	if req.Node != "" {
 		filter.AddNode(req.Node)
@@ -1756,10 +1730,6 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if err := i.db.InsertExecutionBadBlock(ctx, ProtoExecutionBadBlockToDBExecutionBadBlock(block)); err != nil {
-		return nil, status.Error(codes.Internal, "failed to insert execution bad block")
-	}
-
 	logFields := logrus.Fields{
 		KeyNode:            req.GetNode().GetValue(),
 		KeyNetwork:         req.GetNetwork().GetValue(),
@@ -1767,6 +1737,18 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 		KeyContentEncoding: req.GetContentEncoding().GetValue(),
 		KeyLocation:        req.GetLocation().GetValue(),
 		KeyFetchedAt:       req.GetFetchedAt().AsTime(),
+	}
+
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionBadBlockToDBExecutionBadBlock(block),
+		ConflictColumns: []string{KeyNetwork, KeyBlockHash, KeyNode},
+		Kind:            persistence.KindExecutionBadBlock,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
+
+	if err := i.indexArtifact(ctx, params, "execution bad block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed execution bad block")
@@ -1855,6 +1837,10 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 
 func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.CountExecutionBadBlockRequest) (*indexer.CountExecutionBadBlockResponse, error) {
 	filter := &persistence.ExecutionBadBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
 
 	if req.Node != "" {
 		filter.AddNode(req.Node)

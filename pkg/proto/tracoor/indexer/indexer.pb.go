@@ -4169,8 +4169,10 @@ type CountExecutionBlockTraceRequest struct {
 	After                   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=after,proto3" json:"after,omitempty"`
 	ExecutionImplementation string                 `protobuf:"bytes,8,opt,name=execution_implementation,json=executionImplementation,proto3" json:"execution_implementation,omitempty"`
 	NodeVersion             string                 `protobuf:"bytes,9,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// A count must accept every filter the matching list accepts, or the two disagree.
+	Id            string `protobuf:"bytes,10,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CountExecutionBlockTraceRequest) Reset() {
@@ -4262,6 +4264,13 @@ func (x *CountExecutionBlockTraceRequest) GetExecutionImplementation() string {
 func (x *CountExecutionBlockTraceRequest) GetNodeVersion() string {
 	if x != nil {
 		return x.NodeVersion
+	}
+	return ""
+}
+
+func (x *CountExecutionBlockTraceRequest) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -7397,8 +7406,10 @@ type CountExecutionBadBlockRequest struct {
 	ExecutionImplementation string                 `protobuf:"bytes,8,opt,name=execution_implementation,json=executionImplementation,proto3" json:"execution_implementation,omitempty"`
 	NodeVersion             string                 `protobuf:"bytes,9,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
 	BlockExtraData          string                 `protobuf:"bytes,10,opt,name=block_extra_data,json=blockExtraData,proto3" json:"block_extra_data,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// A count must accept every filter the matching list accepts, or the two disagree.
+	Id            string `protobuf:"bytes,11,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CountExecutionBadBlockRequest) Reset() {
@@ -7497,6 +7508,13 @@ func (x *CountExecutionBadBlockRequest) GetNodeVersion() string {
 func (x *CountExecutionBadBlockRequest) GetBlockExtraData() string {
 	if x != nil {
 		return x.BlockExtraData
+	}
+	return ""
+}
+
+func (x *CountExecutionBadBlockRequest) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -8099,7 +8117,7 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	" \x01(\tR\x17executionImplementation\x12!\n" +
 	"\fnode_version\x18\v \x01(\tR\vnodeVersion\"u\n" +
 	"\x1fListExecutionBlockTraceResponse\x12R\n" +
-	"\x16execution_block_traces\x18\x01 \x03(\v2\x1c.indexer.ExecutionBlockTraceR\x14executionBlockTraces\"\xf1\x02\n" +
+	"\x16execution_block_traces\x18\x01 \x03(\v2\x1c.indexer.ExecutionBlockTraceR\x14executionBlockTraces\"\x81\x03\n" +
 	"\x1fCountExecutionBlockTraceRequest\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12!\n" +
 	"\fblock_number\x18\x02 \x01(\x03R\vblockNumber\x12\x1d\n" +
@@ -8110,7 +8128,9 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\x06before\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\x120\n" +
 	"\x05after\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x05after\x129\n" +
 	"\x18execution_implementation\x18\b \x01(\tR\x17executionImplementation\x12!\n" +
-	"\fnode_version\x18\t \x01(\tR\vnodeVersion\"V\n" +
+	"\fnode_version\x18\t \x01(\tR\vnodeVersion\x12\x0e\n" +
+	"\x02id\x18\n" +
+	" \x01(\tR\x02id\"V\n" +
 	" CountExecutionBlockTraceResponse\x122\n" +
 	"\x05count\x18\x01 \x01(\v2\x1c.google.protobuf.UInt64ValueR\x05count\"\xae\x02\n" +
 	"*ListUniqueExecutionBlockTraceValuesRequest\x12Q\n" +
@@ -8471,7 +8491,7 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fnode_version\x18\v \x01(\tR\vnodeVersion\x12(\n" +
 	"\x10block_extra_data\x18\f \x01(\tR\x0eblockExtraData\"m\n" +
 	"\x1dListExecutionBadBlockResponse\x12L\n" +
-	"\x14execution_bad_blocks\x18\x01 \x03(\v2\x1a.indexer.ExecutionBadBlockR\x12executionBadBlocks\"\x99\x03\n" +
+	"\x14execution_bad_blocks\x18\x01 \x03(\v2\x1a.indexer.ExecutionBadBlockR\x12executionBadBlocks\"\xa9\x03\n" +
 	"\x1dCountExecutionBadBlockRequest\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12!\n" +
 	"\fblock_number\x18\x02 \x01(\x03R\vblockNumber\x12\x1d\n" +
@@ -8484,7 +8504,8 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\x18execution_implementation\x18\b \x01(\tR\x17executionImplementation\x12!\n" +
 	"\fnode_version\x18\t \x01(\tR\vnodeVersion\x12(\n" +
 	"\x10block_extra_data\x18\n" +
-	" \x01(\tR\x0eblockExtraData\"T\n" +
+	" \x01(\tR\x0eblockExtraData\x12\x0e\n" +
+	"\x02id\x18\v \x01(\tR\x02id\"T\n" +
 	"\x1eCountExecutionBadBlockResponse\x122\n" +
 	"\x05count\x18\x01 \x01(\v2\x1c.google.protobuf.UInt64ValueR\x05count\"\xc0\x02\n" +
 	"(ListUniqueExecutionBadBlockValuesRequest\x12O\n" +

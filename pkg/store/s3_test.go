@@ -55,6 +55,47 @@ func TestS3StoreOperations(t *testing.T) {
 	t.Run("AbortsOnAFailedRead", func(t *testing.T) {
 		testAbortsOnAFailedRead(ctx, t, store)
 	})
+
+	t.Run("DeleteMany", func(t *testing.T) {
+		testDeleteMany(ctx, t, store)
+	})
+}
+
+func testDeleteMany(ctx context.Context, t *testing.T, st Store) {
+	t.Helper()
+
+	locations := make([]string, 0, 4)
+	locations = append(locations, "delete_many/one.ssz", "delete_many/two.ssz", "delete_many/three.ssz")
+
+	for _, location := range locations {
+		if _, err := st.SaveBeaconState(ctx, &SaveParams{
+			Data:     bytes.NewReader([]byte("payload")),
+			Location: location,
+		}); err != nil {
+			t.Fatalf("Failed to save %s: %v", location, err)
+		}
+	}
+
+	// One location that was never written: bulk delete is idempotent, so it must not turn the
+	// batch into a failure.
+	if err := st.DeleteMany(ctx, append(locations, "delete_many/never-existed.ssz")); err != nil {
+		t.Fatalf("Failed to delete many: %v", err)
+	}
+
+	for _, location := range locations {
+		exists, err := st.Exists(ctx, location)
+		if err != nil {
+			t.Fatalf("Failed to check %s: %v", location, err)
+		}
+
+		if exists {
+			t.Fatalf("Expected %s to be deleted", location)
+		}
+	}
+
+	if err := st.DeleteMany(ctx, nil); err != nil {
+		t.Fatalf("Expected an empty delete to be a no-op, got: %v", err)
+	}
 }
 
 // failingReader serves size bytes and then fails, standing in for a payload

@@ -2,7 +2,6 @@ package persistence
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -81,23 +80,6 @@ func (f *ExecutionBlockTraceFilter) AddBlockNumber(number int64) {
 	f.BlockNumber = &number
 }
 
-func (f *ExecutionBlockTraceFilter) Validate() error {
-	if f.ID == nil &&
-		f.Node == nil &&
-		f.Before == nil &&
-		f.After == nil &&
-		f.BlockHash == nil &&
-		f.BlockNumber == nil &&
-		f.ExecutionImplementation == nil &&
-		f.NodeVersion == nil &&
-		f.Location == nil &&
-		f.Network == nil {
-		return errors.New("no filter specified")
-	}
-
-	return nil
-}
-
 func (f *ExecutionBlockTraceFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	if f.ID != nil {
 		query = query.Where("id = ?", f.ID)
@@ -108,11 +90,11 @@ func (f *ExecutionBlockTraceFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, erro
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", timestampFormatForDB(*f.Before))
+		query = query.Where("fetched_at <= ?", *f.Before)
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", timestampFormatForDB(*f.After))
+		query = query.Where("fetched_at >= ?", *f.After)
 	}
 
 	if f.BlockHash != nil {

@@ -45,7 +45,7 @@ func TestIndexerExecutionBlockTraceCount(t *testing.T) {
 	}()
 
 	t.Run("Counting", func(t *testing.T) {
-		_, err := index.CreateExecutionBlockTrace(ctx, createRandomExecutionBlockTraceRequest())
+		_, err := createExecutionBlockTrace(ctx, index, createRandomExecutionBlockTraceRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
@@ -77,14 +77,14 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 	}()
 
 	t.Run("Creating", func(t *testing.T) {
-		_, err := index.CreateExecutionBlockTrace(ctx, createRandomExecutionBlockTraceRequest())
+		_, err := createExecutionBlockTrace(ctx, index, createRandomExecutionBlockTraceRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
 	})
 
 	t.Run("Creating returns a valid ID", func(t *testing.T) {
-		rsp, err := index.CreateExecutionBlockTrace(ctx, createRandomExecutionBlockTraceRequest())
+		rsp, err := createExecutionBlockTrace(ctx, index, createRandomExecutionBlockTraceRequest())
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomExecutionBlockTraceRequest()
 
-		rsp, err := index.CreateExecutionBlockTrace(ctx, req)
+		rsp, err := createExecutionBlockTrace(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
@@ -106,7 +106,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 			t.Fatalf("expected ID to not be empty")
 		}
 
-		_, err = index.CreateExecutionBlockTrace(ctx, req)
+		_, err = createExecutionBlockTrace(ctx, index, req)
 		if err == nil {
 			t.Fatal("expected duplicate execution block trace to be rejected")
 		}
@@ -115,7 +115,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 	t.Run("Basic Listing", func(t *testing.T) {
 		req := createRandomExecutionBlockTraceRequest()
 
-		resp, err := index.CreateExecutionBlockTrace(ctx, req)
+		resp, err := createExecutionBlockTrace(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
@@ -133,7 +133,7 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 	t.Run("Can list by filters", func(t *testing.T) {
 		req := createRandomExecutionBlockTraceRequest()
 
-		_, err := index.CreateExecutionBlockTrace(ctx, req)
+		_, err := createExecutionBlockTrace(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}
@@ -282,7 +282,7 @@ func TestIndexerExecutionBlockTraceDownloading(t *testing.T) {
 		req := createRandomExecutionBlockTraceRequest()
 		req.Location = wrapperspb.String(location)
 
-		resp, err := index.CreateExecutionBlockTrace(ctx, req)
+		resp, err := createExecutionBlockTrace(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create execution block trace: %v", err)
 		}

@@ -3,6 +3,8 @@ package persistence
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	perrors "github.com/pkg/errors"
@@ -12,10 +14,73 @@ import (
 	"gorm.io/plugin/prometheus"
 )
 
+// Connection pool sizing.
+//
+// SQLite: one connection, always. The pure-Go driver serialises writers anyway, and a DSN of
+// the `file:name?mode=memory` form gives every *connection* its own database, so a pool wider
+// than one is not a throughput knob but a correctness bug. The connection is never retired for
+// the same reason.
+//
+// Postgres: sized for an indexer that runs a handful of concurrent gRPC handlers plus the
+// retention loop, with a lifetime short enough that a rolling database upgrade drains.
+const (
+	sqliteMaxOpenConns = 1
+	sqliteMaxIdleConns = 1
+	pgMaxOpenConns     = 16
+	pgMaxIdleConns     = 8
+	pgConnMaxLifetime  = time.Hour
+)
+
+// sqlitePragmas are carried on the DSN rather than executed after open: a pragma run through
+// the pool lands on whichever connection served it, while DSN pragmas are applied to every
+// connection the driver makes.
+//
+//	synchronous(0)      - the index is rebuildable from the object store; fsync per commit is
+//	                      not worth the write amplification.
+//	cache_size(-400000) - 400 MB of page cache, in KiB as SQLite's negative form.
+//	busy_timeout(10000) - wait out a writer instead of failing the request immediately.
+//	journal_mode(WAL)   - readers do not block the writer.
+const sqlitePragmas = "_pragma=synchronous(0)&_pragma=cache_size(-400000)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)"
+
 type Indexer struct {
 	db      *gorm.DB
 	log     logrus.FieldLogger
 	metrics *BasicMetrics
+}
+
+// withSQLitePragmas appends the standard pragmas to a DSN that does not already carry any. An
+// operator who has spelled out their own pragmas gets them respected verbatim.
+func withSQLitePragmas(dsn string) string {
+	if strings.Contains(dsn, "_pragma=") {
+		return dsn
+	}
+
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+
+	return dsn + separator + sqlitePragmas
+}
+
+func configureConnectionPool(db *gorm.DB, driverName string) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return perrors.Wrap(err, "failed to get underlying sql db")
+	}
+
+	switch driverName {
+	case "sqlite":
+		sqlDB.SetMaxOpenConns(sqliteMaxOpenConns)
+		sqlDB.SetMaxIdleConns(sqliteMaxIdleConns)
+		sqlDB.SetConnMaxLifetime(0)
+	default:
+		sqlDB.SetMaxOpenConns(pgMaxOpenConns)
+		sqlDB.SetMaxIdleConns(pgMaxIdleConns)
+		sqlDB.SetConnMaxLifetime(pgConnMaxLifetime)
+	}
+
+	return nil
 }
 
 func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *Options) (*Indexer, error) {
@@ -24,6 +89,10 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *O
 	var db *gorm.DB
 
 	var err error
+
+	// Statements are reused across the process: every query this package issues comes from a
+	// fixed set of shapes, so caching the prepared form is a pure win on both engines.
+	gormConfig := &gorm.Config{PrepareStmt: true}
 
 	switch config.DriverName {
 	case "postgres":
@@ -34,16 +103,9 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *O
 
 		dialect := postgres.New(conf)
 
-		db, err = gorm.Open(dialect, &gorm.Config{})
+		db, err = gorm.Open(dialect, gormConfig)
 	case "sqlite":
-		db, err = gorm.Open(sqlite.Open(config.DSN), &gorm.Config{})
-		if err != nil {
-			return nil, err
-		}
-
-		db.Exec("PRAGMA synchronous = OFF;")
-		db.Exec("PRAGMA journal_mode = WAL;")
-		db.Exec("PRAGMA cache_size = 100000;")
+		db, err = gorm.Open(sqlite.Open(withSQLitePragmas(config.DSN)), gormConfig)
 	default:
 		return nil, errors.New("invalid driver name: " + config.DriverName)
 	}
@@ -52,7 +114,9 @@ func NewIndexer(namespace string, log logrus.FieldLogger, config Config, opts *O
 		return nil, err
 	}
 
-	db = db.Session(&gorm.Session{FullSaveAssociations: true})
+	if err = configureConnectionPool(db, config.DriverName); err != nil {
+		return nil, err
+	}
 
 	if err = db.Use(
 		prometheus.New(prometheus.Config{

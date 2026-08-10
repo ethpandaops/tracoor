@@ -340,6 +340,45 @@ func (s *FSStore) DeleteExecutionBadBlock(ctx context.Context, location string) 
 	return s.removeFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
+// DeleteMany removes objects in bulk. There is no batch primitive on a filesystem, so this is
+// a loop that keeps going past individual failures and reports the ones that did not go, in
+// the same shape as the object-store implementation.
+func (s *FSStore) DeleteMany(ctx context.Context, locations []string) error {
+	var (
+		failed   []string
+		firstErr error
+	)
+
+	for idx, location := range locations {
+		if err := ctx.Err(); err != nil {
+			// Everything not yet attempted is still there; say so rather than claiming success.
+			failed = append(failed, locations[idx:]...)
+
+			return &DeleteManyError{Failed: failed, Err: err}
+		}
+
+		parts := strings.Split(location, "/")
+
+		if err := s.removeFile(filepath.Join(s.basePath, filepath.Join(parts...))); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+
+			failed = append(failed, location)
+
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+
+	if len(failed) > 0 {
+		return &DeleteManyError{Failed: failed, Err: firstErr}
+	}
+
+	return nil
+}
+
 func (s *FSStore) PathPrefix() string {
 	return s.basePath
 }
