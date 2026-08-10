@@ -68,6 +68,8 @@ export default function Selector() {
     if (index !== -1 && index !== selectedIndex) setSelectedIndex(index);
   }, [currentSelection]);
 
+  // The network dropdown is the one unique-values caller that stays unscoped: it has to see
+  // every network in order to offer them.
   const locationCategory = useMemo(() => {
     return categories.find((category) => category.tabs.includes(currentSelection));
   }, [currentSelection]);
@@ -78,6 +80,7 @@ export default function Selector() {
     error: beaconStateError,
   } = useUniqueBeaconStateValues(
     ['network'],
+    undefined,
     [
       Selection.beacon_state,
       Selection.ncli_state_transition,
@@ -90,7 +93,11 @@ export default function Selector() {
     data: beaconBlockData,
     isLoading: beaconBlockIsLoading,
     error: beaconBlockError,
-  } = useUniqueBeaconBlockValues(['network'], currentSelection === Selection.beacon_block);
+  } = useUniqueBeaconBlockValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_block,
+  );
 
   const {
     data: executionPayloadEnvelopeData,
@@ -98,6 +105,7 @@ export default function Selector() {
     error: executionPayloadEnvelopeError,
   } = useUniqueExecutionPayloadEnvelopeValues(
     ['network'],
+    undefined,
     currentSelection === Selection.execution_payload_envelope,
   );
 
@@ -105,13 +113,21 @@ export default function Selector() {
     data: beaconBadBlockData,
     isLoading: beaconBadBlockIsLoading,
     error: beaconBadBlockError,
-  } = useUniqueBeaconBadBlockValues(['network'], currentSelection === Selection.beacon_bad_block);
+  } = useUniqueBeaconBadBlockValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_bad_block,
+  );
 
   const {
     data: beaconBadBlobData,
     isLoading: beaconBadBlobIsLoading,
     error: beaconBadBlobError,
-  } = useUniqueBeaconBadBlobValues(['network'], currentSelection === Selection.beacon_bad_blob);
+  } = useUniqueBeaconBadBlobValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_bad_blob,
+  );
 
   const {
     data: executionBlockTraceData,
@@ -119,6 +135,7 @@ export default function Selector() {
     error: executionBlockTraceError,
   } = useUniqueExecutionBlockTraceValues(
     ['network'],
+    undefined,
     [Selection.execution_block_trace, Selection.go_evm_lab_diff].includes(currentSelection),
   );
 
@@ -128,6 +145,7 @@ export default function Selector() {
     error: executionBadBlockError,
   } = useUniqueExecutionBadBlockValues(
     ['network'],
+    undefined,
     currentSelection === Selection.execution_bad_block,
   );
 

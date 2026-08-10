@@ -8,7 +8,7 @@ export interface BeaconState {
   node_version: string;
   network: string;
   beacon_implementation: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -23,7 +23,7 @@ export interface BeaconBlock {
   node_version: string;
   network: string;
   beacon_implementation: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -38,7 +38,7 @@ export interface ExecutionPayloadEnvelope {
   node_version: string;
   network: string;
   beacon_implementation: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -53,7 +53,7 @@ export interface BeaconBadBlock {
   node_version: string;
   network: string;
   beacon_implementation: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -69,7 +69,7 @@ export interface BeaconBadBlob {
   network: string;
   beacon_implementation: string;
   index: number;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -83,7 +83,7 @@ export interface ExecutionBlockTrace {
   node_version: string;
   network: string;
   execution_implementation: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }
@@ -98,7 +98,7 @@ export interface ExecutionBadBlock {
   network: string;
   execution_implementation: string;
   block_extra_data: string;
-  content_hash: string;
+  content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
 }

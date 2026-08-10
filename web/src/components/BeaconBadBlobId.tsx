@@ -5,6 +5,7 @@ import { useLocation, Link } from 'wouter';
 
 import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
+import VerificationBadge from '@components/VerificationBadge';
 import useNetwork from '@contexts/network';
 import { useBeaconBadBlobs } from '@hooks/useQuery';
 
@@ -222,6 +223,28 @@ export default function BeaconBadBlobId({ id }: { id: string }) {
                 text={blob?.index.toString() ?? ''}
                 className="ml-2 hidden lg:block"
               />
+            </dd>
+          </div>
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+            <dt className="text-sm font-medium text-gray-500">Content hash</dt>
+            <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
+              {isLoading ? (
+                <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <VerificationBadge
+                    contentHash={blob?.content_hash}
+                    verifiedAt={blob?.verified_at}
+                    contentMatchedAt={blob?.content_matched_at}
+                  />
+                  {blob?.content_hash && (
+                    <span className="flex font-mono">
+                      <span className="relative top-1">{blob.content_hash}</span>
+                      <CopyToClipboard text={blob.content_hash} className="ml-2" />
+                    </span>
+                  )}
+                </div>
+              )}
             </dd>
           </div>
           <div className="py-4 sm:py-5  px-4 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">

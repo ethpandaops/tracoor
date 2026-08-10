@@ -16,6 +16,7 @@ import { Link, useLocation } from 'wouter';
 
 import BeaconStateId from '@components/BeaconStateId';
 import Pagination from '@components/Pagination';
+import VerificationBadge from '@components/VerificationBadge';
 import useNetwork from '@contexts/network';
 import { Selection } from '@contexts/selection';
 import { useBeaconStates, useBeaconStatesCount } from '@hooks/useQuery';
@@ -64,34 +65,40 @@ export default function BeaconStateTable({ id }: { id?: string }) {
     'beaconStateNodeVersion',
   ]);
 
-  const { data, isLoading, error } = useBeaconStates({
-    network: network ? network : undefined,
-    slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
-    epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
-    state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
-    node: beaconStateNode ? beaconStateNode : undefined,
-    node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
-    beacon_implementation: beaconStateNodeImplementation
-      ? beaconStateNodeImplementation
-      : undefined,
-    pagination: {
-      limit: itemsPerPage,
-      offset: (currentPage - 1) * itemsPerPage,
-      order_by: `${sortConfig.key} ${sortConfig.direction}`,
+  const { data, isLoading, error } = useBeaconStates(
+    {
+      network: network ? network : undefined,
+      slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
+      epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
+      state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
+      node: beaconStateNode ? beaconStateNode : undefined,
+      node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
+      beacon_implementation: beaconStateNodeImplementation
+        ? beaconStateNodeImplementation
+        : undefined,
+      pagination: {
+        limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage,
+        order_by: `${sortConfig.key} ${sortConfig.direction}`,
+      },
     },
-  });
+    Boolean(network),
+  );
 
-  const { data: count } = useBeaconStatesCount({
-    network: network ? network : undefined,
-    slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
-    epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
-    state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
-    node: beaconStateNode ? beaconStateNode : undefined,
-    node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
-    beacon_implementation: beaconStateNodeImplementation
-      ? beaconStateNodeImplementation
-      : undefined,
-  });
+  const { data: count } = useBeaconStatesCount(
+    {
+      network: network ? network : undefined,
+      slot: beaconStateSlot ? parseInt(beaconStateSlot) : undefined,
+      epoch: beaconStateEpoch ? parseInt(beaconStateEpoch) : undefined,
+      state_root: beaconStateStateRoot ? beaconStateStateRoot : undefined,
+      node: beaconStateNode ? beaconStateNode : undefined,
+      node_version: beaconStateNodeVersion ? beaconStateNodeVersion : undefined,
+      beacon_implementation: beaconStateNodeImplementation
+        ? beaconStateNodeImplementation
+        : undefined,
+    },
+    Boolean(network),
+  );
 
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 0;
 
@@ -120,6 +127,9 @@ export default function BeaconStateTable({ id }: { id?: string }) {
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 2xl:table-cell">
             <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-32 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
           <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-20 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
@@ -130,7 +140,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
 
   let otherComp = undefined;
 
-  if (isLoading) {
+  if (isLoading || !network) {
     otherComp = loading;
   } else if (error) {
     let message = 'Something went wrong fetching data';
@@ -140,7 +150,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={8}
+          colSpan={9}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-red-600 text-center text-xl"
         >
           {message}
@@ -151,7 +161,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={8}
+          colSpan={9}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-gray-600 text-center text-xl"
         >
           No data available
@@ -373,6 +383,12 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                   </th>
                   <th
                     scope="col"
+                    className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0"
+                  >
+                    <span className="whitespace-nowrap">Verification</span>
+                  </th>
+                  <th
+                    scope="col"
                     className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50"
                   ></th>
                 </tr>
@@ -454,6 +470,13 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                               <span className="relative -top-0.5 block max-w-0 group-hover:max-w-full transition-all duration-500 h-0.5 bg-sky-400"></span>
                             </span>
                           </div>
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-0">
+                          <VerificationBadge
+                            contentHash={row.content_hash}
+                            verifiedAt={row.verified_at}
+                            contentMatchedAt={row.content_matched_at}
+                          />
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
                           <div className="flex flex-row">
