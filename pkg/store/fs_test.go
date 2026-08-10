@@ -2,7 +2,9 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ethpandaops/tracoor/pkg/store"
@@ -272,5 +274,114 @@ func TestFSStoreOperations(t *testing.T) {
 		exists, err := fsStore.Exists(ctx, "beacon_block/location_copy.json")
 		require.NoError(t, err)
 		require.True(t, exists)
+	})
+}
+
+func TestFSStorePathTraversal(t *testing.T) {
+	root, err := os.MkdirTemp("", "fsstore_traversal_test")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(root)
+
+	basePath := filepath.Join(root, "store_data")
+	require.NoError(t, os.MkdirAll(basePath, 0o755))
+
+	// A file outside basePath that the store must never be able to reach.
+	secretPath := filepath.Join(root, "secret.txt")
+	secretContents := []byte("must not be reachable through the store")
+	require.NoError(t, os.WriteFile(secretPath, secretContents, 0o600))
+
+	log := logrus.New()
+	fsStore, err := store.NewFSStore("test", log, &store.FSStoreConfig{BasePath: basePath}, nil)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	maliciousLocations := []string{
+		"../secret.txt",
+		"../../secret.txt",
+		"beacon_state/../../secret.txt",
+		"./../secret.txt",
+	}
+
+	for _, location := range maliciousLocations {
+		t.Run("Exists/"+location, func(t *testing.T) {
+			_, err := fsStore.Exists(ctx, location)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, store.ErrInvalid))
+		})
+
+		t.Run("GetBeaconState/"+location, func(t *testing.T) {
+			_, err := fsStore.GetBeaconState(ctx, location)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, store.ErrInvalid))
+		})
+
+		t.Run("DeleteBeaconState/"+location, func(t *testing.T) {
+			err := fsStore.DeleteBeaconState(ctx, location)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, store.ErrInvalid))
+		})
+
+		t.Run("SaveBeaconState/"+location, func(t *testing.T) {
+			data := []byte("attacker controlled")
+			_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+				Data:     &data,
+				Location: location,
+			})
+			require.Error(t, err)
+			require.True(t, errors.Is(err, store.ErrInvalid))
+		})
+	}
+
+	// The secret file must be completely untouched by all of the above.
+	contents, err := os.ReadFile(secretPath)
+	require.NoError(t, err)
+	require.Equal(t, secretContents, contents)
+
+	t.Run("Copy rejects a traversing source", func(t *testing.T) {
+		err := fsStore.Copy(ctx, &store.CopyParams{
+			Source:      "../secret.txt",
+			Destination: "beacon_block/copied.json",
+		})
+		require.Error(t, err)
+		require.True(t, errors.Is(err, store.ErrInvalid))
+	})
+
+	t.Run("Copy rejects a traversing destination", func(t *testing.T) {
+		data := []byte(`{"block": "data"}`)
+		_, err := fsStore.SaveBeaconBlock(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: locationBeaconBlock,
+		})
+		require.NoError(t, err)
+
+		err = fsStore.Copy(ctx, &store.CopyParams{
+			Source:      locationBeaconBlock,
+			Destination: "../escaped.json",
+		})
+		require.Error(t, err)
+		require.True(t, errors.Is(err, store.ErrInvalid))
+	})
+
+	t.Run("legitimate nested locations are unaffected", func(t *testing.T) {
+		location := "node1/mainnet/beacon_state/slot-123-0xabc.ssz"
+		data := []byte(`{"legitimate": "data"}`)
+
+		_, err := fsStore.SaveBeaconState(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		saved, err := fsStore.GetBeaconState(ctx, location)
+		require.NoError(t, err)
+		require.Equal(t, data, *saved)
+
+		exists, err := fsStore.Exists(ctx, location)
+		require.NoError(t, err)
+		require.True(t, exists)
+
+		require.NoError(t, fsStore.DeleteBeaconState(ctx, location))
 	})
 }
