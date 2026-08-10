@@ -54,21 +54,25 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 	// The trace parameters belong in the key: they are per-agent configuration,
 	// and two agents that disagree about them get different bytes back for the
 	// same block from the same client.
+	dedupKey := executionBlockTraceDedupKey(
+		blockNumber,
+		blockHash,
+		implementation,
+		nodeVersion,
+		traceConfig.GetTraceDisableMemory(),
+		traceConfig.GetTraceDisableStack(),
+		traceConfig.GetTraceDisableStorage(),
+	)
+
 	target := &dedupTarget{
-		kind:    store.BlockTraceDataType,
-		queue:   ExecutionBlockTraceQueue,
-		network: network,
-		dedupKey: executionBlockTraceDedupKey(
-			blockNumber,
-			blockHash,
-			implementation,
-			nodeVersion,
-			traceConfig.GetTraceDisableMemory(),
-			traceConfig.GetTraceDisableStack(),
-			traceConfig.GetTraceDisableStorage(),
-		),
-		directory:  ExecutionBlockTraceDirectory(network, blockNumber),
-		identity:   blockHash,
+		kind:      store.BlockTraceDataType,
+		queue:     ExecutionBlockTraceQueue,
+		network:   network,
+		dedupKey:  dedupKey,
+		directory: ExecutionBlockTraceDirectory(network, blockNumber),
+		// The identity carries the key as well as the block, so two clients
+		// that produced byte-identical traces still own separate objects.
+		identity:   ExecutionBlockTraceIdentity(blockHash, dedupKey),
 		extension:  ".json",
 		identifier: blockHash,
 		// A trace key is a guess rather than a promise, and JSON that differs
@@ -87,8 +91,12 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 				return nil, ferr
 			}
 
-			if data == nil {
-				return nil, errors.New("execution node returned no trace")
+			// A node that answers with no result, or with a JSON null, has no
+			// trace for this block. Hashing and indexing that answer would
+			// record an artifact nobody can use and diverge it against every
+			// peer that returned a real trace.
+			if data == nil || isEmptyJSONResult(*data) {
+				return nil, fmt.Errorf("%w: execution node returned no trace for block %s", errItemNotAvailable, blockHash)
 			}
 
 			return *data, nil
@@ -116,6 +124,15 @@ func (s *agent) fetchAndIndexExecutionBlockTrace(ctx context.Context, blockNumbe
 
 		return err
 	})
+}
+
+// isEmptyJSONResult reports whether a JSON-RPC result carries nothing. An
+// absent result and an explicit null both hash and compress perfectly well,
+// which is exactly why they have to be refused rather than archived.
+func isEmptyJSONResult(data []byte) bool {
+	trimmed := bytes.TrimSpace(data)
+
+	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
 }
 
 func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {

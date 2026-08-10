@@ -306,3 +306,81 @@ func (r *closeTrackingReader) Close() error {
 
 	return nil
 }
+
+func TestStreamPayloadBlamesTheStoreWhenItStopsReading(t *testing.T) {
+	saveErr := goerrors.New("store is down")
+
+	_, base := newTestFSStore(t)
+
+	_, _, err := streamSource(
+		context.Background(),
+		compression.NewCompressor(),
+		sourceFromResponse(&api.RawResponse{
+			Body:          io.NopCloser(bytes.NewReader(payload(512 * 1024))),
+			ContentLength: int64(512 * 1024),
+		}),
+		func(_ context.Context, params *store.SaveParams) (string, error) {
+			// Read a little and then give up, which is what a store that fails
+			// part way through an upload does to the pipe.
+			_, _ = io.CopyN(io.Discard, params.Data, 1024)
+
+			return "", saveErr
+		},
+		testPayloadLocation,
+	)
+
+	require.ErrorIs(t, err, errStoreUnavailable)
+	require.ErrorIs(t, err, saveErr)
+	require.NotErrorIs(t, err, errIncompleteTransfer,
+		"a store that stopped reading says nothing about what the node was serving")
+
+	requireNothingStored(t, base)
+}
+
+func TestStreamPayloadBlamesTheNodeWhenItTruncatesTheBody(t *testing.T) {
+	data := payload(64 * 1024)
+
+	fsStore, _ := newTestFSStore(t)
+
+	// The node ends the body short of what it promised. The store then fails
+	// too, because the pipe carries the failure to it — the node is still the
+	// one that broke the transfer.
+	_, _, err := streamSource(
+		context.Background(),
+		compression.NewCompressor(),
+		sourceFromResponse(&api.RawResponse{
+			Body:          io.NopCloser(bytes.NewReader(data)),
+			ContentLength: int64(len(data)) + 1,
+		}),
+		fsStore.SaveBeaconState,
+		testPayloadLocation,
+	)
+
+	require.ErrorIs(t, err, errIncompleteTransfer)
+	require.NotErrorIs(t, err, errStoreUnavailable)
+}
+
+func TestReadPayloadDoesNotCallOurOwnDeadlineATruncation(t *testing.T) {
+	for _, ctxErr := range []error{context.Canceled, context.DeadlineExceeded} {
+		_, err := hashSource(sourceFromResponse(&api.RawResponse{
+			Body:          io.NopCloser(io.MultiReader(bytes.NewReader(payload(4096)), errReader{err: ctxErr})),
+			ContentLength: -1,
+		}))
+
+		require.ErrorIs(t, err, ctxErr)
+		require.NotErrorIs(t, err, errIncompleteTransfer,
+			"running out of our own time is not the node truncating a body")
+	}
+}
+
+func TestStreamResultReportsWhetherTheLengthCouldBeVerified(t *testing.T) {
+	data := payload(4096)
+
+	known, err := hashSource(&payloadSource{body: io.NopCloser(bytes.NewReader(data)), contentLength: int64(len(data))})
+	require.NoError(t, err)
+	require.True(t, known.LengthKnown)
+
+	unknown, err := hashSource(&payloadSource{body: io.NopCloser(bytes.NewReader(data)), contentLength: -1})
+	require.NoError(t, err)
+	require.False(t, unknown.LengthKnown, "a chunked transfer carries nothing to check the read against")
+}

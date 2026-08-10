@@ -6,6 +6,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"path"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
@@ -37,6 +38,11 @@ const (
 	// location. It only has to separate payloads that disagree under one dedup
 	// key, which is a handful of candidates rather than a global namespace.
 	contentHashSuffixLength = 8
+
+	// dedupFlightBudgetShare is the fraction of its own remaining time a caller
+	// will lend to another node's upload before giving up on it and reading its
+	// own node instead. Half leaves enough budget to actually do that.
+	dedupFlightBudgetShare = 2
 )
 
 // dedupFlight collapses the compress-and-upload work for one dedup key. In
@@ -173,7 +179,8 @@ func (f *bufferedFetcher) Upload(ctx context.Context, location string) (string, 
 		ContentEncoding: compression.Default.ContentEncoding,
 	})
 	if err != nil {
-		return "", streamResult{}, err
+		// The node delivered the payload; the store would not take it.
+		return "", streamResult{}, fmt.Errorf("%w: %w", errStoreUnavailable, err)
 	}
 
 	result.CompressedSize = int64(len(compressed))
@@ -310,17 +317,72 @@ func (s *agent) resolveOutcome(ctx context.Context, target *dedupTarget, fetcher
 // it when nobody has. The returned claim carries an upload only when this call
 // is the one that performed it: a caller that waited on somebody else's upload
 // still has its own node to read.
+//
+// The wait is bounded because the leader is somebody else's node: a slow one
+// would otherwise spend every follower's budget, fail their reads on the
+// remainder and open circuit breakers on nodes that were never asked anything.
 func (s *agent) resolveBlob(ctx context.Context, target *dedupTarget, fetcher payloadFetcher) (*blobClaim, error) {
-	led := false
+	// led is written by the goroutine the flight runs the work in, and read by
+	// this one whether or not that goroutine has finished, so it cannot be a
+	// plain bool.
+	var led atomic.Bool
 
-	value, err, _ := dedupFlight.Do(target.flightKey(), func() (any, error) {
-		led = true
+	// The flight's channel is buffered, so the result is delivered whether or
+	// not anybody is still waiting for it, and the key is released as soon as
+	// the work finishes: an abandoned wait leaks neither a goroutine nor a
+	// result, and a failed leader leaves nothing behind to poison the key.
+	result := dedupFlight.DoChan(target.flightKey(), func() (any, error) {
+		led.Store(true)
 
 		return s.lookupOrClaim(ctx, target, fetcher)
 	})
-	if err != nil {
+
+	wait, cancel := flightWaitContext(ctx)
+	defer cancel()
+
+	select {
+	case res := <-result:
+		return s.claimFromFlight(ctx, target, fetcher, res, led.Load())
+	case <-wait.Done():
+		if led.Load() {
+			// This call is the flight, so waiting on it is waiting on its own
+			// node — exactly the work it came here to do. It gets the whole
+			// budget rather than a share of it.
+			select {
+			case res := <-result:
+				return s.claimFromFlight(ctx, target, fetcher, res, true)
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		// The leader is taking longer than this caller can lend it. The flight
+		// carries on for whoever is still waiting; this one spends what is left
+		// of its own budget on its own node, which is the only node it can
+		// answer for.
+		s.metrics.IncrementFlightAbandoned(target.queue, s.Config.Name)
+
+		return s.lookupOrClaim(ctx, target, fetcher)
+	}
+}
+
+// claimFromFlight turns a flight result into this call's claim. Only the caller
+// that did the work may keep the upload: everything else in the result belongs
+// to a node this one cannot speak for.
+func (s *agent) claimFromFlight(
+	ctx context.Context,
+	target *dedupTarget,
+	fetcher payloadFetcher,
+	res singleflight.Result,
+	led bool,
+) (*blobClaim, error) {
+	if res.Err != nil {
 		if led {
-			return nil, err
+			return nil, res.Err
 		}
 
 		// The leader's failure describes the leader's node, not this one. A
@@ -329,9 +391,9 @@ func (s *agent) resolveBlob(ctx context.Context, target *dedupTarget, fetcher pa
 		return s.lookupOrClaim(ctx, target, fetcher)
 	}
 
-	claim, ok := value.(*blobClaim)
+	claim, ok := res.Val.(*blobClaim)
 	if !ok {
-		return nil, fmt.Errorf("unexpected dedup result of type %T", value)
+		return nil, fmt.Errorf("unexpected dedup result of type %T", res.Val)
 	}
 
 	if !led {
@@ -340,6 +402,23 @@ func (s *agent) resolveBlob(ctx context.Context, target *dedupTarget, fetcher pa
 	}
 
 	return claim, nil
+}
+
+// flightWaitContext bounds how long a caller waits on another node's upload
+// before doing the work itself. A caller with no deadline of its own has
+// nothing to protect and waits for the flight.
+func flightWaitContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return context.WithCancel(ctx)
+	}
+
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return context.WithCancel(ctx)
+	}
+
+	return context.WithTimeout(ctx, remaining/dedupFlightBudgetShare)
 }
 
 // lookupOrClaim asks whether the payload for this dedup key is already stored
@@ -511,7 +590,19 @@ func (s *agent) verifyAgainstBlob(
 		return nil, fmt.Errorf("%w: %w", errPayloadDivergent, err)
 	}
 
-	s.recordDivergence(ctx, target, blob.GetContentHash().GetValue(), own.Result.ContentHash, 2, own.Location)
+	if own.Result.ContentHash != blob.GetContentHash().GetValue() {
+		s.recordDivergence(ctx, target, blob.GetContentHash().GetValue(), own.Result.ContentHash, 2, own.Location)
+	} else {
+		// The re-read agrees with the stored payload, so the first read was a
+		// transient answer rather than a standing disagreement. Recording it as
+		// a second divergence would assert a mismatch whose two hashes are the
+		// same; the attempt-1 record already says what was seen.
+		s.log.
+			WithField("kind", string(target.kind)).
+			WithField("dedup_key", target.dedupKey).
+			WithField("content_hash", own.Result.ContentHash).
+			Info("Node agreed with the stored payload on a re-read, so the mismatch was transient")
+	}
 
 	return &dedupOutcome{
 		Location:       own.Location,
@@ -548,7 +639,7 @@ func (s *agent) uploadPayload(ctx context.Context, target *dedupTarget, fetcher 
 			s.log.WithField("location", saved).WithError(rerr).Debug("Failed to remove a staged payload")
 		}
 
-		return nil, fmt.Errorf("failed to publish payload: %w", err)
+		return nil, fmt.Errorf("%w: failed to publish payload: %w", errStoreUnavailable, err)
 	}
 
 	if err := target.remove(ctx, saved); err != nil {
@@ -572,11 +663,21 @@ func (s *agent) readPayloadOnce(
 ) (streamResult, error) {
 	result, err := read(ctx)
 	if err != nil {
+		// Only a node that failed to deliver counts here. A store outage and
+		// this agent's own deadline both surface as failed reads, and neither
+		// is evidence about the node.
 		if goerrors.Is(err, errIncompleteTransfer) {
 			s.metrics.IncrementTransferIncomplete(target.queue, s.Config.Name)
 		}
 
 		return streamResult{}, err
+	}
+
+	if !result.LengthKnown {
+		// The transfer carried no length, so "it arrived in full" rests on the
+		// read ending cleanly and nothing else. Counting it keeps the reach of
+		// the completeness gate visible instead of assumed.
+		s.metrics.IncrementLengthUnverified(target.queue, s.Config.Name)
 	}
 
 	s.metrics.IncrementPayloadVerified(target.queue, s.Config.Name)

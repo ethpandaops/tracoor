@@ -681,3 +681,178 @@ func TestDedupCollapsesConcurrentUploadsButNotReads(t *testing.T) {
 	require.Equal(t, 1, leader.indexer.getBlobs, "the follower waited on the leader instead of looking up itself")
 	require.Equal(t, 1, leader.indexer.createBlobs)
 }
+
+func TestDedupFollowerStopsWaitingOnASlowLeaderAndReadsItsOwnNode(t *testing.T) {
+	data := payload(16 * 1024)
+
+	leader := newDedupFixture(t, "slow-leader").withPayload(data)
+	follower := newDedupFixture(t, "impatient-follower").withPayload(data)
+
+	// Both agents are after the same payload and share the process, which in
+	// single mode is how every agent reacts to the same block event.
+	follower.target.dedupKey = leader.target.dedupKey
+	follower.agent.indexer = leader.indexer
+	follower.agent.store = leader.agent.store
+	follower.target.save = leader.target.save
+	follower.target.remove = leader.target.remove
+	follower.fetcher.save = leader.target.save
+
+	var (
+		uploading = make(chan struct{})
+		release   = make(chan struct{})
+	)
+
+	leader.fetcher.beforeUpload = func() {
+		close(uploading)
+		<-release
+	}
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- leader.run(t, func(context.Context, *dedupOutcome) error { return nil })
+	}()
+
+	<-uploading
+
+	// The follower's own budget is what bounds it. Half of it may be lent to
+	// the leader; the rest is its own to spend on its own node.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	require.NoError(t, follower.agent.indexDeduplicated(
+		ctx,
+		follower.target,
+		follower.fetcher,
+		func(context.Context, *dedupOutcome) error { return nil },
+	))
+
+	followerUploads, _ := follower.fetcher.counts()
+	require.Equal(t, 1, followerUploads, "the follower read and stored from its own node rather than waiting out the leader")
+	require.Equal(t, float64(1), testutil.ToFloat64(
+		follower.agent.metrics.flightAbandoned.WithLabelValues(string(BeaconStateQueue), follower.agent.Config.Name),
+	))
+
+	close(release)
+	require.NoError(t, <-done)
+}
+
+func TestDedupFollowerDoesNotInheritTheLeadersFailure(t *testing.T) {
+	data := payload(8192)
+
+	leader := newDedupFixture(t, "failing-leader").withPayload(data)
+	follower := newDedupFixture(t, "healthy-follower").withPayload(data)
+
+	follower.target.dedupKey = leader.target.dedupKey
+	follower.agent.indexer = leader.indexer
+	follower.agent.store = leader.agent.store
+	follower.target.save = leader.target.save
+	follower.target.remove = leader.target.remove
+	follower.fetcher.save = leader.target.save
+
+	var (
+		uploading = make(chan struct{})
+		release   = make(chan struct{})
+	)
+
+	// The leader's node stops answering, which describes the leader's node and
+	// nothing about the follower's.
+	leader.fetcher.uploadErr = goerrors.New("leader node stopped answering")
+	leader.fetcher.beforeUpload = func() {
+		close(uploading)
+		<-release
+	}
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- leader.run(t, func(context.Context, *dedupOutcome) error { return nil })
+	}()
+
+	<-uploading
+
+	joined := make(chan error, 1)
+
+	go func() {
+		joined <- follower.run(t, func(context.Context, *dedupOutcome) error { return nil })
+	}()
+
+	// The follower has no way to announce that it has joined the flight, so it
+	// is given a moment to get there before the leader is let go.
+	time.Sleep(100 * time.Millisecond)
+
+	close(release)
+
+	require.Error(t, <-done, "the leader keeps its own failure")
+	require.NoError(t, <-joined, "the follower answered for its own node")
+
+	followerUploads, _ := follower.fetcher.counts()
+	require.Equal(t, 1, followerUploads)
+}
+
+// swappingFetcher answers the hash pass with one payload and the upload pass
+// with another, which is what a node that briefly answered from a half-written
+// cache and then recovered looks like.
+type swappingFetcher struct {
+	hashData   []byte
+	uploadData []byte
+	compressor *compression.Compressor
+	save       saveFunc
+}
+
+func (f *swappingFetcher) Hash(context.Context) (streamResult, error) {
+	return hashSource(sourceFromBytes(f.hashData))
+}
+
+func (f *swappingFetcher) Upload(ctx context.Context, location string) (string, streamResult, error) {
+	return streamSource(ctx, f.compressor, sourceFromBytes(f.uploadData), f.save, location)
+}
+
+func TestDedupSuppressesASecondDivergenceWhenTheRefetchAgrees(t *testing.T) {
+	data := payload(8192)
+	f := newDedupFixture(t, "refetch-agrees")
+
+	// The stored payload is what the node serves on the second read, so the
+	// first read was a transient answer rather than a standing disagreement.
+	f.indexer.setBlob(f.target.dedupKey, hashOf(data), "somebody/elses/object.ssz")
+
+	fetcher := &swappingFetcher{
+		hashData:   []byte("a transient answer"),
+		uploadData: data,
+		compressor: f.agent.compressor,
+		save:       f.target.save,
+	}
+
+	var outcome *dedupOutcome
+
+	require.NoError(t, f.agent.indexDeduplicated(context.Background(), f.target, fetcher, func(_ context.Context, o *dedupOutcome) error {
+		outcome = o
+
+		return nil
+	}))
+
+	require.Equal(t, hashOf(data), outcome.ContentHash)
+
+	divergences := f.indexer.recorded()
+	require.Len(t, divergences, 1, "the re-read agreed, so there is no second mismatch to assert")
+	require.Equal(t, int32(1), divergences[0].GetAttempt().GetValue())
+	require.NotEqual(t,
+		divergences[0].GetExpectedHash().GetValue(),
+		divergences[0].GetActualHash().GetValue(),
+		"a divergence record whose two hashes agree asserts nothing",
+	)
+}
+
+func TestDedupCountsAPayloadWithNoLengthToVerify(t *testing.T) {
+	f := newDedupFixture(t, "no-length").withPayload(payload(4096))
+
+	// A chunked or transparently decompressed transfer carries no length, so
+	// the completeness gate cannot be applied to it.
+	f.fetcher.contentLength = -1
+
+	require.NoError(t, f.run(t, func(context.Context, *dedupOutcome) error { return nil }))
+
+	require.Equal(t, float64(1), testutil.ToFloat64(
+		f.agent.metrics.lengthUnverified.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name),
+	))
+}

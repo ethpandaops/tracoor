@@ -26,6 +26,80 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
+// stateRootPinnedFetcher refuses a payload that was asked for by slot once the
+// slot's state root has moved. The root is resolved before the body and the
+// body is what a row's identity, its dedup key and the canonical payload behind
+// that key are all made of, so bytes that belong to another root must never
+// reach any of them: a reorg mid-read would otherwise store one state under
+// another's root and make every honest peer look divergent.
+//
+// The confirmation costs one extra root read, and only for the clients that
+// cannot serve a state by root in the first place.
+type stateRootPinnedFetcher struct {
+	payloadFetcher
+
+	// root is the state root the caller resolved, and the one the payload is
+	// about to be recorded under.
+	root    string
+	resolve func(ctx context.Context) (string, error)
+
+	// discard removes a payload that was stored before the root was found to
+	// have moved. Nothing references it: it never reached a blob or a row.
+	discard func(ctx context.Context, location string) error
+}
+
+func (f *stateRootPinnedFetcher) Hash(ctx context.Context) (streamResult, error) {
+	result, err := f.payloadFetcher.Hash(ctx)
+	if err != nil {
+		return streamResult{}, err
+	}
+
+	if err := f.confirm(ctx); err != nil {
+		return streamResult{}, err
+	}
+
+	return result, nil
+}
+
+func (f *stateRootPinnedFetcher) Upload(ctx context.Context, location string) (string, streamResult, error) {
+	saved, result, err := f.payloadFetcher.Upload(ctx, location)
+	if err != nil {
+		return "", streamResult{}, err
+	}
+
+	if cerr := f.confirm(ctx); cerr != nil {
+		if f.discard != nil {
+			if derr := f.discard(ctx, saved); derr != nil {
+				return "", streamResult{}, fmt.Errorf("%w (and its payload could not be removed: %w)", cerr, derr)
+			}
+		}
+
+		return "", streamResult{}, cerr
+	}
+
+	return saved, result, nil
+}
+
+func (f *stateRootPinnedFetcher) confirm(ctx context.Context) error {
+	current, err := f.resolve(ctx)
+	if err != nil {
+		return err
+	}
+
+	if current != f.root {
+		// The state under the root we resolved is no longer what this node
+		// serves for that slot, so there is nothing here to record. It is not
+		// held against the node: it answered honestly, the chain moved. The
+		// next attempt resolves the root again and gets a consistent pair.
+		return fmt.Errorf(
+			"%w: state root moved from %s to %s while the state was being read",
+			errItemNotAvailable, f.root, current,
+		)
+	}
+
+	return nil
+}
+
 func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -69,10 +143,17 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	client := s.node.Beacon().Metadata().Client(ctx)
 
+	// Lodestar and Prysm cannot serve a state by root, so theirs is asked for
+	// by slot. That reintroduces the gap the block path closed by fetching by
+	// root: the slot's state root can move while the body is being read, and
+	// the bytes that arrive would then be recorded under the root we resolved
+	// before them.
+	byRoot := true
+
 	if client == string(services.ClientLodestar) ||
 		client == string(services.ClientPrysm) {
-		// Lodestar/prysm requires us to fetch the state id by slot
 		stateID = fmt.Sprintf("%d", slot)
+		byRoot = false
 	}
 
 	spec, err := s.node.Beacon().Node().Spec()
@@ -99,7 +180,7 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 	// is ever held whole in memory: each read goes straight from the node into
 	// a hash, and into the compressor as well when this agent is the one
 	// storing it.
-	fetcher := &streamFetcher{
+	var fetcher payloadFetcher = &streamFetcher{
 		open: func(ctx context.Context) (*payloadSource, error) {
 			raw, ferr := s.node.Beacon().Node().OpenRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
 			if ferr != nil {
@@ -110,6 +191,22 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		},
 		compressor: s.compressor,
 		save:       s.store.SaveBeaconState,
+	}
+
+	if !byRoot {
+		fetcher = &stateRootPinnedFetcher{
+			payloadFetcher: fetcher,
+			root:           rootAsString,
+			resolve: func(ctx context.Context) (string, error) {
+				current, rerr := s.node.Beacon().Node().FetchBeaconStateRoot(ctx, fmt.Sprintf("%d", slot))
+				if rerr != nil {
+					return "", errors.Wrap(rerr, "failed to re-resolve beacon state root")
+				}
+
+				return fmt.Sprintf("%#x", current), nil
+			},
+			discard: target.remove,
+		}
 	}
 
 	return s.indexDeduplicated(ctx, target, fetcher, func(ctx context.Context, outcome *dedupOutcome) error {

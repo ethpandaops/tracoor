@@ -143,6 +143,12 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 }
 
 func (s *agent) Start(ctx context.Context) error {
+	// Everything this agent owns hangs off a context of its own so that a node
+	// that becomes unusable can stop this agent's workers without disturbing
+	// whatever else shares the process.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
 	}
@@ -202,15 +208,18 @@ func (s *agent) Start(ctx context.Context) error {
 	s.node.Beacon().OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
 
+		// Everything this agent records is addressed by network, so without one
+		// there is nothing worth starting. This agent stops; the process, and
+		// every other agent in it, is none the wiser.
+		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
+			return errors.New("unable to determine ethereum network, provide an override network name via ethereum.overrideNetworkName")
+		}
+
 		s.workers.Go(func() { s.processBeaconStateQueue(ctx) })
 		s.workers.Go(func() { s.processBeaconBlockQueue(ctx) })
 		s.workers.Go(func() { s.processExecutionPayloadEnvelopeQueue(ctx) })
 		s.workers.Go(func() { s.processBeaconBadBlockQueue(ctx) })
 		s.workers.Go(func() { s.processBeaconBadBlobQueue(ctx) })
-
-		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
-			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
-		}
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			logCtx := s.log.WithFields(logrus.Fields{
@@ -335,13 +344,27 @@ func (s *agent) Start(ctx context.Context) error {
 		return err
 	}
 
-	<-ctx.Done()
+	var runErr error
 
-	s.log.Info("Shutting down tracoor agent")
+	select {
+	case <-ctx.Done():
+		s.log.Info("Shutting down tracoor agent")
+	case err := <-s.node.Failed():
+		// The node this agent exists to watch is unusable. Only this agent
+		// stops: whatever else shares the process still has healthy nodes of
+		// its own to serve.
+		s.log.WithError(err).Error("Ethereum node is unusable, stopping this agent")
+
+		runErr = err
+
+		// The workers unwind on cancellation, which the failure did not do for
+		// us the way a shutdown would have.
+		cancel()
+	}
 
 	s.shutdown(ctx)
 
-	return nil
+	return runErr
 }
 
 func (s *agent) performTokenHandshake(ctx context.Context) error {
@@ -402,8 +425,10 @@ func (s *agent) ServePProf(ctx context.Context) error {
 	go func() {
 		s.log.Infof("Serving pprof at %s", *s.Config.PProfAddr)
 
+		// pprof is a debugging convenience. Losing it costs a diagnostic, so it
+		// is not worth a single artifact, let alone the process.
 		if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.log.Fatal(err)
+			s.log.WithError(err).Error("Failed to serve pprof")
 		}
 	}()
 

@@ -14,6 +14,7 @@ const (
 	dropReasonDivergent         = "divergent"
 	dropReasonNotAvailable      = "not_available"
 	dropReasonStale             = "stale"
+	dropReasonStoreUnavailable  = "store_unavailable"
 	dropReasonUnsupported       = "unsupported"
 
 	defaultAttemptBudget = 1
@@ -114,6 +115,15 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 			break
 		}
 
+		if goerrors.Is(err, errStoreUnavailable) {
+			// The store could not take the payload. Retrying would re-read the
+			// whole artifact from a node that has done nothing wrong, and a
+			// store that is down is down for every node at once.
+			reason = dropReasonStoreUnavailable
+
+			break
+		}
+
 		class, retryAfter = classifyFailure(kind, err)
 		if class == failurePermanent {
 			reason = dropReasonUnsupported
@@ -127,8 +137,12 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 	// A stale or absent artifact is a property of the chain, not of the node, so
 	// neither outcome is held against it. Nor is a divergence: the node answered
 	// perfectly well, it just answered differently, and pausing it would stop
-	// collecting the very evidence that makes the finding useful.
-	if reason != dropReasonStale && reason != dropReasonNotAvailable && reason != dropReasonDivergent {
+	// collecting the very evidence that makes the finding useful. Nor is a store
+	// outage, which would otherwise pause every node in the fleet at once.
+	if reason != dropReasonStale &&
+		reason != dropReasonNotAvailable &&
+		reason != dropReasonDivergent &&
+		reason != dropReasonStoreUnavailable {
 		if s.breaker.RecordFailure(kind, class, retryAfter) {
 			s.metrics.IncrementArtifactUnsupported(kind, s.Config.Name)
 

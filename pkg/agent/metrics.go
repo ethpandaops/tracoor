@@ -22,6 +22,8 @@ type Metrics struct {
 	payloadMismatch         *prometheus.CounterVec
 	payloadVerified         *prometheus.CounterVec
 	transferIncomplete      *prometheus.CounterVec
+	lengthUnverified        *prometheus.CounterVec
+	flightAbandoned         *prometheus.CounterVec
 	fetchBytes              *prometheus.CounterVec
 	storedBytes             *prometheus.CounterVec
 }
@@ -110,6 +112,16 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Name:      "transfer_incomplete_total",
 				Help:      "The number of payloads abandoned because they did not arrive in full",
 			}, []string{labelQueue, labelAgent}),
+			lengthUnverified: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "payload_length_unverified_total",
+				Help:      "The number of payloads that arrived without a length to check them against, so completeness rests on the read ending cleanly",
+			}, []string{labelQueue, labelAgent}),
+			flightAbandoned: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "dedup_flight_abandoned_total",
+				Help:      "The number of times an agent stopped waiting on another node's upload and read its own node instead",
+			}, []string{labelQueue, labelAgent}),
 			fetchBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "fetch_bytes_total",
@@ -134,6 +146,8 @@ func GetMetricsInstance(namespace string) *Metrics {
 		prometheus.MustRegister(metricsInstance.payloadMismatch)
 		prometheus.MustRegister(metricsInstance.payloadVerified)
 		prometheus.MustRegister(metricsInstance.transferIncomplete)
+		prometheus.MustRegister(metricsInstance.lengthUnverified)
+		prometheus.MustRegister(metricsInstance.flightAbandoned)
 		prometheus.MustRegister(metricsInstance.fetchBytes)
 		prometheus.MustRegister(metricsInstance.storedBytes)
 	})
@@ -187,6 +201,20 @@ func (m *Metrics) IncrementPayloadVerified(queue Queue, agentName string) {
 
 func (m *Metrics) IncrementTransferIncomplete(queue Queue, agentName string) {
 	m.transferIncomplete.WithLabelValues(string(queue), agentName).Inc()
+}
+
+// IncrementLengthUnverified records a payload the completeness gate could not
+// be applied to, which HTTP/2, chunked encoding and transparent decompression
+// all produce.
+func (m *Metrics) IncrementLengthUnverified(queue Queue, agentName string) {
+	m.lengthUnverified.WithLabelValues(string(queue), agentName).Inc()
+}
+
+// IncrementFlightAbandoned records a caller that stopped waiting on another
+// node's upload. A rising count means the fleet is collapsing less work than it
+// could, which is a symptom of slow nodes rather than of this agent.
+func (m *Metrics) IncrementFlightAbandoned(queue Queue, agentName string) {
+	m.flightAbandoned.WithLabelValues(string(queue), agentName).Inc()
 }
 
 // AddFetchedBytes records raw bytes read from a node, whether or not they were

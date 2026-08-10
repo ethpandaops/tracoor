@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -35,8 +36,11 @@ func StartMetricsServer(ctx context.Context, addr string) {
 		go func() {
 			logrus.Infof("Starting metrics server on %s", addr)
 
-			if err := metricsServerInstance.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logrus.WithError(err).Fatal("Failed to start metrics server")
+			// Losing metrics costs visibility, not correctness. Ending the
+			// process over it would take everything that was still working
+			// with it.
+			if err := metricsServerInstance.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logrus.WithError(err).Error("Failed to start metrics server")
 			}
 		}()
 	})

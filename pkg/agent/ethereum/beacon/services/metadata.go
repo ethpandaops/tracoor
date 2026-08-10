@@ -30,6 +30,8 @@ type MetadataService struct {
 
 	onReadyCallbacks []func(context.Context) error
 
+	onFailureCallbacks []FailureHandler
+
 	overrideNetworkName string
 
 	mu sync.Mutex
@@ -41,6 +43,7 @@ func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, overrideNet
 		log:                 log.WithField("module", "agent/ethereum/beacon/metadata"),
 		Network:             &networks.Network{Name: networks.NetworkNameNone},
 		onReadyCallbacks:    []func(context.Context) error{},
+		onFailureCallbacks:  []FailureHandler{},
 		mu:                  sync.Mutex{},
 		overrideNetworkName: overrideNetworkName,
 	}
@@ -52,7 +55,9 @@ func (m *MetadataService) Start(ctx context.Context) error {
 			if !m.beacon.Healthy() {
 				m.log.Info("Waiting for beacon node to be healthy")
 
-				m.WaitForHealthyBeaconNode(ctx)
+				if err := m.WaitForHealthyBeaconNode(ctx); err != nil {
+					return err
+				}
 			}
 
 			if err := m.RefreshAll(ctx); err != nil {
@@ -66,8 +71,21 @@ func (m *MetadataService) Start(ctx context.Context) error {
 			return nil
 		}
 
-		if err := backoff.Retry(operation, backoff.NewExponentialBackOff()); err != nil {
-			m.log.WithError(err).Warn("Failed to refresh metadata")
+		// A node that never gives up its metadata is a broken node, not a
+		// broken process: the service reports the failure and stops, and the
+		// owner of this node decides what happens next. Nothing here may end
+		// the process, which in single mode is also every other node's agent
+		// and the server they all index through.
+		if err := backoff.Retry(operation, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+
+			m.log.WithError(err).Error("Gave up waiting for beacon node metadata")
+
+			m.reportFailure(ctx, err)
+
+			return
 		}
 
 		for _, cb := range m.onReadyCallbacks {
@@ -102,7 +120,22 @@ func (m *MetadataService) OnReady(ctx context.Context, cb func(context.Context) 
 	m.onReadyCallbacks = append(m.onReadyCallbacks, cb)
 }
 
-func (m *MetadataService) WaitForHealthyBeaconNode(ctx context.Context) {
+func (m *MetadataService) OnFailure(cb FailureHandler) {
+	m.onFailureCallbacks = append(m.onFailureCallbacks, cb)
+}
+
+// reportFailure hands the reason this service stopped to whoever registered for
+// it. Callbacks are registered before Start, so this is only ever read here.
+func (m *MetadataService) reportFailure(ctx context.Context, err error) {
+	for _, cb := range m.onFailureCallbacks {
+		cb(ctx, err)
+	}
+}
+
+// WaitForHealthyBeaconNode blocks until the node reports itself healthy. It
+// returns an error rather than ending the process: an unhealthy node is one
+// node's problem, and the caller is the one that knows what depends on it.
+func (m *MetadataService) WaitForHealthyBeaconNode(ctx context.Context) error {
 	operation := func() error {
 		if !m.beacon.Healthy() {
 			return errors.New("beacon node is not healthy")
@@ -111,11 +144,13 @@ func (m *MetadataService) WaitForHealthyBeaconNode(ctx context.Context) {
 		return nil
 	}
 
-	if err := backoff.Retry(operation, backoff.NewExponentialBackOff()); err != nil {
+	if err := backoff.Retry(operation, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
 		m.log.WithError(err).Warn("Failed to wait for healthy beacon node")
 
-		m.log.Fatal(err)
+		return fmt.Errorf("beacon node did not become healthy: %w", err)
 	}
+
+	return nil
 }
 
 func (m *MetadataService) Ready(ctx context.Context) error {

@@ -21,6 +21,12 @@ import (
 // one may be stored, compared or recorded.
 var errIncompleteTransfer = goerrors.New("incomplete transfer")
 
+// errStoreUnavailable marks a failure that belongs to the store rather than to
+// the node: the object could not be written, or the store stopped reading the
+// payload part way through. The node answered perfectly well, so nothing about
+// this outcome may be held against it.
+var errStoreUnavailable = goerrors.New("store unavailable")
+
 // saveFunc is one of the store's Save* methods. Naming the shape here keeps the
 // streaming pipeline from having to know which artifact it is carrying.
 type saveFunc func(ctx context.Context, params *store.SaveParams) (string, error)
@@ -55,6 +61,10 @@ type streamResult struct {
 	// ContentHash is the hex sha256 of the raw bytes, taken from the same pass
 	// that fed the compressor, so it describes exactly what was read.
 	ContentHash string
+	// LengthKnown reports whether the transfer carried a length to check the
+	// read against. When it does not, completeness rests on the read ending
+	// cleanly and nothing else, which is worth counting rather than assuming.
+	LengthKnown bool
 }
 
 // streamSource reads src once, feeding a sha256 and a compressor from the same
@@ -114,20 +124,27 @@ func streamSource(
 
 	<-produced
 
-	// The transfer is judged before the upload: a store that happened to
-	// succeed on a truncated body is still a failure.
-	if streamErr != nil {
+	// Both sides of the pipe see the other's failure, so blame is assigned from
+	// where the failure started rather than from who noticed it. A write that
+	// failed means the store stopped reading; only a read that failed on its
+	// own account belongs to the node. Getting this backwards silences a
+	// healthy node for the duration of a store outage.
+	switch {
+	case counter.err != nil:
+		return "", streamResult{}, fmt.Errorf("%w: %w", errStoreUnavailable, counter.err)
+	case streamErr != nil:
+		// The transfer is judged before the upload: a store that happened to
+		// succeed on a truncated body is still a failure.
 		return "", streamResult{}, streamErr
-	}
-
-	if saveErr != nil {
-		return "", streamResult{}, saveErr
+	case saveErr != nil:
+		return "", streamResult{}, fmt.Errorf("%w: %w", errStoreUnavailable, saveErr)
 	}
 
 	return savedLocation, streamResult{
 		RawSize:        rawSize,
 		CompressedSize: counter.written,
 		ContentHash:    hex.EncodeToString(hasher.Sum(nil)),
+		LengthKnown:    src.contentLength >= 0,
 	}, nil
 }
 
@@ -155,6 +172,7 @@ func hashSource(src *payloadSource) (streamResult, error) {
 	return streamResult{
 		RawSize:     read,
 		ContentHash: hex.EncodeToString(hasher.Sum(nil)),
+		LengthKnown: src.contentLength >= 0,
 	}, nil
 }
 
@@ -190,9 +208,18 @@ func compressInto(
 // whether the whole payload arrived. A short read against a known length is an
 // error: the node closed the connection before it delivered what it promised,
 // and the bytes that did arrive are not the artifact.
+//
+// Only the node's own failures are marked as incomplete transfers. A read that
+// ended because this side ran out of time or was shut down says nothing about
+// what the node was serving, and counting it as truncation would blame a node
+// for a deadline it never saw.
 func readPayload(src *payloadSource, dst io.Writer, hasher hash.Hash) (int64, error) {
 	written, err := io.Copy(io.MultiWriter(dst, hasher), src.body)
 	if err != nil {
+		if goerrors.Is(err, context.Canceled) || goerrors.Is(err, context.DeadlineExceeded) {
+			return written, fmt.Errorf("failed to stream payload: %w", err)
+		}
+
 		return written, fmt.Errorf("%w: failed to stream payload: %w", errIncompleteTransfer, err)
 	}
 
@@ -204,15 +231,23 @@ func readPayload(src *payloadSource, dst io.Writer, hasher hash.Hash) (int64, er
 }
 
 // countingWriter records how much was written through it, which is how the
-// compressed size of a stream is known without buffering it.
+// compressed size of a stream is known without buffering it, and keeps the
+// first write failure. A write can only fail because whatever is downstream —
+// the pipe the store is reading — gave up, which is what tells a store outage
+// apart from a node that stopped sending.
 type countingWriter struct {
 	writer  io.Writer
 	written int64
+	err     error
 }
 
 func (c *countingWriter) Write(p []byte) (int, error) {
 	n, err := c.writer.Write(p)
 	c.written += int64(n)
+
+	if err != nil && c.err == nil {
+		c.err = err
+	}
 
 	return n, err
 }
