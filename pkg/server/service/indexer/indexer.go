@@ -183,6 +183,14 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// A location must never be shared between two different beacon states. Without
+	// this check, a request for an unrelated node/slot/state_root but a location
+	// that already belongs to another record would ride along on that record's
+	// blob, and later cause it to be deleted out from under the original record.
+	if err := i.checkBeaconStateLocationOwnership(ctx, req); err != nil {
+		return nil, err
+	}
+
 	if exists {
 		// Check if the state is already indexed
 		filter := &persistence.BeaconStateFilter{}
@@ -439,6 +447,14 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 			Error("Failed to index a beacon block because the block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// A location must never be shared between two different beacon blocks. Without
+	// this check, a request for an unrelated node/slot/block_root but a location
+	// that already belongs to another record would ride along on that record's
+	// blob, and later cause it to be deleted out from under the original record.
+	if err := i.checkBeaconBlockLocationOwnership(ctx, req); err != nil {
+		return nil, err
 	}
 
 	if exists {
@@ -707,6 +723,15 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// A location must never be shared between two different beacon bad blocks.
+	// Without this check, a request for an unrelated node/slot/block_root but a
+	// location that already belongs to another record would ride along on that
+	// record's blob, and later cause it to be deleted out from under the original
+	// record.
+	if err := i.checkBeaconBadBlockLocationOwnership(ctx, req); err != nil {
+		return nil, err
+	}
+
 	if exists {
 		// Check if the bad block is already indexed
 		filter := &persistence.BeaconBadBlockFilter{}
@@ -963,6 +988,15 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 			Error("Failed to index a beacon blob because the bad blob could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
 
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// A location must never be shared between two different beacon bad blobs.
+	// Without this check, a request for an unrelated node/slot/block_root/index but
+	// a location that already belongs to another record would ride along on that
+	// record's blob, and later cause it to be deleted out from under the original
+	// record.
+	if err := i.checkBeaconBadBlobLocationOwnership(ctx, req); err != nil {
+		return nil, err
 	}
 
 	if exists {
@@ -1225,6 +1259,14 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	// A location must never be shared between two different execution block traces.
+	// Without this check, a request for an unrelated node/block_hash but a location
+	// that already belongs to another record would ride along on that record's
+	// blob, and later cause it to be deleted out from under the original record.
+	if err := i.checkExecutionBlockTraceLocationOwnership(ctx, req); err != nil {
+		return nil, err
+	}
+
 	// Create the execution block trace
 	trace := &indexer.ExecutionBlockTrace{
 		Id:                      wrapperspb.String(uuid.New().String()),
@@ -1426,6 +1468,14 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.CreateExecutionBadBlockRequest) (*indexer.CreateExecutionBadBlockResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// A location must never be shared between two different execution bad blocks.
+	// Without this check, a request for an unrelated node/block_hash but a location
+	// that already belongs to another record would ride along on that record's
+	// blob, and later cause it to be deleted out from under the original record.
+	if err := i.checkExecutionBadBlockLocationOwnership(ctx, req); err != nil {
+		return nil, err
 	}
 
 	// Create the execution bad block
