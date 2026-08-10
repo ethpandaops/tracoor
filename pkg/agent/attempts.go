@@ -11,6 +11,7 @@ import (
 const (
 	dropReasonAttemptsExhausted = "attempts_exhausted"
 	dropReasonCircuitOpen       = "circuit_open"
+	dropReasonDivergent         = "divergent"
 	dropReasonNotAvailable      = "not_available"
 	dropReasonStale             = "stale"
 	dropReasonUnsupported       = "unsupported"
@@ -26,6 +27,12 @@ var (
 	// errItemStale marks an item that has aged past the window in which its
 	// artifact can still be served, so attempting it is a guaranteed failure.
 	errItemStale = goerrors.New("item is past its capture window")
+
+	// errPayloadDivergent marks an item whose node served bytes that did not
+	// match the stored payload, and whose re-fetch then failed. The divergence
+	// record was already written, which was the point; retrying would only
+	// write it again.
+	errPayloadDivergent = goerrors.New("payload diverged from the stored copy")
 )
 
 // attemptBudgets bounds how many times a single queued item may be attempted.
@@ -101,6 +108,12 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 			continue
 		}
 
+		if goerrors.Is(err, errPayloadDivergent) {
+			reason = dropReasonDivergent
+
+			break
+		}
+
 		class, retryAfter = classifyFailure(kind, err)
 		if class == failurePermanent {
 			reason = dropReasonUnsupported
@@ -112,8 +125,10 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 	}
 
 	// A stale or absent artifact is a property of the chain, not of the node, so
-	// neither outcome is held against it.
-	if reason != dropReasonStale && reason != dropReasonNotAvailable {
+	// neither outcome is held against it. Nor is a divergence: the node answered
+	// perfectly well, it just answered differently, and pausing it would stop
+	// collecting the very evidence that makes the finding useful.
+	if reason != dropReasonStale && reason != dropReasonNotAvailable && reason != dropReasonDivergent {
 		if s.breaker.RecordFailure(kind, class, retryAfter) {
 			s.metrics.IncrementArtifactUnsupported(kind, s.Config.Name)
 

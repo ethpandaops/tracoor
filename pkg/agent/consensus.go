@@ -3,6 +3,8 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	goerrors "errors"
 	"fmt"
 	"os"
@@ -35,21 +37,14 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 
 	rootAsString := fmt.Sprintf("%#x", root)
 
-	location := CreateBeaconStateFileName(
-		s.Config.Name,
-		string(s.node.Beacon().Metadata().Network.Name),
-		slot,
-		rootAsString,
-	)
-
-	location = fmt.Sprintf("%s.ssz", location)
+	network := string(s.node.Beacon().Metadata().Network.Name)
 
 	// Check if we've somehow already indexed this beacon state
 	rsp, err := s.indexer.ListBeaconState(ctx, &indexer.ListBeaconStateRequest{
 		Node:      s.Config.Name,
 		StateRoot: rootAsString,
 		Slot:      uint64(slot),
-		Network:   string(s.node.Beacon().Metadata().Network.Name),
+		Network:   network,
 	})
 	if err != nil {
 		s.log.
@@ -80,56 +75,67 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		stateID = fmt.Sprintf("%d", slot)
 	}
 
-	// Open the state and stream it straight through to the store. States are
-	// the largest artifact the agent handles, so nothing about them is ever
-	// held whole in memory.
-	raw, err := s.node.Beacon().Node().OpenRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
-	if err != nil {
-		return err
-	}
-
-	s.log.WithField("location", location).Debug("Saving beacon state")
-
-	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveBeaconState, location)
-	if err != nil {
-		return errors.Wrap(err, "failed to store beacon state")
-	}
-
 	spec, err := s.node.Beacon().Node().Spec()
 	if err != nil {
 		return err
 	}
 
-	req := &indexer.CreateBeaconStateRequest{
-		Node:            wrapperspb.String(s.Config.Name),
-		Network:         wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
-		Slot:            wrapperspb.UInt64(uint64(slot)),
-		Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
-		StateRoot:       wrapperspb.String(rootAsString),
-		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
-		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
-		BeaconImplementation: wrapperspb.String(
-			s.node.Beacon().Metadata().Client(ctx),
-		),
-		FetchedAt: timestamppb.New(now),
+	target := &dedupTarget{
+		kind:       store.BeaconStateDataType,
+		queue:      BeaconStateQueue,
+		network:    network,
+		dedupKey:   beaconStateDedupKey(slot, rootAsString),
+		directory:  BeaconStateDirectory(network, slot),
+		identity:   rootAsString,
+		extension:  ".ssz",
+		slot:       uint64(slot),
+		identifier: rootAsString,
+		severity:   divergenceSeverityAlarm,
+		save:       s.store.SaveBeaconState,
+		remove:     s.store.DeleteBeaconState,
 	}
 
-	// Index the state
-	if _, err := s.indexer.CreateBeaconState(ctx, req); err != nil {
+	// States are the largest artifact the agent handles, so nothing about them
+	// is ever held whole in memory: each read goes straight from the node into
+	// a hash, and into the compressor as well when this agent is the one
+	// storing it.
+	fetcher := &streamFetcher{
+		open: func(ctx context.Context) (*payloadSource, error) {
+			raw, ferr := s.node.Beacon().Node().OpenRawBeaconState(ctx, stateID, string(mime.ContentTypeOctet))
+			if ferr != nil {
+				return nil, errors.Wrap(ferr, "failed to open beacon state")
+			}
+
+			return sourceFromResponse(raw), nil
+		},
+		compressor: s.compressor,
+		save:       s.store.SaveBeaconState,
+	}
+
+	return s.indexDeduplicated(ctx, target, fetcher, func(ctx context.Context, outcome *dedupOutcome) error {
+		req := &indexer.CreateBeaconStateRequest{
+			Node:            wrapperspb.String(s.Config.Name),
+			Network:         wrapperspb.String(network),
+			Slot:            wrapperspb.UInt64(uint64(slot)),
+			Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
+			StateRoot:       wrapperspb.String(rootAsString),
+			Location:        wrapperspb.String(outcome.Location),
+			ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
+			NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
+			BeaconImplementation: wrapperspb.String(
+				s.node.Beacon().Metadata().Client(ctx),
+			),
+			FetchedAt:        timestamppb.New(now),
+			ContentHash:      wrapperspb.String(outcome.ContentHash),
+			VerifiedAt:       timestamppb.New(outcome.VerifiedAt),
+			ContentMatchedAt: contentMatchedAt(outcome),
+			DedupKey:         wrapperspb.String(target.dedupKey),
+		}
+
+		_, err := s.indexer.CreateBeaconState(ctx, req)
+
 		return err
-	}
-
-	s.metrics.IncrementItemExported(BeaconStateQueue, s.Config.Name)
-
-	s.log.
-		WithField("state_root", rootAsString).
-		WithField("slot", slot).
-		WithField("raw_size", result.RawSize).
-		WithField("compressed_size", result.CompressedSize).
-		Debug("Indexed beacon state")
-
-	return nil
+	})
 }
 
 func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) error {
@@ -143,21 +149,14 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 
 	blockRootAsString := blockRoot.String()
 
-	location := CreateBeaconBlockFileName(
-		s.Config.Name,
-		string(s.node.Beacon().Metadata().Network.Name),
-		slot,
-		blockRootAsString,
-	)
-
-	location = fmt.Sprintf("%s.ssz", location)
+	network := string(s.node.Beacon().Metadata().Network.Name)
 
 	// Check if we've somehow already indexed this beacon state
 	rsp, err := s.indexer.ListBeaconBlock(ctx, &indexer.ListBeaconBlockRequest{
 		Node:      s.Config.Name,
 		BlockRoot: blockRootAsString,
 		Slot:      uint64(slot),
-		Network:   string(s.node.Beacon().Metadata().Network.Name),
+		Network:   network,
 	})
 	if err != nil {
 		s.log.
@@ -183,54 +182,63 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	// root.
 	blockID := blockRootAsString
 
-	// Open the block and stream it straight through to the store.
-	raw, err := s.node.Beacon().Node().OpenRawBlock(ctx, blockID, string(mime.ContentTypeOctet))
-	if err != nil {
-		return err
-	}
-
-	s.log.WithField("location", location).Debug("Saving beacon block")
-
-	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveBeaconBlock, location)
-	if err != nil {
-		return errors.Wrap(err, "failed to store beacon block")
-	}
-
 	spec, err := s.node.Beacon().Node().Spec()
 	if err != nil {
 		return err
 	}
 
-	req := &indexer.CreateBeaconBlockRequest{
-		Node:            wrapperspb.String(s.Config.Name),
-		Network:         wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
-		Slot:            wrapperspb.UInt64(uint64(slot)),
-		Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
-		BlockRoot:       wrapperspb.String(blockRootAsString),
-		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
-		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
-		BeaconImplementation: wrapperspb.String(
-			s.node.Beacon().Metadata().Client(ctx),
-		),
-		FetchedAt: timestamppb.New(now),
+	target := &dedupTarget{
+		kind:       store.BeaconBlockDataType,
+		queue:      BeaconBlockQueue,
+		network:    network,
+		dedupKey:   beaconBlockDedupKey(slot, blockRootAsString),
+		directory:  BeaconBlockDirectory(network, slot),
+		identity:   blockRootAsString,
+		extension:  ".ssz",
+		slot:       uint64(slot),
+		identifier: blockRootAsString,
+		severity:   divergenceSeverityAlarm,
+		save:       s.store.SaveBeaconBlock,
+		remove:     s.store.DeleteBeaconBlock,
 	}
 
-	// Index the block
-	if _, err := s.indexer.CreateBeaconBlock(ctx, req); err != nil {
+	fetcher := &streamFetcher{
+		open: func(ctx context.Context) (*payloadSource, error) {
+			raw, ferr := s.node.Beacon().Node().OpenRawBlock(ctx, blockID, string(mime.ContentTypeOctet))
+			if ferr != nil {
+				return nil, errors.Wrap(ferr, "failed to open beacon block")
+			}
+
+			return sourceFromResponse(raw), nil
+		},
+		compressor: s.compressor,
+		save:       s.store.SaveBeaconBlock,
+	}
+
+	return s.indexDeduplicated(ctx, target, fetcher, func(ctx context.Context, outcome *dedupOutcome) error {
+		req := &indexer.CreateBeaconBlockRequest{
+			Node:            wrapperspb.String(s.Config.Name),
+			Network:         wrapperspb.String(network),
+			Slot:            wrapperspb.UInt64(uint64(slot)),
+			Epoch:           wrapperspb.UInt64(uint64(slot) / uint64(spec.SlotsPerEpoch)),
+			BlockRoot:       wrapperspb.String(blockRootAsString),
+			Location:        wrapperspb.String(outcome.Location),
+			ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
+			NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
+			BeaconImplementation: wrapperspb.String(
+				s.node.Beacon().Metadata().Client(ctx),
+			),
+			FetchedAt:        timestamppb.New(now),
+			ContentHash:      wrapperspb.String(outcome.ContentHash),
+			VerifiedAt:       timestamppb.New(outcome.VerifiedAt),
+			ContentMatchedAt: contentMatchedAt(outcome),
+			DedupKey:         wrapperspb.String(target.dedupKey),
+		}
+
+		_, err := s.indexer.CreateBeaconBlock(ctx, req)
+
 		return err
-	}
-
-	s.metrics.IncrementItemExported(BeaconBlockQueue, s.Config.Name)
-
-	s.log.
-		WithField("block_root", blockRootAsString).
-		WithField("slot", slot).
-		WithField("raw_size", result.RawSize).
-		WithField("compressed_size", result.CompressedSize).
-		Debug("Indexed beacon block")
-
-	return nil
+	})
 }
 
 func getBadBlocksFilePattern(client string) (*string, error) {
@@ -280,21 +288,14 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	blockRootAsString := blockRoot.String()
 
-	location := CreateExecutionPayloadEnvelopeFileName(
-		s.Config.Name,
-		string(s.node.Beacon().Metadata().Network.Name),
-		slot,
-		blockRootAsString,
-	)
-
-	location = fmt.Sprintf("%s.ssz", location)
+	network := string(s.node.Beacon().Metadata().Network.Name)
 
 	// Check if we've somehow already indexed this envelope
 	rsp, err := s.indexer.ListExecutionPayloadEnvelope(ctx, &indexer.ListExecutionPayloadEnvelopeRequest{
 		Node:      s.Config.Name,
 		BlockRoot: blockRootAsString,
 		Slot:      uint64(slot),
-		Network:   string(s.node.Beacon().Metadata().Network.Name),
+		Network:   network,
 	})
 	if err != nil {
 		s.log.
@@ -315,52 +316,62 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	now := time.Now()
 
-	raw, err := s.node.Beacon().Node().OpenRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
-	if err != nil {
-		if goerrors.Is(err, api.ErrNotFound) {
-			return fmt.Errorf("%w: execution payload envelope for %s has not been revealed", errItemNotAvailable, blockRootAsString)
+	target := &dedupTarget{
+		kind:       store.ExecutionPayloadEnvelopeDataType,
+		queue:      ExecutionPayloadEnvelopeQueue,
+		network:    network,
+		dedupKey:   executionPayloadEnvelopeDedupKey(slot, blockRootAsString),
+		directory:  ExecutionPayloadEnvelopeDirectory(network, slot),
+		identity:   blockRootAsString,
+		extension:  ".ssz",
+		slot:       uint64(slot),
+		identifier: blockRootAsString,
+		severity:   divergenceSeverityAlarm,
+		save:       s.store.SaveExecutionPayloadEnvelope,
+		remove:     s.store.DeleteExecutionPayloadEnvelope,
+	}
+
+	fetcher := &streamFetcher{
+		open: func(ctx context.Context) (*payloadSource, error) {
+			raw, ferr := s.node.Beacon().Node().OpenRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
+			if ferr != nil {
+				if goerrors.Is(ferr, api.ErrNotFound) {
+					return nil, fmt.Errorf("%w: execution payload envelope for %s has not been revealed", errItemNotAvailable, blockRootAsString)
+				}
+
+				return nil, errors.Wrap(ferr, "failed to fetch execution payload envelope")
+			}
+
+			return sourceFromResponse(raw), nil
+		},
+		compressor: s.compressor,
+		save:       s.store.SaveExecutionPayloadEnvelope,
+	}
+
+	return s.indexDeduplicated(ctx, target, fetcher, func(ctx context.Context, outcome *dedupOutcome) error {
+		req := &indexer.CreateExecutionPayloadEnvelopeRequest{
+			Node:            wrapperspb.String(s.Config.Name),
+			Network:         wrapperspb.String(network),
+			Slot:            wrapperspb.UInt64(uint64(slot)),
+			Epoch:           wrapperspb.UInt64(epoch),
+			BlockRoot:       wrapperspb.String(blockRootAsString),
+			Location:        wrapperspb.String(outcome.Location),
+			ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
+			NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
+			BeaconImplementation: wrapperspb.String(
+				s.node.Beacon().Metadata().Client(ctx),
+			),
+			FetchedAt:        timestamppb.New(now),
+			ContentHash:      wrapperspb.String(outcome.ContentHash),
+			VerifiedAt:       timestamppb.New(outcome.VerifiedAt),
+			ContentMatchedAt: contentMatchedAt(outcome),
+			DedupKey:         wrapperspb.String(target.dedupKey),
 		}
 
-		return errors.Wrap(err, "failed to fetch execution payload envelope")
-	}
+		_, err := s.indexer.CreateExecutionPayloadEnvelope(ctx, req)
 
-	s.log.WithField("location", location).Debug("Saving execution payload envelope")
-
-	location, result, err := streamPayload(ctx, s.compressor, raw, s.store.SaveExecutionPayloadEnvelope, location)
-	if err != nil {
-		return errors.Wrap(err, "failed to store execution payload envelope")
-	}
-
-	req := &indexer.CreateExecutionPayloadEnvelopeRequest{
-		Node:            wrapperspb.String(s.Config.Name),
-		Network:         wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
-		Slot:            wrapperspb.UInt64(uint64(slot)),
-		Epoch:           wrapperspb.UInt64(epoch),
-		BlockRoot:       wrapperspb.String(blockRootAsString),
-		Location:        wrapperspb.String(location),
-		ContentEncoding: wrapperspb.String(compression.Default.ContentEncoding),
-		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
-		BeaconImplementation: wrapperspb.String(
-			s.node.Beacon().Metadata().Client(ctx),
-		),
-		FetchedAt: timestamppb.New(now),
-	}
-
-	// Index the envelope
-	if _, err := s.indexer.CreateExecutionPayloadEnvelope(ctx, req); err != nil {
 		return err
-	}
-
-	s.metrics.IncrementItemExported(ExecutionPayloadEnvelopeQueue, s.Config.Name)
-
-	s.log.
-		WithField("block_root", blockRootAsString).
-		WithField("slot", slot).
-		WithField("raw_size", result.RawSize).
-		WithField("compressed_size", result.CompressedSize).
-		Debug("Indexed execution payload envelope")
-
-	return nil
+	})
 }
 
 func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) error {
@@ -468,6 +479,14 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 			if !exists {
 				now := time.Now()
 
+				// Bad blocks are node-local by nature: one node rejecting a
+				// block says nothing about what another holds under the same
+				// root. They are hashed anyway, so two nodes that did happen to
+				// keep identical bytes can be noticed.
+				contentHash := sha256.Sum256(blockRaw)
+
+				s.metrics.IncrementPayloadVerified(BeaconBadBlockQueue, s.Config.Name)
+
 				compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Default)
 				if err != nil {
 					return errors.Wrap(err, "failed to compress beacon bad block")
@@ -513,7 +532,9 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 					BeaconImplementation: wrapperspb.String(
 						s.node.Beacon().Metadata().Client(ctx),
 					),
-					FetchedAt: timestamppb.New(now),
+					FetchedAt:   timestamppb.New(now),
+					ContentHash: wrapperspb.String(hex.EncodeToString(contentHash[:])),
+					VerifiedAt:  timestamppb.New(now),
 				}
 
 				// Index the block
@@ -682,6 +703,11 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 			if !exists {
 				now := time.Now()
 
+				// Node-local like bad blocks, and hashed for the same reason.
+				contentHash := sha256.Sum256(blobRaw)
+
+				s.metrics.IncrementPayloadVerified(BeaconBadBlobQueue, s.Config.Name)
+
 				// Compress it
 				compressedBlob, err := s.compressor.Compress(&blobRaw, compression.Default)
 				if err != nil {
@@ -731,7 +757,9 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 					BeaconImplementation: wrapperspb.String(
 						s.node.Beacon().Metadata().Client(ctx),
 					),
-					FetchedAt: timestamppb.New(now),
+					FetchedAt:   timestamppb.New(now),
+					ContentHash: wrapperspb.String(hex.EncodeToString(contentHash[:])),
+					VerifiedAt:  timestamppb.New(now),
 				}
 
 				// Index the blob

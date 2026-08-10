@@ -28,6 +28,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// indexerClient is the part of the indexer the agent actually calls. It is
+// named here rather than in the client package so the fetch paths can be
+// exercised without a server on the other end.
+type indexerClient interface {
+	CreateBeaconState(ctx context.Context, req *pIndexer.CreateBeaconStateRequest) (*pIndexer.CreateBeaconStateResponse, error)
+	ListBeaconState(ctx context.Context, req *pIndexer.ListBeaconStateRequest) (*pIndexer.ListBeaconStateResponse, error)
+	CreateBeaconBlock(ctx context.Context, req *pIndexer.CreateBeaconBlockRequest) (*pIndexer.CreateBeaconBlockResponse, error)
+	ListBeaconBlock(ctx context.Context, req *pIndexer.ListBeaconBlockRequest) (*pIndexer.ListBeaconBlockResponse, error)
+	CreateExecutionPayloadEnvelope(ctx context.Context, req *pIndexer.CreateExecutionPayloadEnvelopeRequest) (*pIndexer.CreateExecutionPayloadEnvelopeResponse, error)
+	ListExecutionPayloadEnvelope(ctx context.Context, req *pIndexer.ListExecutionPayloadEnvelopeRequest) (*pIndexer.ListExecutionPayloadEnvelopeResponse, error)
+	CreateBeaconBadBlock(ctx context.Context, req *pIndexer.CreateBeaconBadBlockRequest) (*pIndexer.CreateBeaconBadBlockResponse, error)
+	ListBeaconBadBlock(ctx context.Context, req *pIndexer.ListBeaconBadBlockRequest) (*pIndexer.ListBeaconBadBlockResponse, error)
+	CreateBeaconBadBlob(ctx context.Context, req *pIndexer.CreateBeaconBadBlobRequest) (*pIndexer.CreateBeaconBadBlobResponse, error)
+	ListBeaconBadBlob(ctx context.Context, req *pIndexer.ListBeaconBadBlobRequest) (*pIndexer.ListBeaconBadBlobResponse, error)
+	CreateExecutionBlockTrace(ctx context.Context, req *pIndexer.CreateExecutionBlockTraceRequest) (*pIndexer.CreateExecutionBlockTraceResponse, error)
+	ListExecutionBlockTrace(ctx context.Context, req *pIndexer.ListExecutionBlockTraceRequest) (*pIndexer.ListExecutionBlockTraceResponse, error)
+	CreateExecutionBadBlock(ctx context.Context, req *pIndexer.CreateExecutionBadBlockRequest) (*pIndexer.CreateExecutionBadBlockResponse, error)
+	ListExecutionBadBlock(ctx context.Context, req *pIndexer.ListExecutionBadBlockRequest) (*pIndexer.ListExecutionBadBlockResponse, error)
+	GetStorageHandshakeToken(ctx context.Context, req *pIndexer.GetStorageHandshakeTokenRequest) (*pIndexer.GetStorageHandshakeTokenResponse, error)
+	GetBlob(ctx context.Context, req *pIndexer.GetBlobRequest) (*pIndexer.GetBlobResponse, error)
+	CreateBlob(ctx context.Context, req *pIndexer.CreateBlobRequest) (*pIndexer.CreateBlobResponse, error)
+	CreatePayloadDivergence(ctx context.Context, req *pIndexer.CreatePayloadDivergenceRequest) (*pIndexer.CreatePayloadDivergenceResponse, error)
+}
+
+var _ indexerClient = (*indexer.Client)(nil)
+
 type agent struct {
 	Config *Config
 
@@ -39,7 +65,7 @@ type agent struct {
 
 	scheduler *gocron.Scheduler
 
-	indexer *indexer.Client
+	indexer indexerClient
 
 	store store.Store
 

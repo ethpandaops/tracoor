@@ -180,6 +180,25 @@ func TestRunQueueItemDropsStaleItemsWithoutRetrying(t *testing.T) {
 	require.Equal(t, float64(breakerFailureThreshold+1), droppedCount(s, ExecutionBlockTraceQueue, dropReasonStale))
 }
 
+func TestRunQueueItemDropsDivergentItemsWithoutBlamingTheNode(t *testing.T) {
+	s := newTestAgent("divergent")
+
+	calls := 0
+
+	for i := 0; i < breakerFailureThreshold+1; i++ {
+		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, func(context.Context) error {
+			calls++
+
+			return fmt.Errorf("%w: slot 1", errPayloadDivergent)
+		})
+	}
+
+	require.Equal(t, breakerFailureThreshold+1, calls, "the divergence was recorded already, so there is nothing to retry")
+	require.True(t, s.breaker.Allow(BeaconStateQueue), "a node that answers differently is still answering")
+	require.Zero(t, unsupportedCount(s, BeaconStateQueue))
+	require.Equal(t, float64(breakerFailureThreshold+1), droppedCount(s, BeaconStateQueue, dropReasonDivergent))
+}
+
 func TestRunQueueItemStopsOnCancelledContext(t *testing.T) {
 	s := newTestAgent("cancelled")
 

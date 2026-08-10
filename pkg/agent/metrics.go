@@ -16,6 +16,11 @@ type Metrics struct {
 	queueItemSkipped        *prometheus.CounterVec
 	itemsDropped            *prometheus.CounterVec
 	artifactUnsupported     *prometheus.CounterVec
+	blobCreated             *prometheus.CounterVec
+	blobReused              *prometheus.CounterVec
+	payloadMismatch         *prometheus.CounterVec
+	payloadVerified         *prometheus.CounterVec
+	transferIncomplete      *prometheus.CounterVec
 }
 
 type Queue string
@@ -69,6 +74,31 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Name:      "artifact_unsupported_total",
 				Help:      "The number of times a node was found to be unable to serve an artifact",
 			}, []string{labelQueue, labelAgent}),
+			blobCreated: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blob_created_total",
+				Help:      "The number of payloads this agent compressed and stored for the first time",
+			}, []string{labelQueue, labelAgent}),
+			blobReused: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blob_reused_total",
+				Help:      "The number of times a verified payload was linked to bytes somebody else had already stored",
+			}, []string{labelQueue, labelAgent}),
+			payloadMismatch: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "payload_mismatch_total",
+				Help:      "The number of divergences recorded, where a node served bytes that did not match the stored payload",
+			}, []string{labelQueue, labelAgent}),
+			payloadVerified: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "payload_verified_total",
+				Help:      "The number of payloads read from a node in full and hashed",
+			}, []string{labelQueue, labelAgent}),
+			transferIncomplete: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "transfer_incomplete_total",
+				Help:      "The number of payloads abandoned because they did not arrive in full",
+			}, []string{labelQueue, labelAgent}),
 		}
 
 		prometheus.MustRegister(metricsInstance.queueSize)
@@ -77,6 +107,11 @@ func GetMetricsInstance(namespace string) *Metrics {
 		prometheus.MustRegister(metricsInstance.queueItemSkipped)
 		prometheus.MustRegister(metricsInstance.itemsDropped)
 		prometheus.MustRegister(metricsInstance.artifactUnsupported)
+		prometheus.MustRegister(metricsInstance.blobCreated)
+		prometheus.MustRegister(metricsInstance.blobReused)
+		prometheus.MustRegister(metricsInstance.payloadMismatch)
+		prometheus.MustRegister(metricsInstance.payloadVerified)
+		prometheus.MustRegister(metricsInstance.transferIncomplete)
 	})
 
 	return metricsInstance
@@ -104,6 +139,26 @@ func (m *Metrics) IncrementItemDropped(queue Queue, agentName, reason string) {
 
 func (m *Metrics) IncrementArtifactUnsupported(queue Queue, agentName string) {
 	m.artifactUnsupported.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementBlobCreated(queue Queue, agentName string) {
+	m.blobCreated.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementBlobReused(queue Queue, agentName string) {
+	m.blobReused.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementPayloadMismatch(queue Queue, agentName string) {
+	m.payloadMismatch.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementPayloadVerified(queue Queue, agentName string) {
+	m.payloadVerified.WithLabelValues(string(queue), agentName).Inc()
+}
+
+func (m *Metrics) IncrementTransferIncomplete(queue Queue, agentName string) {
+	m.transferIncomplete.WithLabelValues(string(queue), agentName).Inc()
 }
 
 func (m *Metrics) ServeMetrics(ctx context.Context, addr string) {
