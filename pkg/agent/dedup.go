@@ -561,6 +561,10 @@ func (s *agent) uploadPayload(ctx context.Context, target *dedupTarget, fetcher 
 // readPayloadOnce runs one read of the node and accounts for how it went. A
 // payload that did not arrive in full is counted and refused: nothing derived
 // from a truncated body may reach a decision.
+//
+// Bytes are accounted here rather than at each call site because every read of
+// a node passes through it: a read that only hashed contributes to the fetched
+// side and nothing to the stored side, which is the gap dedup is worth.
 func (s *agent) readPayloadOnce(
 	ctx context.Context,
 	target *dedupTarget,
@@ -576,6 +580,8 @@ func (s *agent) readPayloadOnce(
 	}
 
 	s.metrics.IncrementPayloadVerified(target.queue, s.Config.Name)
+	s.metrics.AddFetchedBytes(target.queue, s.Config.Name, result.RawSize)
+	s.metrics.AddStoredBytes(target.queue, s.Config.Name, result.CompressedSize)
 
 	return result, nil
 }

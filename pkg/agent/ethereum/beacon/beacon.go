@@ -27,9 +27,15 @@ type Node struct {
 }
 
 func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkName string, config *Config) *Node {
+	// The node's metrics stay on for the raw response counters they carry:
+	// raw_response_leaks_total counts bodies that only the cleanup safety net
+	// closed, and a leaked body holds a transport slot for the life of the
+	// process, degrading every later fetch against that node. The library owns
+	// those counters and only feeds them when its metrics are enabled, so
+	// turning them off costs the one signal that makes a missing Close visible.
 	opts := *bn.
 		DefaultOptions().
-		DisablePrometheusMetrics()
+		EnablePrometheusMetrics()
 
 	if config.BeaconSubscriptions != nil {
 		opts.BeaconSubscription = bn.BeaconSubscriptionOptions{

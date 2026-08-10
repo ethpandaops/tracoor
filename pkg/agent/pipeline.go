@@ -57,22 +57,6 @@ type streamResult struct {
 	ContentHash string
 }
 
-// streamPayload reads rsp once, feeding a sha256 and a compressor from the same
-// pass, and hands the compressed bytes straight to the store through a pipe.
-func streamPayload(
-	ctx context.Context,
-	compressor *compression.Compressor,
-	rsp *api.RawResponse,
-	save saveFunc,
-	location string,
-) (string, streamResult, error) {
-	if rsp == nil {
-		return "", streamResult{}, fmt.Errorf("response is nil")
-	}
-
-	return streamSource(ctx, compressor, sourceFromResponse(rsp), save, location)
-}
-
 // streamSource reads src once, feeding a sha256 and a compressor from the same
 // pass, and hands the compressed bytes straight to the store through a pipe.
 // Nothing larger than the copy buffer, the compression window and the store's

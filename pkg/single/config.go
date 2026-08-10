@@ -42,6 +42,22 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("at least one agent configuration is required. If you just want to run the server, use the `server` subcommand instead")
 	}
 
+	// Agent names key metrics registration, storage handshakes and index rows,
+	// so a duplicate cannot be tolerated.
+	names := make(map[string]struct{}, len(c.Agents))
+
+	for _, a := range c.Agents {
+		if a.Name == "" {
+			return fmt.Errorf("every agent requires a name")
+		}
+
+		if _, ok := names[a.Name]; ok {
+			return fmt.Errorf("duplicate agent name: %s", a.Name)
+		}
+
+		names[a.Name] = struct{}{}
+	}
+
 	return nil
 }
 

@@ -486,6 +486,7 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 				contentHash := sha256.Sum256(blockRaw)
 
 				s.metrics.IncrementPayloadVerified(BeaconBadBlockQueue, s.Config.Name)
+				s.metrics.AddFetchedBytes(BeaconBadBlockQueue, s.Config.Name, int64(len(blockRaw)))
 
 				compressedBlock, err := s.compressor.Compress(&blockRaw, compression.Default)
 				if err != nil {
@@ -508,6 +509,8 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 
 					continue
 				}
+
+				s.metrics.AddStoredBytes(BeaconBadBlockQueue, s.Config.Name, int64(len(compressedBlock)))
 
 				spec, err := s.node.Beacon().Node().Spec()
 				if err != nil {
@@ -707,6 +710,7 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 				contentHash := sha256.Sum256(blobRaw)
 
 				s.metrics.IncrementPayloadVerified(BeaconBadBlobQueue, s.Config.Name)
+				s.metrics.AddFetchedBytes(BeaconBadBlobQueue, s.Config.Name, int64(len(blobRaw)))
 
 				// Compress it
 				compressedBlob, err := s.compressor.Compress(&blobRaw, compression.Default)
@@ -731,6 +735,8 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 
 					continue
 				}
+
+				s.metrics.AddStoredBytes(BeaconBadBlobQueue, s.Config.Name, int64(len(compressedBlob)))
 
 				spec, err := s.node.Beacon().Node().Spec()
 				if err != nil {

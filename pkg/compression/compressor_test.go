@@ -15,9 +15,11 @@ import (
 )
 
 const (
-	testFilename    = "test"
-	testFilenameGz  = "test.gz"
-	testFilenameZst = "test.zst"
+	testFilename = "test"
+	// testFilenameUnknown carries an extension no algorithm claims, which is what a lookup has
+	// to reject rather than guess at.
+	testFilenameUnknown = "test.br"
+	testFilenameZst     = "test.zst"
 )
 
 func TestNewCompressor(t *testing.T) {
@@ -34,12 +36,6 @@ func TestCompressor_Compress(t *testing.T) {
 		algorithm *compression.CompressionAlgorithm
 		wantErr   bool
 	}{
-		{
-			name:      "Compress with Gzip",
-			data:      []byte("test data"),
-			algorithm: compression.Gzip,
-			wantErr:   false,
-		},
 		{
 			name:      "Compress with Zstd",
 			data:      []byte("test data"),
@@ -81,9 +77,6 @@ func TestCompressor_Decompress(t *testing.T) {
 
 	testData := []byte("test data")
 
-	compressed, err := c.Compress(&testData, compression.Gzip)
-	require.NoError(t, err)
-
 	compressedZstd, err := c.Compress(&testData, compression.Zstd)
 	require.NoError(t, err)
 
@@ -94,21 +87,15 @@ func TestCompressor_Decompress(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "Decompress Gzip",
-			data:     compressed,
-			filename: testFilenameGz,
-			wantErr:  false,
-		},
-		{
 			name:     "Decompress Zstd",
 			data:     compressedZstd,
 			filename: testFilenameZst,
 			wantErr:  false,
 		},
 		{
-			name:     "Decompress with nil data",
-			data:     nil,
-			filename: testFilenameGz,
+			name:     "Decompress data that is not a valid frame",
+			data:     []byte("this was never compressed"),
+			filename: testFilenameZst,
 			wantErr:  true,
 		},
 		{
@@ -142,20 +129,14 @@ func TestAddExtension(t *testing.T) {
 		want      string
 	}{
 		{
-			name:      "Add Gzip extension",
+			name:      "Add Zstd extension",
 			filename:  testFilename,
-			algorithm: compression.Gzip,
-			want:      "test.gz",
+			algorithm: compression.Zstd,
+			want:      "test.zst",
 		},
 		{
 			name:      "Extension already present",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
-			want:      "test.gz",
-		},
-		{
-			name:      "Add Zstd extension",
-			filename:  testFilename,
+			filename:  testFilenameZst,
 			algorithm: compression.Zstd,
 			want:      "test.zst",
 		},
@@ -179,22 +160,10 @@ func TestRemoveExtension(t *testing.T) {
 		want      string
 	}{
 		{
-			name:      "Remove Gzip extension",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
-			want:      "test",
-		},
-		{
 			name:      "No extension to remove",
 			filename:  testFilename,
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
 			want:      "test",
-		},
-		{
-			name:      "Remove Gzip extension from .json.gz",
-			filename:  "test.json.gz",
-			algorithm: compression.Gzip,
-			want:      "test.json",
 		},
 		{
 			name:      "Remove Zstd extension",
@@ -228,26 +197,20 @@ func TestHasCompressionExtension(t *testing.T) {
 		want      bool
 	}{
 		{
-			name:      "Has Gzip extension",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
-			want:      true,
-		},
-		{
-			name:      "No Gzip extension",
-			filename:  testFilename,
-			algorithm: compression.Gzip,
-			want:      false,
-		},
-		{
 			name:      "Has Zstd extension",
 			filename:  testFilenameZst,
 			algorithm: compression.Zstd,
 			want:      true,
 		},
 		{
-			name:      "Gzip file is not Zstd",
-			filename:  testFilenameGz,
+			name:      "No Zstd extension",
+			filename:  testFilename,
+			algorithm: compression.Zstd,
+			want:      false,
+		},
+		{
+			name:      "Unknown extension is not Zstd",
+			filename:  testFilenameUnknown,
 			algorithm: compression.Zstd,
 			want:      false,
 		},
@@ -255,14 +218,14 @@ func TestHasCompressionExtension(t *testing.T) {
 			// A nil algorithm reaches this function whenever a lookup failed upstream. It must
 			// answer rather than panic.
 			name:      "Nil algorithm",
-			filename:  testFilenameGz,
+			filename:  testFilenameZst,
 			algorithm: nil,
 			want:      false,
 		},
 		{
 			// None has no extension of its own, so it must not match every filename.
 			name:      "None algorithm never matches",
-			filename:  testFilenameGz,
+			filename:  testFilenameZst,
 			algorithm: compression.None,
 			want:      false,
 		},
@@ -285,12 +248,6 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 		want     *compression.CompressionAlgorithm
 		wantErr  bool
 	}{
-		{
-			name:     "Get Gzip algorithm",
-			filename: testFilenameGz,
-			want:     compression.Gzip,
-			wantErr:  false,
-		},
 		{
 			name:     "Get Zstd algorithm",
 			filename: testFilenameZst,
@@ -335,21 +292,6 @@ func TestCompressAndDecompress(t *testing.T) {
 		data      []byte
 		algorithm *compression.CompressionAlgorithm
 	}{
-		{
-			name:      "Compress and decompress with Gzip",
-			data:      []byte("This is a test string for compression and decompression"),
-			algorithm: compression.Gzip,
-		},
-		{
-			name:      "Compress and decompress empty data with Gzip",
-			data:      []byte{},
-			algorithm: compression.Gzip,
-		},
-		{
-			name:      "Compress and decompress large data with Gzip",
-			data:      []byte(strings.Repeat("Large data test ", 1000)),
-			algorithm: compression.Gzip,
-		},
 		{
 			name:      "Compress and decompress with Zstd",
 			data:      []byte("This is a test string for compression and decompression"),
@@ -396,9 +338,10 @@ func TestGetCompressionAlgorithmFromContentEncoding(t *testing.T) {
 		wantErr         bool
 	}{
 		{
+			// Nothing writes gzip, and nothing stored carries it.
 			name:            "Gzip encoding",
 			contentEncoding: "gzip",
-			want:            compression.Gzip,
+			wantErr:         true,
 		},
 		{
 			name:            "Zstd encoding",
@@ -446,9 +389,9 @@ func TestHasAnyCompressionExtension(t *testing.T) {
 		filename string
 		want     bool
 	}{
-		{name: "Gzip", filename: testFilenameGz, want: true},
 		{name: "Zstd", filename: testFilenameZst, want: true},
 		{name: "Suffixed Zstd", filename: "test.ssz.zst", want: true},
+		{name: "Gzip", filename: "test.gz", want: false},
 		{name: "No extension", filename: testFilename, want: false},
 		{name: "Uncompressed extension", filename: "test.ssz", want: false},
 		{name: "Empty filename", filename: "", want: false},
@@ -475,7 +418,6 @@ func TestCompressor_Streams(t *testing.T) {
 
 	algorithms := []*compression.CompressionAlgorithm{
 		compression.Zstd,
-		compression.Gzip,
 		compression.None,
 	}
 
@@ -512,7 +454,7 @@ func TestCompressor_StreamsInteroperateWithByteAPI(t *testing.T) {
 
 	data := []byte(strings.Repeat("interop ", 5000))
 
-	for _, algorithm := range []*compression.CompressionAlgorithm{compression.Zstd, compression.Gzip} {
+	for _, algorithm := range []*compression.CompressionAlgorithm{compression.Zstd} {
 		algo := algorithm
 
 		t.Run(algo.Name, func(t *testing.T) {
@@ -572,14 +514,14 @@ func TestCompressor_NewWriterAndReaderErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestCompressor_Concurrent exercises the shared zstd encoder and decoder, and the pooled gzip
-// writers, from many goroutines at once. Run with -race.
+// TestCompressor_Concurrent exercises the shared zstd encoder and decoder from many goroutines at
+// once. Run with -race.
 func TestCompressor_Concurrent(t *testing.T) {
 	c := compression.NewCompressor()
 
 	const goroutines = 32
 
-	algorithms := []*compression.CompressionAlgorithm{compression.Zstd, compression.Gzip}
+	algorithms := []*compression.CompressionAlgorithm{compression.Zstd}
 
 	var wg sync.WaitGroup
 

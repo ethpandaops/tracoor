@@ -11,6 +11,7 @@ import (
 
 type Metrics struct {
 	queueSize               *prometheus.GaugeVec
+	queueWaitTime           *prometheus.HistogramVec
 	queueItemProcessingTime *prometheus.HistogramVec
 	itemExported            *prometheus.CounterVec
 	queueItemSkipped        *prometheus.CounterVec
@@ -21,6 +22,8 @@ type Metrics struct {
 	payloadMismatch         *prometheus.CounterVec
 	payloadVerified         *prometheus.CounterVec
 	transferIncomplete      *prometheus.CounterVec
+	fetchBytes              *prometheus.CounterVec
+	storedBytes             *prometheus.CounterVec
 }
 
 type Queue string
@@ -47,6 +50,14 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Namespace: namespace,
 				Name:      "queue_size",
 				Help:      "The size of the queue",
+			}, []string{labelQueue, labelAgent}),
+			queueWaitTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "queue_wait_seconds",
+				Help:      "The time an item spent waiting in the queue before a worker picked it up",
+				// A backlog is measured in slots, not seconds, so the buckets have
+				// to reach well past a slot without losing resolution beneath one.
+				Buckets: prometheus.ExponentialBuckets(0.1, 3, 9),
 			}, []string{labelQueue, labelAgent}),
 			queueItemProcessingTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 				Namespace: namespace,
@@ -99,9 +110,20 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Name:      "transfer_incomplete_total",
 				Help:      "The number of payloads abandoned because they did not arrive in full",
 			}, []string{labelQueue, labelAgent}),
+			fetchBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "fetch_bytes_total",
+				Help:      "The number of raw bytes read from a node",
+			}, []string{labelQueue, labelAgent}),
+			storedBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "stored_bytes_total",
+				Help:      "The number of compressed bytes handed to the store; the gap against fetch_bytes_total is what dedup saved",
+			}, []string{labelQueue, labelAgent}),
 		}
 
 		prometheus.MustRegister(metricsInstance.queueSize)
+		prometheus.MustRegister(metricsInstance.queueWaitTime)
 		prometheus.MustRegister(metricsInstance.queueItemProcessingTime)
 		prometheus.MustRegister(metricsInstance.itemExported)
 		prometheus.MustRegister(metricsInstance.queueItemSkipped)
@@ -112,6 +134,8 @@ func GetMetricsInstance(namespace string) *Metrics {
 		prometheus.MustRegister(metricsInstance.payloadMismatch)
 		prometheus.MustRegister(metricsInstance.payloadVerified)
 		prometheus.MustRegister(metricsInstance.transferIncomplete)
+		prometheus.MustRegister(metricsInstance.fetchBytes)
+		prometheus.MustRegister(metricsInstance.storedBytes)
 	})
 
 	return metricsInstance
@@ -119,6 +143,10 @@ func GetMetricsInstance(namespace string) *Metrics {
 
 func (m *Metrics) SetQueueSize(queue Queue, count int, agentName string) {
 	m.queueSize.WithLabelValues(string(queue), agentName).Set(float64(count))
+}
+
+func (m *Metrics) ObserveQueueWaitTime(queue Queue, duration time.Duration, agentName string) {
+	m.queueWaitTime.WithLabelValues(string(queue), agentName).Observe(duration.Seconds())
 }
 
 func (m *Metrics) ObserveQueueItemProcessingTime(queue Queue, duration time.Duration, agentName string) {
@@ -159,6 +187,27 @@ func (m *Metrics) IncrementPayloadVerified(queue Queue, agentName string) {
 
 func (m *Metrics) IncrementTransferIncomplete(queue Queue, agentName string) {
 	m.transferIncomplete.WithLabelValues(string(queue), agentName).Inc()
+}
+
+// AddFetchedBytes records raw bytes read from a node, whether or not they were
+// stored.
+func (m *Metrics) AddFetchedBytes(queue Queue, agentName string, bytes int64) {
+	if bytes <= 0 {
+		return
+	}
+
+	m.fetchBytes.WithLabelValues(string(queue), agentName).Add(float64(bytes))
+}
+
+// AddStoredBytes records compressed bytes handed to the store. A payload that
+// was hashed against one somebody else had already stored contributes nothing,
+// which is the whole point of measuring it separately.
+func (m *Metrics) AddStoredBytes(queue Queue, agentName string, bytes int64) {
+	if bytes <= 0 {
+		return
+	}
+
+	m.storedBytes.WithLabelValues(string(queue), agentName).Add(float64(bytes))
 }
 
 func (m *Metrics) ServeMetrics(ctx context.Context, addr string) {

@@ -105,10 +105,10 @@ func TestStreamPayloadStoresACompleteBody(t *testing.T) {
 	rsp := openTestResponse(t, server.URL)
 	require.Equal(t, int64(len(data)), rsp.ContentLength)
 
-	location, result, err := streamPayload(
+	location, result, err := streamSource(
 		context.Background(),
 		compressor,
-		rsp,
+		sourceFromResponse(rsp),
 		fsStore.SaveBeaconState,
 		testPayloadLocation,
 	)
@@ -153,10 +153,10 @@ func TestStreamPayloadAcceptsAnUnknownContentLength(t *testing.T) {
 	rsp := openTestResponse(t, server.URL)
 	require.Equal(t, int64(-1), rsp.ContentLength, "a chunked response has no length to check against")
 
-	_, result, err := streamPayload(
+	_, result, err := streamSource(
 		context.Background(),
 		compressor,
-		rsp,
+		sourceFromResponse(rsp),
 		fsStore.SaveBeaconState,
 		testPayloadLocation,
 	)
@@ -196,10 +196,10 @@ func TestStreamPayloadStoresNothingWhenTheBodyIsTruncated(t *testing.T) {
 
 	fsStore, base := newTestFSStore(t)
 
-	_, _, err := streamPayload(
+	_, _, err := streamSource(
 		context.Background(),
 		compression.NewCompressor(),
-		openTestResponse(t, server.URL),
+		sourceFromResponse(openTestResponse(t, server.URL)),
 		fsStore.SaveBeaconState,
 		testPayloadLocation,
 	)
@@ -220,10 +220,10 @@ func TestStreamPayloadStoresNothingOnAShortRead(t *testing.T) {
 		ContentLength: int64(len(data)) + 1,
 	}
 
-	_, _, err := streamPayload(
+	_, _, err := streamSource(
 		context.Background(),
 		compression.NewCompressor(),
-		rsp,
+		sourceFromResponse(rsp),
 		fsStore.SaveBeaconState,
 		testPayloadLocation,
 	)
@@ -242,10 +242,10 @@ func TestStreamPayloadAbortsTheSaveWhenTheReaderFails(t *testing.T) {
 		ContentLength: -1,
 	}
 
-	_, _, err := streamPayload(
+	_, _, err := streamSource(
 		context.Background(),
 		compression.NewCompressor(),
-		rsp,
+		sourceFromResponse(rsp),
 		fsStore.SaveBeaconState,
 		testPayloadLocation,
 	)
@@ -257,10 +257,10 @@ func TestStreamPayloadAbortsTheSaveWhenTheReaderFails(t *testing.T) {
 func TestStreamPayloadReportsAFailedSave(t *testing.T) {
 	saveErr := goerrors.New("store is down")
 
-	_, _, err := streamPayload(
+	_, _, err := streamSource(
 		context.Background(),
 		compression.NewCompressor(),
-		&api.RawResponse{Body: io.NopCloser(bytes.NewReader(payload(1024))), ContentLength: -1},
+		sourceFromResponse(&api.RawResponse{Body: io.NopCloser(bytes.NewReader(payload(1024))), ContentLength: -1}),
 		func(context.Context, *store.SaveParams) (string, error) {
 			return "", saveErr
 		},
@@ -272,10 +272,10 @@ func TestStreamPayloadReportsAFailedSave(t *testing.T) {
 func TestStreamPayloadClosesTheResponse(t *testing.T) {
 	body := &closeTrackingReader{Reader: bytes.NewReader(payload(4096))}
 
-	_, _, err := streamPayload(
+	_, _, err := streamSource(
 		context.Background(),
 		compression.NewCompressor(),
-		&api.RawResponse{Body: body, ContentLength: -1},
+		sourceFromResponse(&api.RawResponse{Body: body, ContentLength: -1}),
 		func(_ context.Context, params *store.SaveParams) (string, error) {
 			_, err := io.Copy(io.Discard, params.Data)
 

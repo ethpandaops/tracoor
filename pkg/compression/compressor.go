@@ -2,12 +2,10 @@ package compression
 
 import (
 	"bytes"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -29,11 +27,6 @@ var (
 		Extension:       ".zst",
 		ContentEncoding: "zstd",
 	}
-	Gzip = &CompressionAlgorithm{
-		Name:            "gzip",
-		Extension:       ".gz",
-		ContentEncoding: "gzip",
-	}
 	None = &CompressionAlgorithm{
 		Name:            "none",
 		Extension:       "",
@@ -46,7 +39,7 @@ var Default = Zstd
 
 // decodable lists the algorithms that leave a recognisable extension behind, newest first.
 // None is deliberately absent: its empty extension matches every filename.
-var decodable = []*CompressionAlgorithm{Zstd, Gzip}
+var decodable = []*CompressionAlgorithm{Zstd}
 
 // Compressor provides methods for compressing and decompressing data.
 //
@@ -61,19 +54,11 @@ type Compressor struct {
 	// zstdErr records a construction failure so the byte-slice API can report it on use rather
 	// than forcing every caller to handle a constructor error.
 	zstdErr error
-
-	gzipWriters sync.Pool
 }
 
 // NewCompressor creates a new Compressor instance.
 func NewCompressor() *Compressor {
-	c := &Compressor{
-		gzipWriters: sync.Pool{
-			New: func() any {
-				return gzip.NewWriter(io.Discard)
-			},
-		},
-	}
+	c := &Compressor{}
 
 	// A nil destination yields an encoder usable for EncodeAll only, which is all the
 	// byte-slice API needs. Zero frames keep an empty payload encoding to a real frame instead
@@ -127,15 +112,6 @@ func (c *Compressor) NewWriter(algorithm *CompressionAlgorithm, dst io.Writer) (
 		}
 
 		return w, nil
-	case Gzip.Name:
-		w, ok := c.gzipWriters.Get().(*gzip.Writer)
-		if !ok {
-			w = gzip.NewWriter(dst)
-		}
-
-		w.Reset(dst)
-
-		return &pooledGzipWriter{Writer: w, pool: &c.gzipWriters}, nil
 	case None.Name:
 		return nopWriteCloser{dst}, nil
 	default:
@@ -164,13 +140,6 @@ func (c *Compressor) NewReader(algorithm *CompressionAlgorithm, src io.Reader) (
 		}
 
 		return r.IOReadCloser(), nil
-	case Gzip.Name:
-		r, err := gzip.NewReader(src)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
-		}
-
-		return r, nil
 	case None.Name:
 		return io.NopCloser(src), nil
 	default:
@@ -206,7 +175,7 @@ func (c *Compressor) Compress(data *[]byte, algorithm *CompressionAlgorithm) ([]
 	}
 
 	if _, err := w.Write(*data); err != nil {
-		// Close anyway so a pooled writer is returned rather than dropped.
+		// Close anyway so the writer releases whatever it holds rather than being dropped.
 		_ = w.Close()
 
 		return nil, err
@@ -308,39 +277,13 @@ func GetCompressionAlgorithm(filename string) (*CompressionAlgorithm, error) {
 
 // GetCompressionAlgorithmFromContentEncoding resolves the algorithm a Content-Encoding names.
 func GetCompressionAlgorithmFromContentEncoding(contentEncoding string) (*CompressionAlgorithm, error) {
-	for _, algorithm := range []*CompressionAlgorithm{Zstd, Gzip, None} {
+	for _, algorithm := range []*CompressionAlgorithm{Zstd, None} {
 		if contentEncoding == algorithm.ContentEncoding {
 			return algorithm, nil
 		}
 	}
 
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedAlgorithm, contentEncoding)
-}
-
-// pooledGzipWriter returns its underlying writer to the pool on Close, so a compressor that is
-// called repeatedly does not allocate a fresh window each time.
-type pooledGzipWriter struct {
-	*gzip.Writer
-
-	pool *sync.Pool
-}
-
-func (w *pooledGzipWriter) Close() error {
-	if w.Writer == nil {
-		return nil
-	}
-
-	gz := w.Writer
-	w.Writer = nil
-
-	err := gz.Close()
-
-	// Drop the reference to the destination before parking the writer, so a pooled writer
-	// cannot keep a finished stream alive.
-	gz.Reset(io.Discard)
-	w.pool.Put(gz)
-
-	return err
 }
 
 type nopWriteCloser struct {

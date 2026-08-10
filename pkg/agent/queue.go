@@ -9,38 +9,59 @@ import (
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
-// Each request carries the pending-set key its producer claimed, so the worker
-// that finishes it releases exactly that claim rather than deriving the key a
-// second time.
+// queueItem is what every queued request carries regardless of which artifact
+// it is for: the pending-set key its producer claimed, so the worker that
+// finishes it releases exactly that claim rather than deriving the key a second
+// time, and when it was accepted, so the wait ahead of a worker can be told
+// apart from the time the worker itself spends.
+type queueItem struct {
+	key        string
+	enqueuedAt time.Time
+}
+
+func newQueueItem(key string) queueItem {
+	return queueItem{key: key, enqueuedAt: time.Now()}
+}
+
+func (i queueItem) claimKey() string { return i.key }
+
+func (i queueItem) acceptedAt() time.Time { return i.enqueuedAt }
+
+// queued is the shape every queue worker relies on, satisfied by embedding
+// queueItem.
+type queued interface {
+	claimKey() string
+	acceptedAt() time.Time
+}
 
 type BeaconStateRequest struct {
 	Slot phase0.Slot
 
-	key string
+	queueItem
 }
 
 type BeaconBlockRequest struct {
 	Slot phase0.Slot
 
-	key string
+	queueItem
 }
 
 type ExecutionPayloadEnvelopeRequest struct {
 	Slot phase0.Slot
 
-	key string
+	queueItem
 }
 
 type BeaconBadBlockRequest struct {
 	Path string
 
-	key string
+	queueItem
 }
 
 type BeaconBadBlobRequest struct {
 	Path string
 
-	key string
+	queueItem
 }
 
 // ExecutionBlockTraceRequest identifies the beacon block whose execution
@@ -50,11 +71,11 @@ type BeaconBadBlobRequest struct {
 type ExecutionBlockTraceRequest struct {
 	BlockID string
 
-	key string
+	queueItem
 }
 
 type ExecutionBadBlockRequest struct {
-	key string
+	queueItem
 }
 
 // enqueue hands an item to a queue, giving up if the agent is shutting down.
@@ -105,7 +126,7 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	if !enqueue(ctx, s.beaconStateQueue, &BeaconStateRequest{Slot: slot, key: key}) {
+	if !enqueue(ctx, s.beaconStateQueue, &BeaconStateRequest{Slot: slot, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -120,7 +141,7 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
-	if !enqueue(ctx, s.beaconBlockQueue, &BeaconBlockRequest{Slot: slot, key: key}) {
+	if !enqueue(ctx, s.beaconBlockQueue, &BeaconBlockRequest{Slot: slot, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -135,7 +156,7 @@ func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0
 		return
 	}
 
-	if !enqueue(ctx, s.executionPayloadEnvelopeQueue, &ExecutionPayloadEnvelopeRequest{Slot: slot, key: key}) {
+	if !enqueue(ctx, s.executionPayloadEnvelopeQueue, &ExecutionPayloadEnvelopeRequest{Slot: slot, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -150,7 +171,7 @@ func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
 		return
 	}
 
-	if !enqueue(ctx, s.beaconBadBlockQueue, &BeaconBadBlockRequest{Path: path, key: key}) {
+	if !enqueue(ctx, s.beaconBadBlockQueue, &BeaconBadBlockRequest{Path: path, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -165,7 +186,7 @@ func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
 		return
 	}
 
-	if !enqueue(ctx, s.beaconBadBlobQueue, &BeaconBadBlobRequest{Path: path, key: key}) {
+	if !enqueue(ctx, s.beaconBadBlobQueue, &BeaconBadBlobRequest{Path: path, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -180,7 +201,7 @@ func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) 
 		return
 	}
 
-	if !enqueue(ctx, s.executionBlockTraceQueue, &ExecutionBlockTraceRequest{BlockID: blockID, key: key}) {
+	if !enqueue(ctx, s.executionBlockTraceQueue, &ExecutionBlockTraceRequest{BlockID: blockID, queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -197,7 +218,7 @@ func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
 		return
 	}
 
-	if !enqueue(ctx, s.executionBadBlockQueue, &ExecutionBadBlockRequest{key: key}) {
+	if !enqueue(ctx, s.executionBadBlockQueue, &ExecutionBadBlockRequest{queueItem: newQueueItem(key)}) {
 		s.releaseQueueItem(key)
 	}
 }
@@ -206,18 +227,35 @@ func slotIdentifier(slot phase0.Slot) string {
 	return strconv.FormatUint(uint64(slot), 10)
 }
 
+// runWorker drains a queue and accounts for every item it takes out of it: the
+// claim released, the wait it served before a worker was free, and the time the
+// worker then spent on it. The accounting lives here rather than in the handlers
+// so an item that is dropped, skipped or abandoned half way is measured the same
+// as one that succeeded — a handler that returns early is exactly the case the
+// numbers need to include.
+func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue <-chan T, handle func(item T)) {
+	drainQueue(ctx, queue, func(item T) {
+		defer s.releaseQueueItem(item.claimKey())
+
+		s.metrics.SetQueueSize(kind, len(queue), s.Config.Name)
+		s.metrics.ObserveQueueWaitTime(kind, time.Since(item.acceptedAt()), s.Config.Name)
+
+		start := time.Now()
+
+		defer func() {
+			s.metrics.ObserveQueueItemProcessingTime(kind, time.Since(start), s.Config.Name)
+		}()
+
+		handle(item)
+	})
+}
+
 func (s *agent) processBeaconStateQueue(ctx context.Context) {
 	if !s.Config.Ethereum.Features.GetFetchBeaconState() {
 		return
 	}
 
-	drainQueue(ctx, s.beaconStateQueue, func(stateRequest *BeaconStateRequest) {
-		defer s.releaseQueueItem(stateRequest.key)
-
-		s.metrics.SetQueueSize(BeaconStateQueue, len(s.beaconStateQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, func(stateRequest *BeaconStateRequest) {
 		_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
 		if err != nil {
 			s.log.WithError(err).Error("Failed to get current time")
@@ -234,17 +272,13 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.BeaconStateAgeThresholdEpochs {
 			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
 			s.metrics.IncrementItemDropped(BeaconStateQueue, s.Config.Name, dropReasonStale)
-		} else {
-			s.runQueueItem(ctx, BeaconStateQueue, logCtx, func(ctx context.Context) error {
-				return s.fetchAndIndexBeaconState(ctx, stateRequest.Slot)
-			})
+
+			return
 		}
 
-		s.metrics.ObserveQueueItemProcessingTime(
-			BeaconStateQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
+		s.runQueueItem(ctx, BeaconStateQueue, logCtx, func(ctx context.Context) error {
+			return s.fetchAndIndexBeaconState(ctx, stateRequest.Slot)
+		})
 	})
 }
 
@@ -253,24 +287,12 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.beaconBlockQueue, func(blockRequest *BeaconBlockRequest) {
-		defer s.releaseQueueItem(blockRequest.key)
-
-		s.metrics.SetQueueSize(BeaconBlockQueue, len(s.beaconBlockQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, BeaconBlockQueue, s.beaconBlockQueue, func(blockRequest *BeaconBlockRequest) {
 		logCtx := s.log.WithField("slot", blockRequest.Slot)
 
 		s.runQueueItem(ctx, BeaconBlockQueue, logCtx, func(ctx context.Context) error {
 			return s.fetchAndIndexBeaconBlock(ctx, blockRequest.Slot)
 		})
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			BeaconBlockQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }
 
@@ -279,24 +301,12 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.executionPayloadEnvelopeQueue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
-		defer s.releaseQueueItem(envelopeRequest.key)
-
-		s.metrics.SetQueueSize(ExecutionPayloadEnvelopeQueue, len(s.executionPayloadEnvelopeQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, ExecutionPayloadEnvelopeQueue, s.executionPayloadEnvelopeQueue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
 		logCtx := s.log.WithField("slot", envelopeRequest.Slot)
 
 		s.runQueueItem(ctx, ExecutionPayloadEnvelopeQueue, logCtx, func(ctx context.Context) error {
 			return s.fetchAndIndexExecutionPayloadEnvelope(ctx, envelopeRequest.Slot)
 		})
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			ExecutionPayloadEnvelopeQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }
 
@@ -305,26 +315,12 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.beaconBadBlockQueue, func(badBlockRequest *BeaconBadBlockRequest) {
-		defer s.releaseQueueItem(badBlockRequest.key)
-
-		s.metrics.SetQueueSize(BeaconBadBlockQueue, len(s.beaconBadBlockQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, BeaconBadBlockQueue, s.beaconBadBlockQueue, func(badBlockRequest *BeaconBadBlockRequest) {
 		if err := s.fetchAndIndexBeaconBadBlocks(ctx, badBlockRequest.Path); err != nil {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index beacon bad blocks")
-
-			return
 		}
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			BeaconBadBlockQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }
 
@@ -333,26 +329,12 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.beaconBadBlobQueue, func(badBlobRequest *BeaconBadBlobRequest) {
-		defer s.releaseQueueItem(badBlobRequest.key)
-
-		s.metrics.SetQueueSize(BeaconBadBlobQueue, len(s.beaconBadBlobQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, BeaconBadBlobQueue, s.beaconBadBlobQueue, func(badBlobRequest *BeaconBadBlobRequest) {
 		if err := s.fetchAndIndexBeaconBadBlobs(ctx, badBlobRequest.Path); err != nil {
 			s.log.
 				WithError(err).
-				Error("Failed to fetch and index beacon bad blocks")
-
-			return
+				Error("Failed to fetch and index beacon bad blobs")
 		}
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			BeaconBadBlobQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }
 
@@ -361,13 +343,7 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.executionBlockTraceQueue, func(traceRequest *ExecutionBlockTraceRequest) {
-		defer s.releaseQueueItem(traceRequest.key)
-
-		s.metrics.SetQueueSize(ExecutionBlockTraceQueue, len(s.executionBlockTraceQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, ExecutionBlockTraceQueue, s.executionBlockTraceQueue, func(traceRequest *ExecutionBlockTraceRequest) {
 		logCtx := s.log.WithField("block_id", traceRequest.BlockID)
 
 		s.runQueueItem(ctx, ExecutionBlockTraceQueue, logCtx, func(ctx context.Context) error {
@@ -382,12 +358,6 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 
 			return s.fetchAndIndexExecutionBlockTrace(ctx, blockNumber, blockHash)
 		})
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			ExecutionBlockTraceQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }
 
@@ -396,25 +366,11 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	drainQueue(ctx, s.executionBadBlockQueue, func(badBlockRequest *ExecutionBadBlockRequest) {
-		defer s.releaseQueueItem(badBlockRequest.key)
-
-		s.metrics.SetQueueSize(ExecutionBadBlockQueue, len(s.executionBadBlockQueue), s.Config.Name)
-
-		start := time.Now()
-
+	runWorker(ctx, s, ExecutionBadBlockQueue, s.executionBadBlockQueue, func(_ *ExecutionBadBlockRequest) {
 		if err := s.fetchAndIndexExecutionBadBlocks(ctx); err != nil {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index execution bad blocks")
-
-			return
 		}
-
-		s.metrics.ObserveQueueItemProcessingTime(
-			ExecutionBadBlockQueue,
-			time.Since(start),
-			s.Config.Name,
-		)
 	})
 }

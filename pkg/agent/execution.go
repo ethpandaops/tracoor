@@ -178,6 +178,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 	contentHash := sha256.Sum256(rawBlockData)
 
 	s.metrics.IncrementPayloadVerified(ExecutionBadBlockQueue, s.Config.Name)
+	s.metrics.AddFetchedBytes(ExecutionBadBlockQueue, s.Config.Name, int64(len(rawBlockData)))
 
 	// Compress it
 	compressedBlockData, err := s.compressor.Compress(&rawBlockData, compression.Default)
@@ -204,6 +205,8 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 	if err != nil {
 		return errors.Wrap(err, "failed to save execution bad block to store")
 	}
+
+	s.metrics.AddStoredBytes(ExecutionBadBlockQueue, s.Config.Name, int64(len(compressedBlockData)))
 
 	req := &indexer.CreateExecutionBadBlockRequest{
 		Node:                    wrapperspb.String(s.Config.Name),

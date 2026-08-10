@@ -83,7 +83,7 @@ func TestIndexerBeaconBadBlockDownloading(t *testing.T) {
 
 		compressor := compression.NewCompressor()
 
-		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		compressedData, err := compressor.Compress(&data, compression.Default)
 		if err != nil {
 			t.Fatalf("failed to compress data: %v", err)
 		}
@@ -91,7 +91,7 @@ func TestIndexerBeaconBadBlockDownloading(t *testing.T) {
 		location, err := index.Store().SaveBeaconBadBlock(ctx, &store.SaveParams{
 			Data:            bytes.NewReader(compressedData),
 			Location:        testDataLocation,
-			ContentEncoding: compression.Gzip.ContentEncoding,
+			ContentEncoding: compression.Default.ContentEncoding,
 		})
 		if err != nil {
 			t.Fatalf("failed to save beacon state: %v", err)

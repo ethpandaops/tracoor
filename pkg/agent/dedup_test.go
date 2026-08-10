@@ -393,6 +393,11 @@ func TestDedupMissStoresThePayloadAndLinksToIt(t *testing.T) {
 	require.Equal(t, float64(1), testutil.ToFloat64(f.agent.metrics.blobCreated.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
 	require.Equal(t, float64(1), testutil.ToFloat64(f.agent.metrics.payloadVerified.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
 	require.Equal(t, float64(1), testutil.ToFloat64(f.agent.metrics.itemExported.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
+	require.Equal(t, float64(len(data)), testutil.ToFloat64(f.agent.metrics.fetchBytes.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
+
+	stored := testutil.ToFloat64(f.agent.metrics.storedBytes.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name))
+	require.Positive(t, stored)
+	require.Less(t, stored, float64(len(data)), "the stored bytes are the compressed ones")
 }
 
 func TestDedupHitLinksToTheStoredPayloadWhenTheHashMatches(t *testing.T) {
@@ -419,6 +424,9 @@ func TestDedupHitLinksToTheStoredPayloadWhenTheHashMatches(t *testing.T) {
 
 	require.Empty(t, storedObjects(t, f.base))
 	require.Equal(t, float64(1), testutil.ToFloat64(f.agent.metrics.blobReused.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
+	require.Equal(t, float64(len(data)), testutil.ToFloat64(f.agent.metrics.fetchBytes.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)))
+	require.Zero(t, testutil.ToFloat64(f.agent.metrics.storedBytes.WithLabelValues(string(BeaconStateQueue), f.agent.Config.Name)),
+		"a payload that was only hashed stored nothing, which is the gap dedup saved")
 }
 
 func TestDedupHitRecordsADivergenceAndStoresTheDivergentCopy(t *testing.T) {

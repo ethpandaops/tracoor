@@ -175,7 +175,7 @@ func testBeaconState(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		compressedData, err := compressor.Compress(&data, compression.Default)
 		if err != nil {
 			t.Fatalf("Failed to compress data: %v", err)
 		}
@@ -183,7 +183,7 @@ func testBeaconState(ctx context.Context, t *testing.T, store Store) {
 		location, err = store.SaveBeaconState(ctx, &SaveParams{
 			Data:            bytes.NewReader(compressedData),
 			Location:        location,
-			ContentEncoding: compression.Gzip.ContentEncoding,
+			ContentEncoding: compression.Default.ContentEncoding,
 		})
 		if err != nil {
 			t.Fatalf("Failed to save beacon state: %v", err)
