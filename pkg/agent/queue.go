@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
@@ -27,16 +28,19 @@ type BeaconBadBlobRequest struct {
 	Path string
 }
 
+// ExecutionBlockTraceRequest identifies the beacon block whose execution
+// payload should be traced. It carries no execution block hash or number:
+// resolving those can block on a builder revealing a payload, so it happens on
+// the queue worker rather than in the beacon event callback that queues it.
 type ExecutionBlockTraceRequest struct {
-	BlockNumber uint64
-	BlockHash   string
+	BlockID string
 }
 
 type ExecutionBadBlockRequest struct {
 }
 
 func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
-	if !s.Config.Ethereum.Features.GetFetchBeaconState() {
+	if !s.Config.Ethereum.Features.GetFetchBeaconState() || !s.allowArtifact(BeaconStateQueue) {
 		return
 	}
 
@@ -46,7 +50,7 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 }
 
 func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
-	if !s.Config.Ethereum.Features.GetFetchBeaconBlock() {
+	if !s.Config.Ethereum.Features.GetFetchBeaconBlock() || !s.allowArtifact(BeaconBlockQueue) {
 		return
 	}
 
@@ -56,7 +60,7 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 }
 
 func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) {
-	if !s.Config.Ethereum.Features.GetFetchExecutionPayloadEnvelope() {
+	if !s.Config.Ethereum.Features.GetFetchExecutionPayloadEnvelope() || !s.allowArtifact(ExecutionPayloadEnvelopeQueue) {
 		return
 	}
 
@@ -85,14 +89,13 @@ func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
 	}
 }
 
-func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockHash string, blockNumber uint64) {
-	if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() {
+func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) {
+	if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() || !s.allowArtifact(ExecutionBlockTraceQueue) {
 		return
 	}
 
 	s.executionBlockTraceQueue <- &ExecutionBlockTraceRequest{
-		BlockNumber: blockNumber,
-		BlockHash:   blockHash,
+		BlockID: blockID,
 	}
 }
 
@@ -124,16 +127,16 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(stateRequest.Slot))
 		targetEpochNumber := targetEpoch.Number()
 
+		logCtx := s.log.WithField("slot", stateRequest.Slot)
+
 		// If the slot is older than the allowed number of epochs we'll skip it.
 		if nowEpoch.Number()-targetEpochNumber > s.Config.Ethereum.BeaconStateAgeThresholdEpochs {
 			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
+			s.metrics.IncrementItemDropped(BeaconStateQueue, s.Config.Name, dropReasonStale)
 		} else {
-			if err := s.fetchAndIndexBeaconState(ctx, stateRequest.Slot); err != nil {
-				s.log.
-					WithError(err).
-					WithField("slot", stateRequest.Slot).
-					Error("Failed to fetch and index beacon state")
-			}
+			s.runQueueItem(ctx, BeaconStateQueue, logCtx, func(ctx context.Context) error {
+				return s.fetchAndIndexBeaconState(ctx, stateRequest.Slot)
+			})
 		}
 
 		s.metrics.ObserveQueueItemProcessingTime(
@@ -154,14 +157,11 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 
 		start := time.Now()
 
-		if err := s.fetchAndIndexBeaconBlock(ctx, blockRequest.Slot); err != nil {
-			s.log.
-				WithError(err).
-				WithField("slot", blockRequest.Slot).
-				Error("Failed to fetch and index beacon block")
+		logCtx := s.log.WithField("slot", blockRequest.Slot)
 
-			continue
-		}
+		s.runQueueItem(ctx, BeaconBlockQueue, logCtx, func(ctx context.Context) error {
+			return s.fetchAndIndexBeaconBlock(ctx, blockRequest.Slot)
+		})
 
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBlockQueue,
@@ -181,14 +181,11 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 
 		start := time.Now()
 
-		if err := s.fetchAndIndexExecutionPayloadEnvelope(ctx, envelopeRequest.Slot); err != nil {
-			s.log.
-				WithError(err).
-				WithField("slot", envelopeRequest.Slot).
-				Error("Failed to fetch and index execution payload envelope")
+		logCtx := s.log.WithField("slot", envelopeRequest.Slot)
 
-			continue
-		}
+		s.runQueueItem(ctx, ExecutionPayloadEnvelopeQueue, logCtx, func(ctx context.Context) error {
+			return s.fetchAndIndexExecutionPayloadEnvelope(ctx, envelopeRequest.Slot)
+		})
 
 		s.metrics.ObserveQueueItemProcessingTime(
 			ExecutionPayloadEnvelopeQueue,
@@ -260,15 +257,20 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 
 		start := time.Now()
 
-		if err := s.fetchAndIndexExecutionBlockTrace(ctx, traceRequest.BlockNumber, traceRequest.BlockHash); err != nil {
-			s.log.
-				WithError(err).
-				WithField("block_hash", traceRequest.BlockHash).
-				WithField("block_number", traceRequest.BlockNumber).
-				Error("Failed to fetch and index execution block trace")
+		logCtx := s.log.WithField("block_id", traceRequest.BlockID)
 
-			continue
-		}
+		s.runQueueItem(ctx, ExecutionBlockTraceQueue, logCtx, func(ctx context.Context) error {
+			blockHash, blockNumber, err := s.resolveExecutionBlock(ctx, traceRequest.BlockID)
+			if err != nil {
+				return err
+			}
+
+			if s.executionBlockTraceStale(ctx, blockNumber) {
+				return fmt.Errorf("%w: execution block %d", errItemStale, blockNumber)
+			}
+
+			return s.fetchAndIndexExecutionBlockTrace(ctx, blockNumber, blockHash)
+		})
 
 		s.metrics.ObserveQueueItemProcessingTime(
 			ExecutionBlockTraceQueue,

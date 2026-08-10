@@ -165,6 +165,11 @@ func (n *Node) rawResult(ctx context.Context, call ethrpc.Call) ([]byte, error) 
 	return data.Result, nil
 }
 
+// BlockNumber returns the execution node's current head block number.
+func (n *Node) BlockNumber(ctx context.Context) (uint64, error) {
+	return n.rpc.BlockNumber(ctx)
+}
+
 // GetBlockNumberByHash resolves an execution block number from its hash.
 // Returns ErrBlockNotFound if the node does not (yet) have the block.
 func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, error) {

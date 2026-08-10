@@ -290,17 +290,12 @@ func getBadBlocksFilePattern(client string) (*string, error) {
 	return &pattern, nil
 }
 
-const (
-	executionPayloadEnvelopeFetchAttempts = 5
-	executionPayloadEnvelopeFetchDelay    = 3 * time.Second
-)
-
 // fetchAndIndexExecutionPayloadEnvelope archives the signed execution payload
 // envelope for the block at the given slot. Envelopes exist from the gloas
-// fork onwards and are revealed by the builder after the block arrives, so
-// the fetch retries briefly while the beacon node reports it as not found. A
-// payload that is never revealed leaves the slot without an envelope, which
-// is not an error.
+// fork onwards and are revealed by the builder after the block arrives, so a
+// not-found response means the payload has not (yet) been revealed. A payload
+// that is never revealed leaves the slot without an envelope, which is not an
+// error worth chasing.
 func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -360,54 +355,22 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	now := time.Now()
 
-	var envelopeRaw []byte
-
 	// Held only while a fetch is in flight and, on success, until the upload
-	// finishes. The retry delays below are spent without a slot so a payload that
-	// is never revealed does not occupy one for the whole backoff.
-	var releaseFetchSlot func()
-
-	defer func() {
-		if releaseFetchSlot != nil {
-			releaseFetchSlot()
-		}
-	}()
-
-	for attempt := 0; attempt < executionPayloadEnvelopeFetchAttempts; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(executionPayloadEnvelopeFetchDelay):
-			}
-		}
-
-		release, aErr := s.acquireFetchSlot(ctx)
-		if aErr != nil {
-			return errors.Wrap(aErr, "failed to acquire fetch slot")
-		}
-
-		envelopeRaw, err = s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
-		if err == nil {
-			releaseFetchSlot = release
-
-			break
-		}
-
-		release()
-
-		if !goerrors.Is(err, api.ErrNotFound) {
-			return errors.Wrap(err, "failed to fetch execution payload envelope")
-		}
+	// finishes.
+	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to acquire fetch slot")
 	}
 
-	if err != nil {
-		s.log.
-			WithField("block_root", blockRootAsString).
-			WithField("slot", slot).
-			Debug("Execution payload envelope not available, payload was likely never revealed")
+	defer releaseFetchSlot()
 
-		return nil
+	envelopeRaw, err := s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
+	if err != nil {
+		if goerrors.Is(err, api.ErrNotFound) {
+			return fmt.Errorf("%w: execution payload envelope for %s has not been revealed", errItemNotAvailable, blockRootAsString)
+		}
+
+		return errors.Wrap(err, "failed to fetch execution payload envelope")
 	}
 
 	// Compress it
