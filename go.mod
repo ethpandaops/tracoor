@@ -10,7 +10,7 @@ require (
 	github.com/aws/smithy-go v1.20.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/creasty/defaults v1.7.0
-	github.com/ethpandaops/beacon v0.69.1-0.20260716043407-1de3961bc7c9
+	github.com/ethpandaops/beacon v0.69.1-0.20260729054934-116daa79091e
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/ethpandaops/go-eth2-client v0.1.7-0.20260712074542-bca0dce49005
 	github.com/glebarez/sqlite v1.10.0
