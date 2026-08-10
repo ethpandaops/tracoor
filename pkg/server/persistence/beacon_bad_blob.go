@@ -10,22 +10,27 @@ import (
 )
 
 type BeaconBadBlob struct {
-	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:1"`
+	Node string `gorm:"not null;default:'';uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:5;index:ix_beacon_bad_blobs_network_node_fetched_at,priority:2"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_bad_blob_slot,where:deleted_at IS NULL;index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:2"`
-	Epoch                int64
-	BlockRoot            string    `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:5;index:idx_beacon_bad_blob_fetchedat,where:deleted_at IS NULL;index:idx_beacon_bad_blob_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	BeaconImplementation string
-	NodeVersion          string `gorm:"not null;default:''"`
-	Location             string `gorm:"not null;default:''"`
-	ContentEncoding      string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:'';index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:4;index:idx_beacon_bad_blob_network,where:deleted_at IS NULL;index:idx_beacon_bad_blob_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	Index                int64  `gorm:"index;index:idx_beacon_bad_blob_node_slot_blockroot_network_fetchedat_index,where:deleted_at IS NULL,priority:6"`
+	Slot                 int64     `gorm:"not null;default:0;uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:2"`
+	Epoch                int64     `gorm:"not null;default:0"`
+	BlockRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:3"`
+	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_bad_blobs_fetched_at;index:ix_beacon_bad_blobs_network_node_fetched_at,priority:3;index:ix_beacon_bad_blobs_network_fetched_at,priority:2"`
+	BeaconImplementation string    `gorm:"not null;default:''"`
+	NodeVersion          string    `gorm:"not null;default:''"`
+	ContentEncoding      string    `gorm:"not null;default:''"`
+	Location             string    `gorm:"not null;default:''"`
+	ContentHash          string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched. Bad blobs are never linked, so it stays null.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:1;index:ix_beacon_bad_blobs_network_node_fetched_at,priority:1;index:ix_beacon_bad_blobs_network_fetched_at,priority:1"`
+	Index            int64  `gorm:"not null;default:0;uniqueIndex:ux_beacon_bad_blobs_dedupe,priority:4"`
 }
 
 type BeaconBadBlobFilter struct {
@@ -266,7 +271,7 @@ type DistinctBeaconBadBlobValueResults struct {
 }
 
 //nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []string) (*DistinctBeaconBadBlobValueResults, error) {
+func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []string, network string) (*DistinctBeaconBadBlobValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -282,7 +287,13 @@ func (i *Indexer) DistinctBeaconBadBlobValues(ctx context.Context, fields []stri
 		BeaconImplementation: make([]string, 0),
 		Index:                make([]uint64, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&BeaconBadBlob{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
+	query := i.db.WithContext(ctx).Model(&BeaconBadBlob{})
+
+	if network != "" {
+		query = query.Where("network = ?", network)
+	}
+
+	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
 	rows, err := query.Rows()
 	if err != nil {

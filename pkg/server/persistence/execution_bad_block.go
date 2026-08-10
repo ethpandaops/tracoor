@@ -11,18 +11,23 @@ import (
 )
 
 type ExecutionBadBlock struct {
-	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
-	Node                    string    `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	FetchedAt               time.Time `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:iidx_execution_bad_block_fetchedat,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	ExecutionImplementation string
-	NodeVersion             string `gorm:"not null;default:''"`
-	ContentEncoding         string `gorm:"not null;default:''"`
-	Location                string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:iidx_execution_bad_block_network,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockHash               string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockNumber             sql.NullInt64
-	BlockExtraData          sql.NullString
+	Node                    string    `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:3;index:ix_execution_bad_blocks_network_node_fetched_at,priority:2"`
+	FetchedAt               time.Time `gorm:"not null;index:ix_execution_bad_blocks_fetched_at;index:ix_execution_bad_blocks_network_node_fetched_at,priority:3;index:ix_execution_bad_blocks_network_fetched_at,priority:2"`
+	ExecutionImplementation string    `gorm:"not null;default:''"`
+	NodeVersion             string    `gorm:"not null;default:''"`
+	ContentEncoding         string    `gorm:"not null;default:''"`
+	Location                string    `gorm:"not null;default:''"`
+	ContentHash             string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched. Bad blocks are never linked, so it stays null.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:1;index:ix_execution_bad_blocks_network_node_fetched_at,priority:1;index:ix_execution_bad_blocks_network_fetched_at,priority:1"`
+	BlockHash        string `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:2"`
+	BlockNumber      sql.NullInt64
+	BlockExtraData   sql.NullString
 }
 
 type ExecutionBadBlockFilter struct {
@@ -252,7 +257,7 @@ type DistinctExecutionBadBlockValueResults struct {
 }
 
 //nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []string) (*DistinctExecutionBadBlockValueResults, error) {
+func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []string, network string) (*DistinctExecutionBadBlockValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -267,7 +272,13 @@ func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []
 		NodeVersion:             make([]string, 0),
 		BlockExtraData:          make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&ExecutionBadBlock{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
+	query := i.db.WithContext(ctx).Model(&ExecutionBadBlock{})
+
+	if network != "" {
+		query = query.Where("network = ?", network)
+	}
+
+	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
 	rows, err := query.Rows()
 	if err != nil {

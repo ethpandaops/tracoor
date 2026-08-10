@@ -28,6 +28,19 @@ func generateRandomInt64() int64 {
 	return rand.Int63()
 }
 
+// generateRandomContentHash produces a value shaped like a sha256 digest in lower-case hex.
+func generateRandomContentHash() string {
+	const charset = "0123456789abcdef"
+
+	b := make([]byte, 64)
+
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+
+	return string(b)
+}
+
 func NewMockIndexer(ctx context.Context, config *Config) (*Indexer, func() error, error) {
 	st, cleanup, err := store.NewMockS3Store(ctx, "example-bucket")
 	if err != nil {

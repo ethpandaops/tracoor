@@ -109,6 +109,16 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate execution bad block")
 	}
 
+	err = i.db.AutoMigrate(&Blob{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate blob")
+	}
+
+	err = i.db.AutoMigrate(&PayloadDivergence{})
+	if err != nil {
+		return perrors.Wrap(err, "failed to auto migrate payload divergence")
+	}
+
 	err = i.db.AutoMigrate(&DistributedLock{})
 	if err != nil {
 		return perrors.Wrap(err, "failed to auto migrate distributed lock")

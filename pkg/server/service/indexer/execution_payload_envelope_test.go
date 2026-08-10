@@ -26,6 +26,8 @@ func createRandomExecutionPayloadEnvelopeRequest() *pindexer.CreateExecutionPayl
 		NodeVersion:          wrapperspb.String(generateRandomString(8)),
 		Location:             wrapperspb.String(generateRandomString(10)),
 		Network:              wrapperspb.String(generateRandomString(5)),
+		ContentHash:          wrapperspb.String(generateRandomContentHash()),
+		DedupKey:             wrapperspb.String(generateRandomString(20)),
 	}
 }
 
@@ -191,8 +193,8 @@ func TestIndexerExecutionPayloadEnvelope(t *testing.T) {
 		}
 
 		_, err = index.CreateExecutionPayloadEnvelope(ctx, req)
-		if err != nil && err.Error() != beaconStateExistsStr {
-			t.Fatal("expected error to be 'beacon state already exists'")
+		if err == nil {
+			t.Fatal("expected duplicate execution payload envelope to be rejected")
 		}
 	})
 

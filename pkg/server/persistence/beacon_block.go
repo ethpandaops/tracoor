@@ -10,21 +10,26 @@ import (
 )
 
 type BeaconBlock struct {
-	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:1"`
+	Node string `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:4;index:ix_beacon_blocks_network_node_fetched_at,priority:2"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_block_slot,where:deleted_at IS NULL;index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
-	Epoch                int64
-	BlockRoot            string    `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_block_fetchedat,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	BeaconImplementation string
-	NodeVersion          string `gorm:"not null;default:''"`
-	ContentEncoding      string `gorm:"not null;default:''"`
-	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:'';index;index:idx_beacon_block_node_slot_blockroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_network,where:deleted_at IS NULL;index:idx_beacon_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	Slot                 int64     `gorm:"not null;default:0;uniqueIndex:ux_beacon_blocks_dedupe,priority:2"`
+	Epoch                int64     `gorm:"not null;default:0"`
+	BlockRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:3"`
+	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_blocks_fetched_at;index:ix_beacon_blocks_network_node_fetched_at,priority:3;index:ix_beacon_blocks_network_fetched_at,priority:2"`
+	BeaconImplementation string    `gorm:"not null;default:''"`
+	NodeVersion          string    `gorm:"not null;default:''"`
+	ContentEncoding      string    `gorm:"not null;default:''"`
+	Location             string    `gorm:"not null;default:''"`
+	ContentHash          string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:1;index:ix_beacon_blocks_network_node_fetched_at,priority:1;index:ix_beacon_blocks_network_fetched_at,priority:1"`
 }
 
 type BeaconBlockFilter struct {
@@ -254,7 +259,7 @@ type DistinctBeaconBlockValueResults struct {
 }
 
 //nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctBeaconBlockValues(ctx context.Context, fields []string) (*DistinctBeaconBlockValueResults, error) {
+func (i *Indexer) DistinctBeaconBlockValues(ctx context.Context, fields []string, network string) (*DistinctBeaconBlockValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -269,7 +274,13 @@ func (i *Indexer) DistinctBeaconBlockValues(ctx context.Context, fields []string
 		Network:              make([]string, 0),
 		BeaconImplementation: make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&BeaconBlock{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
+	query := i.db.WithContext(ctx).Model(&BeaconBlock{})
+
+	if network != "" {
+		query = query.Where("network = ?", network)
+	}
+
+	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
 	rows, err := query.Rows()
 	if err != nil {

@@ -26,6 +26,8 @@ func createRandomBeaconStateRequest() *pindexer.CreateBeaconStateRequest {
 		NodeVersion:          wrapperspb.String(generateRandomString(8)),
 		Location:             wrapperspb.String(generateRandomString(10)),
 		Network:              wrapperspb.String(generateRandomString(5)),
+		ContentHash:          wrapperspb.String(generateRandomContentHash()),
+		DedupKey:             wrapperspb.String(generateRandomString(20)),
 	}
 }
 
@@ -191,8 +193,8 @@ func TestIndexerBeaconState(t *testing.T) {
 		}
 
 		_, err = index.CreateBeaconState(ctx, req)
-		if err != nil && err.Error() != "beacon state already exists" {
-			t.Fatal("expected error to be 'beacon state already exists'")
+		if err == nil {
+			t.Fatal("expected duplicate beacon state to be rejected")
 		}
 	})
 

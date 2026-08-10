@@ -140,6 +140,9 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 			Network:              state.Network,
 			FetchedAt:            state.FetchedAt,
 			BeaconImplementation: state.BeaconImplementation,
+			ContentHash:          state.ContentHash,
+			VerifiedAt:           state.VerifiedAt,
+			ContentMatchedAt:     state.ContentMatchedAt,
 		}
 	}
 
@@ -178,7 +181,8 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconStateValuesRequest{
-		Fields: []indexer.ListUniqueBeaconStateValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconStateValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -264,6 +268,9 @@ func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockReque
 			Network:              block.Network,
 			FetchedAt:            block.FetchedAt,
 			BeaconImplementation: block.BeaconImplementation,
+			ContentHash:          block.ContentHash,
+			VerifiedAt:           block.VerifiedAt,
+			ContentMatchedAt:     block.ContentMatchedAt,
 		}
 	}
 
@@ -302,7 +309,8 @@ func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniq
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBlockValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -388,6 +396,9 @@ func (i *API) ListExecutionPayloadEnvelope(ctx context.Context, req *api.ListExe
 			Network:              envelope.Network,
 			FetchedAt:            envelope.FetchedAt,
 			BeaconImplementation: envelope.BeaconImplementation,
+			ContentHash:          envelope.ContentHash,
+			VerifiedAt:           envelope.VerifiedAt,
+			ContentMatchedAt:     envelope.ContentMatchedAt,
 		}
 	}
 
@@ -426,7 +437,8 @@ func (i *API) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req 
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest{
-		Fields: []indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -512,6 +524,9 @@ func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBloc
 			Network:              block.Network,
 			FetchedAt:            block.FetchedAt,
 			BeaconImplementation: block.BeaconImplementation,
+			ContentHash:          block.ContentHash,
+			VerifiedAt:           block.VerifiedAt,
+			ContentMatchedAt:     block.ContentMatchedAt,
 		}
 	}
 
@@ -550,7 +565,8 @@ func (i *API) ListUniqueBeaconBadBlockValues(ctx context.Context, req *api.ListU
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBadBlockValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBadBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBadBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -638,6 +654,9 @@ func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobR
 			FetchedAt:            blob.FetchedAt,
 			BeaconImplementation: blob.BeaconImplementation,
 			Index:                blob.Index,
+			ContentHash:          blob.ContentHash,
+			VerifiedAt:           blob.VerifiedAt,
+			ContentMatchedAt:     blob.ContentMatchedAt,
 		}
 	}
 
@@ -677,7 +696,8 @@ func (i *API) ListUniqueBeaconBadBlobValues(ctx context.Context, req *api.ListUn
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBadBlobValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBadBlobValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBadBlobValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -762,6 +782,9 @@ func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutio
 			Network:                 trace.Network,
 			ExecutionImplementation: trace.ExecutionImplementation,
 			NodeVersion:             trace.NodeVersion,
+			ContentHash:             trace.ContentHash,
+			VerifiedAt:              trace.VerifiedAt,
+			ContentMatchedAt:        trace.ContentMatchedAt,
 		}
 	}
 
@@ -799,7 +822,8 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueExecutionBlockTraceValuesRequest{
-		Fields: []indexer.ListUniqueExecutionBlockTraceValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueExecutionBlockTraceValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -880,6 +904,9 @@ func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionB
 			ExecutionImplementation: trace.ExecutionImplementation,
 			NodeVersion:             trace.NodeVersion,
 			BlockExtraData:          trace.BlockExtraData,
+			ContentHash:             trace.ContentHash,
+			VerifiedAt:              trace.VerifiedAt,
+			ContentMatchedAt:        trace.ContentMatchedAt,
 		}
 	}
 
@@ -918,7 +945,8 @@ func (i *API) ListUniqueExecutionBadBlockValues(ctx context.Context, req *api.Li
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueExecutionBadBlockValuesRequest{
-		Fields: []indexer.ListUniqueExecutionBadBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueExecutionBadBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {

@@ -47,6 +47,12 @@ const (
 	OperationListExecutionBadBlock   Operation = "list_execution_bad_block"
 	OperationUpdateExecutionBadBlock Operation = "update_execution_bad_block"
 
+	OperationGetBlob    Operation = "get_blob"
+	OperationInsertBlob Operation = "insert_blob"
+
+	OperationInsertPayloadDivergence Operation = "insert_payload_divergence"
+	OperationListPayloadDivergence   Operation = "list_payload_divergence"
+
 	OperationInsertPermanentBlock Operation = "insert_permanent_block"
 	OperationGetPermanentBlock    Operation = "get_permanent_block"
 	OperationCountPermanentBlock  Operation = "count_permanent_block"

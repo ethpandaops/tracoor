@@ -199,69 +199,42 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Create a lock key for this block
 	lockKey := fmt.Sprintf("permanent_store:%s", cacheKey)
 
-	// Try to acquire a distributed lock with retries
+	// Try to acquire a distributed lock with retries. An unacquired lock is not an error:
+	// another instance holds it and is processing this block.
 	var acquired bool
-
-	var err error
 
 	retryInterval := 200 * time.Millisecond
 	maxRetryDuration := 35 * time.Second
 	startTime := time.Now()
 
 	for time.Since(startTime) < maxRetryDuration {
-		if acquired {
-			break
-		}
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			acquired, err = p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
+			a, err := p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
 			if err != nil {
-				// If the error indicates someone else has the lock, retry
-				if err.Error() != "" && time.Since(startTime) < maxRetryDuration {
-					p.log.WithFields(logrus.Fields{
-						KeyBlockRoot: block.BlockRoot,
-						KeyNetwork:   block.Network,
-						KeyLockKey:   lockKey,
-						"error":      err.Error(),
-						"elapsed":    time.Since(startTime).String(),
-					}).Debug("Failed to acquire lock, retrying...")
-
-					time.Sleep(retryInterval)
-
-					continue
-				}
-
 				return fmt.Errorf("failed to acquire lock: %w", err)
 			}
 
-			if acquired {
+			if a {
+				acquired = true
+
 				break
-			}
-
-			// If we couldn't acquire the lock but there's no error, retry
-			if time.Since(startTime) < maxRetryDuration {
-				p.log.WithFields(logrus.Fields{
-					KeyBlockRoot: block.BlockRoot,
-					KeyNetwork:   block.Network,
-					KeyLockKey:   lockKey,
-					"elapsed":    time.Since(startTime).String(),
-				}).Debug("Failed to acquire lock, retrying...")
-
-				time.Sleep(retryInterval)
-
-				continue
 			}
 
 			p.log.WithFields(logrus.Fields{
 				KeyBlockRoot: block.BlockRoot,
 				KeyNetwork:   block.Network,
 				KeyLockKey:   lockKey,
-			}).Debug("Failed to acquire lock after retries, another instance is processing this block")
+				"elapsed":    time.Since(startTime).String(),
+			}).Debug("Failed to acquire lock, retrying...")
 
-			return nil
+			time.Sleep(retryInterval)
+		}
+
+		if acquired {
+			break
 		}
 	}
 

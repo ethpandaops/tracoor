@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
@@ -36,6 +37,8 @@ const (
 	KeyID                      = "id"
 	KeyIndex                   = "index"
 	KeyLockKey                 = "lock_key"
+	KeyKind                    = "kind"
+	KeyDedupKey                = "dedup_key"
 
 	OrderFetchedAtDesc = "fetched_at DESC"
 	OrderFetchedAtAsc  = "fetched_at ASC"
@@ -215,6 +218,9 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := state.Validate(); err != nil {
@@ -410,7 +416,7 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconStateValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconStateValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +484,9 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := block.Validate(); err != nil {
@@ -681,7 +690,7 @@ func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -749,6 +758,9 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := envelope.Validate(); err != nil {
@@ -944,7 +956,7 @@ func (i *Indexer) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, 
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionPayloadEnvelopeValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionPayloadEnvelopeValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1012,6 +1024,8 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
 	}
 
 	if err := badBlock.Validate(); err != nil {
@@ -1207,7 +1221,7 @@ func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *index
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBadBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBadBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1277,6 +1291,8 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
 		Index:                req.GetIndex(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
 	}
 
 	if err := badBlob.Validate(); err != nil {
@@ -1483,7 +1499,7 @@ func (i *Indexer) ListUniqueBeaconBadBlobValues(ctx context.Context, req *indexe
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBadBlobValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBadBlobValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1519,6 +1535,9 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		Network:                 req.GetNetwork(),
 		ExecutionImplementation: req.GetExecutionImplementation(),
 		NodeVersion:             req.GetNodeVersion(),
+		ContentHash:             req.GetContentHash(),
+		VerifiedAt:              req.GetVerifiedAt(),
+		ContentMatchedAt:        req.GetContentMatchedAt(),
 	}
 
 	if err := trace.Validate(); err != nil {
@@ -1693,7 +1712,7 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionBlockTraceValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionBlockTraceValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1729,6 +1748,8 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 		Network:                 req.GetNetwork(),
 		ExecutionImplementation: req.GetExecutionImplementation(),
 		NodeVersion:             req.GetNodeVersion(),
+		ContentHash:             req.GetContentHash(),
+		VerifiedAt:              req.GetVerifiedAt(),
 	}
 
 	if err := block.Validate(); err != nil {
@@ -1914,7 +1935,7 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionBadBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionBadBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1931,4 +1952,167 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 	}
 
 	return response, nil
+}
+
+func (i *Indexer) GetBlob(ctx context.Context, req *indexer.GetBlobRequest) (*indexer.GetBlobResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	blob, err := i.db.GetBlob(ctx, req.GetKind().GetValue(), req.GetNetwork().GetValue(), req.GetDedupKey().GetValue())
+	if err != nil {
+		if errors.Is(err, persistence.ErrBlobNotFound) {
+			return nil, status.Error(codes.NotFound, "blob not found")
+		}
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &indexer.GetBlobResponse{
+		Blob: DBBlobToProtoBlob(blob),
+	}, nil
+}
+
+func (i *Indexer) CreateBlob(ctx context.Context, req *indexer.CreateBlobRequest) (*indexer.CreateBlobResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	blob := &persistence.Blob{
+		Kind:            req.GetKind().GetValue(),
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+		ContentEncoding: req.GetContentEncoding().GetValue(),
+		RawSize:         req.GetRawSize().GetValue(),
+		CompressedSize:  req.GetCompressedSize().GetValue(),
+		State:           persistence.BlobStateReady,
+		CreatedAt:       time.Now(),
+	}
+
+	// The winner is whichever row is in the table afterwards: a concurrent creator with
+	// different bytes must be visible to the loser so it can compare hashes.
+	winner, err := i.db.InsertBlob(ctx, blob)
+	if err != nil {
+		i.log.WithError(err).WithFields(logrus.Fields{
+			KeyKind:     blob.Kind,
+			KeyNetwork:  blob.Network,
+			KeyDedupKey: blob.DedupKey,
+		}).Error("Failed to create blob")
+
+		return nil, status.Error(codes.Internal, "failed to create blob")
+	}
+
+	return &indexer.CreateBlobResponse{
+		Blob: DBBlobToProtoBlob(winner),
+	}, nil
+}
+
+func (i *Indexer) CreatePayloadDivergence(ctx context.Context, req *indexer.CreatePayloadDivergenceRequest) (*indexer.CreatePayloadDivergenceResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	divergence := &indexer.PayloadDivergence{
+		Id:           wrapperspb.String(uuid.New().String()),
+		ObservedAt:   req.GetObservedAt(),
+		Network:      req.GetNetwork(),
+		Kind:         req.GetKind(),
+		Node:         req.GetNode(),
+		DedupKey:     req.GetDedupKey(),
+		ExpectedHash: req.GetExpectedHash(),
+		ActualHash:   req.GetActualHash(),
+		Slot:         req.GetSlot(),
+		Identifier:   req.GetIdentifier(),
+		Attempt:      req.GetAttempt(),
+		Severity:     req.GetSeverity(),
+		Location:     req.GetLocation(),
+	}
+
+	row := ProtoPayloadDivergenceToDBPayloadDivergence(divergence)
+	if req.GetObservedAt() == nil {
+		row.ObservedAt = time.Now()
+	}
+
+	// Attempt 1 is the first observation; an unset attempt means exactly that.
+	if req.GetAttempt() == nil {
+		row.Attempt = 1
+	}
+
+	if err := i.db.InsertPayloadDivergence(ctx, row); err != nil {
+		i.log.WithError(err).WithFields(logrus.Fields{
+			KeyKind:     row.Kind,
+			KeyNetwork:  row.Network,
+			KeyDedupKey: row.DedupKey,
+			KeyNode:     row.Node,
+		}).Error("Failed to record payload divergence")
+
+		return nil, status.Error(codes.Internal, "failed to record payload divergence")
+	}
+
+	i.log.WithFields(logrus.Fields{
+		KeyKind:     row.Kind,
+		KeyNetwork:  row.Network,
+		KeyDedupKey: row.DedupKey,
+		KeyNode:     row.Node,
+		"expected":  row.ExpectedHash,
+		"actual":    row.ActualHash,
+	}).Warn("Payload divergence recorded")
+
+	return &indexer.CreatePayloadDivergenceResponse{
+		Id: divergence.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListPayloadDivergence(ctx context.Context, req *indexer.ListPayloadDivergenceRequest) (*indexer.ListPayloadDivergenceResponse, error) {
+	filter := &persistence.PayloadDivergenceFilter{}
+
+	if req.GetNetwork() != "" {
+		filter.AddNetwork(req.GetNetwork())
+	}
+
+	if req.GetKind() != "" {
+		filter.AddKind(req.GetKind())
+	}
+
+	if req.GetDedupKey() != "" {
+		filter.AddDedupKey(req.GetDedupKey())
+	}
+
+	if req.GetBefore() != nil {
+		filter.AddBefore(req.GetBefore().AsTime())
+	}
+
+	if req.GetAfter() != nil {
+		filter.AddAfter(req.GetAfter().AsTime())
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:  persistence.DefaultPageLimit,
+		Offset: 0,
+	}
+
+	if req.GetPagination() != nil {
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.GetPagination())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
+	}
+
+	divergences, err := i.db.ListPayloadDivergence(ctx, filter, pagination)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	protoDivergences := make([]*indexer.PayloadDivergence, len(divergences))
+	for idx, divergence := range divergences {
+		protoDivergences[idx] = DBPayloadDivergenceToProtoPayloadDivergence(divergence)
+	}
+
+	return &indexer.ListPayloadDivergenceResponse{
+		PayloadDivergences: protoDivergences,
+	}, nil
 }

@@ -18,6 +18,12 @@ message BeaconState {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9
       [ json_name = "beacon_implementation" ];
+  google.protobuf.StringValue content_hash = 10 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12
+      [ json_name = "content_matched_at" ];
 }
 
 message BeaconBlock {
@@ -31,6 +37,12 @@ message BeaconBlock {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9
       [ json_name = "beacon_implementation" ];
+  google.protobuf.StringValue content_hash = 10 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12
+      [ json_name = "content_matched_at" ];
 }
 
 message ExecutionPayloadEnvelope {
@@ -44,6 +56,12 @@ message ExecutionPayloadEnvelope {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9
       [ json_name = "beacon_implementation" ];
+  google.protobuf.StringValue content_hash = 10 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12
+      [ json_name = "content_matched_at" ];
 }
 
 message BeaconBadBlock {
@@ -57,6 +75,12 @@ message BeaconBadBlock {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9
       [ json_name = "beacon_implementation" ];
+  google.protobuf.StringValue content_hash = 10 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12
+      [ json_name = "content_matched_at" ];
 }
 
 message BeaconBadBlob {
@@ -71,6 +95,12 @@ message BeaconBadBlob {
   google.protobuf.StringValue beacon_implementation = 9
       [ json_name = "beacon_implementation" ];
   google.protobuf.UInt64Value index = 10;
+  google.protobuf.StringValue content_hash = 11 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 13
+      [ json_name = "content_matched_at" ];
 }
 
 message ExecutionBlockTrace {
@@ -83,6 +113,12 @@ message ExecutionBlockTrace {
   google.protobuf.StringValue execution_implementation = 7
       [ json_name = "execution_implementation" ];
   google.protobuf.StringValue node_version = 8 [ json_name = "node_version" ];
+  google.protobuf.StringValue content_hash = 9 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 10 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 11
+      [ json_name = "content_matched_at" ];
 }
 
 message ExecutionBadBlock {
@@ -97,6 +133,12 @@ message ExecutionBadBlock {
   google.protobuf.StringValue node_version = 8 [ json_name = "node_version" ];
   google.protobuf.StringValue block_extra_data = 9
       [ json_name = "block_extra_data" ];
+  google.protobuf.StringValue content_hash = 10 [ json_name = "content_hash" ];
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11 [ json_name = "verified_at" ];
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12
+      [ json_name = "content_matched_at" ];
 }
 
 service API {
@@ -242,6 +284,10 @@ message ListUniqueBeaconStateValuesRequest {
     beacon_implementation = 6;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueBeaconStateValuesResponse {
@@ -300,6 +346,10 @@ message ListUniqueBeaconBlockValuesRequest {
     beacon_implementation = 6;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueBeaconBlockValuesResponse {
@@ -361,6 +411,10 @@ message ListUniqueExecutionPayloadEnvelopeValuesRequest {
     beacon_implementation = 6;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueExecutionPayloadEnvelopeValuesResponse {
@@ -420,6 +474,10 @@ message ListUniqueBeaconBadBlockValuesRequest {
     beacon_implementation = 6;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueBeaconBadBlockValuesResponse {
@@ -482,6 +540,10 @@ message ListUniqueBeaconBadBlobValuesRequest {
     index = 7;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueBeaconBadBlobValuesResponse {
@@ -543,6 +605,10 @@ message ListUniqueExecutionBlockTraceValuesRequest {
     execution_implementation = 5;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueExecutionBlockTraceValuesResponse {
@@ -607,6 +673,10 @@ message ListUniqueExecutionBadBlockValuesRequest {
     block_extra_data = 6;
   }
   repeated Field fields = 1 [ json_name = "fields" ];
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  // Named network_filter because the enum above already owns "network" in this
+  // message scope; the wire/JSON name stays "network".
+  string network_filter = 2 [ json_name = "network" ];
 }
 
 message ListUniqueExecutionBadBlockValuesResponse {

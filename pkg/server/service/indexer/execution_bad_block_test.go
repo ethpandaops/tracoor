@@ -24,6 +24,7 @@ func createRandomExecutionBadBlockRequest() *pindexer.CreateExecutionBadBlockReq
 		ExecutionImplementation: wrapperspb.String(generateRandomString(15)),
 		NodeVersion:             wrapperspb.String(generateRandomString(8)),
 		BlockExtraData:          wrapperspb.String(generateRandomString(20)),
+		ContentHash:             wrapperspb.String(generateRandomContentHash()),
 	}
 }
 
@@ -105,8 +106,8 @@ func TestIndexerExecutionBadBlock(t *testing.T) {
 		}
 
 		_, err = index.CreateExecutionBadBlock(ctx, req)
-		if err != nil && err.Error() != "execution bad block already exists" {
-			t.Fatal("expected error to be 'execution bad block already exists'")
+		if err == nil {
+			t.Fatal("expected duplicate execution bad block to be rejected")
 		}
 	})
 

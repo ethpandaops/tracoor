@@ -23,6 +23,8 @@ func createRandomExecutionBlockTraceRequest() *pindexer.CreateExecutionBlockTrac
 		Network:                 wrapperspb.String(generateRandomString(5)),
 		ExecutionImplementation: wrapperspb.String(generateRandomString(15)),
 		NodeVersion:             wrapperspb.String(generateRandomString(8)),
+		ContentHash:             wrapperspb.String(generateRandomContentHash()),
+		DedupKey:                wrapperspb.String(generateRandomString(20)),
 	}
 }
 
@@ -104,8 +106,8 @@ func TestIndexerExecutionBlockTrace(t *testing.T) {
 		}
 
 		_, err = index.CreateExecutionBlockTrace(ctx, req)
-		if err != nil && err.Error() != "execution block trace already exists" {
-			t.Fatal("expected error to be 'execution block trace already exists'")
+		if err == nil {
+			t.Fatal("expected duplicate execution block trace to be rejected")
 		}
 	})
 

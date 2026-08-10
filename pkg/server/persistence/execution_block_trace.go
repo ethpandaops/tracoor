@@ -10,17 +10,22 @@ import (
 )
 
 type ExecutionBlockTrace struct {
-	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
-	Node                    string    `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	FetchedAt               time.Time `gorm:"index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:idx_execution_block_trace_fetchedat,where:deleted_at IS NULL;index:idx_execution_block_trace_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	ExecutionImplementation string
-	NodeVersion             string `gorm:"not null;default:''"`
-	Location                string `gorm:"not null;default:''"`
-	ContentEncoding         string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:idx_execution_block_trace_network,where:deleted_at IS NULL;index:idx_execution_block_trace_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockHash               string `gorm:"not null;default:'';index;index:idx_execution_block_trace_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockNumber             int64
+	Node                    string    `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:3;index:ix_execution_block_traces_network_node_fetched_at,priority:2"`
+	FetchedAt               time.Time `gorm:"not null;index:ix_execution_block_traces_fetched_at;index:ix_execution_block_traces_network_node_fetched_at,priority:3;index:ix_execution_block_traces_network_fetched_at,priority:2"`
+	ExecutionImplementation string    `gorm:"not null;default:''"`
+	NodeVersion             string    `gorm:"not null;default:''"`
+	ContentEncoding         string    `gorm:"not null;default:''"`
+	Location                string    `gorm:"not null;default:''"`
+	ContentHash             string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:1;index:ix_execution_block_traces_network_node_fetched_at,priority:1;index:ix_execution_block_traces_network_fetched_at,priority:1"`
+	BlockHash        string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:2"`
+	BlockNumber      int64  `gorm:"not null;default:0"`
 }
 
 type ExecutionBlockTraceFilter struct {
@@ -239,7 +244,7 @@ type DistinctExecutionBlockTraceValueResults struct {
 }
 
 //nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields []string) (*DistinctExecutionBlockTraceValueResults, error) {
+func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields []string, network string) (*DistinctExecutionBlockTraceValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -253,7 +258,13 @@ func (i *Indexer) DistinctExecutionBlockTraceValues(ctx context.Context, fields 
 		ExecutionImplementation: make([]string, 0),
 		NodeVersion:             make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&ExecutionBlockTrace{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
+	query := i.db.WithContext(ctx).Model(&ExecutionBlockTrace{})
+
+	if network != "" {
+		query = query.Where("network = ?", network)
+	}
+
+	query = query.Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
 	rows, err := query.Rows()
 	if err != nil {

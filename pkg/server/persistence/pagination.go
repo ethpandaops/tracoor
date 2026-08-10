@@ -17,7 +17,7 @@ const (
 	MaxPageLimit = 10000
 )
 
-// sortableColumns is the union of columns the artifact models can be ordered by. GORM treats
+// sortableColumns is the union of columns the persisted models can be ordered by. GORM treats
 // an order string as raw SQL, so anything outside this set is rejected before it reaches the
 // query builder.
 var sortableColumns = map[string]struct{}{
@@ -32,8 +32,7 @@ var sortableColumns = map[string]struct{}{
 	"block_number":             {},
 	"block_extra_data":         {},
 	"fetched_at":               {},
-	"created_at":               {},
-	"updated_at":               {},
+	"observed_at":              {},
 	"network":                  {},
 	"location":                 {},
 	"content_encoding":         {},
