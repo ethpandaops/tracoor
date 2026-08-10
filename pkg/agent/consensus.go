@@ -116,9 +116,6 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 		return err
 	}
 
-	// Sleep for 1s to give the store time to update
-	time.Sleep(1 * time.Second)
-
 	spec, err := s.node.Beacon().Node().Spec()
 	if err != nil {
 		return err
@@ -200,7 +197,10 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 
 	now := time.Now()
 
-	stateID := fmt.Sprintf("%d", slot)
+	// Fetch by root rather than by slot: a reorg between resolving the root and
+	// fetching the body would otherwise store one block's bytes under another's
+	// root.
+	blockID := blockRootAsString
 
 	// Held until the upload finishes, not just the fetch.
 	releaseFetchSlot, err := s.acquireFetchSlot(ctx)
@@ -211,7 +211,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	defer releaseFetchSlot()
 
 	// Fetch the block
-	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, stateID, string(mime.ContentTypeOctet))
+	blockRaw, err := s.node.Beacon().Node().FetchRawBlock(ctx, blockID, string(mime.ContentTypeOctet))
 	if err != nil {
 		return err
 	}
@@ -237,9 +237,6 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	if err != nil {
 		return err
 	}
-
-	// Sleep for 1s to give the store time to update
-	time.Sleep(1 * time.Second)
 
 	spec, err := s.node.Beacon().Node().Spec()
 	if err != nil {
@@ -435,9 +432,6 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 		return err
 	}
 
-	// Sleep for 1s to give the store time to update
-	time.Sleep(1 * time.Second)
-
 	req := &indexer.CreateExecutionPayloadEnvelopeRequest{
 		Node:            wrapperspb.String(s.Config.Name),
 		Network:         wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
@@ -594,9 +588,6 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 
 					continue
 				}
-
-				// Sleep for 1s to give the store time to update
-				time.Sleep(1 * time.Second)
 
 				spec, err := s.node.Beacon().Node().Spec()
 				if err != nil {
@@ -813,9 +804,6 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 
 					continue
 				}
-
-				// Sleep for 1s to give the store time to update
-				time.Sleep(1 * time.Second)
 
 				spec, err := s.node.Beacon().Node().Spec()
 				if err != nil {

@@ -118,7 +118,7 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		if err != nil {
 			s.log.WithError(err).Error("Failed to get current time")
 
-			return
+			continue
 		}
 
 		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(stateRequest.Slot))
