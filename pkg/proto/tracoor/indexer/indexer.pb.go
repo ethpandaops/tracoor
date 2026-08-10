@@ -495,8 +495,11 @@ type BeaconState struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=verified_at,json=verifiedAt,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=content_matched_at,json=contentMatchedAt,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when there is no ready blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,15,opt,name=agreement_count,json=agreementCount,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeaconState) Reset() {
@@ -627,6 +630,13 @@ func (x *BeaconState) GetContentMatchedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *BeaconState) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
+	}
+	return nil
+}
+
 type BeaconBlock struct {
 	state                protoimpl.MessageState  `protogen:"open.v1"`
 	Id                   *wrapperspb.StringValue `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -645,8 +655,11 @@ type BeaconBlock struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=verified_at,json=verifiedAt,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=content_matched_at,json=contentMatchedAt,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when there is no ready blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,15,opt,name=agreement_count,json=agreementCount,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeaconBlock) Reset() {
@@ -777,6 +790,13 @@ func (x *BeaconBlock) GetContentMatchedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *BeaconBlock) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
+	}
+	return nil
+}
+
 type ExecutionPayloadEnvelope struct {
 	state                protoimpl.MessageState  `protogen:"open.v1"`
 	Id                   *wrapperspb.StringValue `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -795,8 +815,11 @@ type ExecutionPayloadEnvelope struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=verified_at,json=verifiedAt,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=content_matched_at,json=contentMatchedAt,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when there is no ready blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,15,opt,name=agreement_count,json=agreementCount,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExecutionPayloadEnvelope) Reset() {
@@ -923,6 +946,13 @@ func (x *ExecutionPayloadEnvelope) GetVerifiedAt() *timestamppb.Timestamp {
 func (x *ExecutionPayloadEnvelope) GetContentMatchedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ContentMatchedAt
+	}
+	return nil
+}
+
+func (x *ExecutionPayloadEnvelope) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
 	}
 	return nil
 }
@@ -1252,8 +1282,11 @@ type ExecutionBlockTrace struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=verified_at,json=verifiedAt,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=content_matched_at,json=contentMatchedAt,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when there is no ready blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,14,opt,name=agreement_count,json=agreementCount,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExecutionBlockTrace) Reset() {
@@ -1373,6 +1406,13 @@ func (x *ExecutionBlockTrace) GetVerifiedAt() *timestamppb.Timestamp {
 func (x *ExecutionBlockTrace) GetContentMatchedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ContentMatchedAt
+	}
+	return nil
+}
+
+func (x *ExecutionBlockTrace) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
 	}
 	return nil
 }
@@ -7728,7 +7768,7 @@ var File_pkg_proto_tracoor_indexer_indexer_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\n" +
-	"'pkg/proto/tracoor/indexer/indexer.proto\x12\aindexer\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xe2\x06\n" +
+	"'pkg/proto/tracoor/indexer/indexer.proto\x12\aindexer\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xa9\a\n" +
 	"\vBeaconState\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -7747,7 +7787,8 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fcontent_hash\x18\f \x01(\v2\x1c.google.protobuf.StringValueR\vcontentHash\x12;\n" +
 	"\vverified_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"verifiedAt\x12H\n" +
-	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\xe2\x06\n" +
+	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\x12E\n" +
+	"\x0fagreement_count\x18\x0f \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0eagreementCount\"\xa9\a\n" +
 	"\vBeaconBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -7766,7 +7807,8 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fcontent_hash\x18\f \x01(\v2\x1c.google.protobuf.StringValueR\vcontentHash\x12;\n" +
 	"\vverified_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"verifiedAt\x12H\n" +
-	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\xef\x06\n" +
+	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\x12E\n" +
+	"\x0fagreement_count\x18\x0f \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0eagreementCount\"\xb6\a\n" +
 	"\x18ExecutionPayloadEnvelope\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -7785,7 +7827,8 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fcontent_hash\x18\f \x01(\v2\x1c.google.protobuf.StringValueR\vcontentHash\x12;\n" +
 	"\vverified_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"verifiedAt\x12H\n" +
-	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\xe5\x06\n" +
+	"\x12content_matched_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\x12E\n" +
+	"\x0fagreement_count\x18\x0f \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0eagreementCount\"\xe5\x06\n" +
 	"\x0eBeaconBadBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -7824,7 +7867,7 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fcontent_hash\x18\r \x01(\v2\x1c.google.protobuf.StringValueR\vcontentHash\x12;\n" +
 	"\vverified_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"verifiedAt\x12H\n" +
-	"\x12content_matched_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\xca\x06\n" +
+	"\x12content_matched_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\x91\a\n" +
 	"\x13ExecutionBlockTrace\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -7842,7 +7885,8 @@ const file_pkg_proto_tracoor_indexer_indexer_proto_rawDesc = "" +
 	"\fcontent_hash\x18\v \x01(\v2\x1c.google.protobuf.StringValueR\vcontentHash\x12;\n" +
 	"\vverified_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"verifiedAt\x12H\n" +
-	"\x12content_matched_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\"\x90\a\n" +
+	"\x12content_matched_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x10contentMatchedAt\x12E\n" +
+	"\x0fagreement_count\x18\x0e \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0eagreementCount\"\x90\a\n" +
 	"\x11ExecutionBadBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x129\n" +
@@ -8679,8 +8723,9 @@ var file_pkg_proto_tracoor_indexer_indexer_proto_goTypes = []any{
 	(*wrapperspb.StringValue)(nil),                           // 91: google.protobuf.StringValue
 	(*timestamppb.Timestamp)(nil),                            // 92: google.protobuf.Timestamp
 	(*wrapperspb.UInt64Value)(nil),                           // 93: google.protobuf.UInt64Value
-	(*wrapperspb.Int64Value)(nil),                            // 94: google.protobuf.Int64Value
-	(*wrapperspb.Int32Value)(nil),                            // 95: google.protobuf.Int32Value
+	(*wrapperspb.UInt32Value)(nil),                           // 94: google.protobuf.UInt32Value
+	(*wrapperspb.Int64Value)(nil),                            // 95: google.protobuf.Int64Value
+	(*wrapperspb.Int32Value)(nil),                            // 96: google.protobuf.Int32Value
 }
 var file_pkg_proto_tracoor_indexer_indexer_proto_depIdxs = []int32{
 	91,  // 0: indexer.BeaconState.id:type_name -> google.protobuf.StringValue
@@ -8697,389 +8742,393 @@ var file_pkg_proto_tracoor_indexer_indexer_proto_depIdxs = []int32{
 	91,  // 11: indexer.BeaconState.content_hash:type_name -> google.protobuf.StringValue
 	92,  // 12: indexer.BeaconState.verified_at:type_name -> google.protobuf.Timestamp
 	92,  // 13: indexer.BeaconState.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 14: indexer.BeaconBlock.id:type_name -> google.protobuf.StringValue
-	91,  // 15: indexer.BeaconBlock.node:type_name -> google.protobuf.StringValue
-	92,  // 16: indexer.BeaconBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 17: indexer.BeaconBlock.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 18: indexer.BeaconBlock.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 19: indexer.BeaconBlock.block_root:type_name -> google.protobuf.StringValue
-	91,  // 20: indexer.BeaconBlock.node_version:type_name -> google.protobuf.StringValue
-	91,  // 21: indexer.BeaconBlock.location:type_name -> google.protobuf.StringValue
-	91,  // 22: indexer.BeaconBlock.network:type_name -> google.protobuf.StringValue
-	91,  // 23: indexer.BeaconBlock.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 24: indexer.BeaconBlock.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 25: indexer.BeaconBlock.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 26: indexer.BeaconBlock.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 27: indexer.BeaconBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 28: indexer.ExecutionPayloadEnvelope.id:type_name -> google.protobuf.StringValue
-	91,  // 29: indexer.ExecutionPayloadEnvelope.node:type_name -> google.protobuf.StringValue
-	92,  // 30: indexer.ExecutionPayloadEnvelope.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 31: indexer.ExecutionPayloadEnvelope.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 32: indexer.ExecutionPayloadEnvelope.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 33: indexer.ExecutionPayloadEnvelope.block_root:type_name -> google.protobuf.StringValue
-	91,  // 34: indexer.ExecutionPayloadEnvelope.node_version:type_name -> google.protobuf.StringValue
-	91,  // 35: indexer.ExecutionPayloadEnvelope.location:type_name -> google.protobuf.StringValue
-	91,  // 36: indexer.ExecutionPayloadEnvelope.network:type_name -> google.protobuf.StringValue
-	91,  // 37: indexer.ExecutionPayloadEnvelope.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 38: indexer.ExecutionPayloadEnvelope.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 39: indexer.ExecutionPayloadEnvelope.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 40: indexer.ExecutionPayloadEnvelope.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 41: indexer.ExecutionPayloadEnvelope.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 42: indexer.BeaconBadBlock.id:type_name -> google.protobuf.StringValue
-	91,  // 43: indexer.BeaconBadBlock.node:type_name -> google.protobuf.StringValue
-	92,  // 44: indexer.BeaconBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 45: indexer.BeaconBadBlock.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 46: indexer.BeaconBadBlock.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 47: indexer.BeaconBadBlock.block_root:type_name -> google.protobuf.StringValue
-	91,  // 48: indexer.BeaconBadBlock.node_version:type_name -> google.protobuf.StringValue
-	91,  // 49: indexer.BeaconBadBlock.location:type_name -> google.protobuf.StringValue
-	91,  // 50: indexer.BeaconBadBlock.network:type_name -> google.protobuf.StringValue
-	91,  // 51: indexer.BeaconBadBlock.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 52: indexer.BeaconBadBlock.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 53: indexer.BeaconBadBlock.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 54: indexer.BeaconBadBlock.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 55: indexer.BeaconBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 56: indexer.BeaconBadBlob.id:type_name -> google.protobuf.StringValue
-	91,  // 57: indexer.BeaconBadBlob.node:type_name -> google.protobuf.StringValue
-	92,  // 58: indexer.BeaconBadBlob.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 59: indexer.BeaconBadBlob.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 60: indexer.BeaconBadBlob.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 61: indexer.BeaconBadBlob.block_root:type_name -> google.protobuf.StringValue
-	91,  // 62: indexer.BeaconBadBlob.node_version:type_name -> google.protobuf.StringValue
-	91,  // 63: indexer.BeaconBadBlob.location:type_name -> google.protobuf.StringValue
-	91,  // 64: indexer.BeaconBadBlob.network:type_name -> google.protobuf.StringValue
-	91,  // 65: indexer.BeaconBadBlob.beacon_implementation:type_name -> google.protobuf.StringValue
-	93,  // 66: indexer.BeaconBadBlob.index:type_name -> google.protobuf.UInt64Value
-	91,  // 67: indexer.BeaconBadBlob.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 68: indexer.BeaconBadBlob.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 69: indexer.BeaconBadBlob.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 70: indexer.BeaconBadBlob.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 71: indexer.ExecutionBlockTrace.id:type_name -> google.protobuf.StringValue
-	91,  // 72: indexer.ExecutionBlockTrace.node:type_name -> google.protobuf.StringValue
-	92,  // 73: indexer.ExecutionBlockTrace.fetched_at:type_name -> google.protobuf.Timestamp
-	91,  // 74: indexer.ExecutionBlockTrace.block_hash:type_name -> google.protobuf.StringValue
-	94,  // 75: indexer.ExecutionBlockTrace.block_number:type_name -> google.protobuf.Int64Value
-	91,  // 76: indexer.ExecutionBlockTrace.location:type_name -> google.protobuf.StringValue
-	91,  // 77: indexer.ExecutionBlockTrace.network:type_name -> google.protobuf.StringValue
-	91,  // 78: indexer.ExecutionBlockTrace.execution_implementation:type_name -> google.protobuf.StringValue
-	91,  // 79: indexer.ExecutionBlockTrace.node_version:type_name -> google.protobuf.StringValue
-	91,  // 80: indexer.ExecutionBlockTrace.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 81: indexer.ExecutionBlockTrace.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 82: indexer.ExecutionBlockTrace.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 83: indexer.ExecutionBlockTrace.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 84: indexer.ExecutionBadBlock.id:type_name -> google.protobuf.StringValue
-	91,  // 85: indexer.ExecutionBadBlock.node:type_name -> google.protobuf.StringValue
-	92,  // 86: indexer.ExecutionBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	91,  // 87: indexer.ExecutionBadBlock.block_hash:type_name -> google.protobuf.StringValue
-	94,  // 88: indexer.ExecutionBadBlock.block_number:type_name -> google.protobuf.Int64Value
-	91,  // 89: indexer.ExecutionBadBlock.location:type_name -> google.protobuf.StringValue
-	91,  // 90: indexer.ExecutionBadBlock.network:type_name -> google.protobuf.StringValue
-	91,  // 91: indexer.ExecutionBadBlock.execution_implementation:type_name -> google.protobuf.StringValue
-	91,  // 92: indexer.ExecutionBadBlock.node_version:type_name -> google.protobuf.StringValue
-	91,  // 93: indexer.ExecutionBadBlock.block_extra_data:type_name -> google.protobuf.StringValue
-	91,  // 94: indexer.ExecutionBadBlock.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 95: indexer.ExecutionBadBlock.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 96: indexer.ExecutionBadBlock.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 97: indexer.ExecutionBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	15,  // 98: indexer.Config.ethereum:type_name -> indexer.EthereumConfig
-	91,  // 99: indexer.EthereumConfig.network:type_name -> google.protobuf.StringValue
-	16,  // 100: indexer.EthereumConfig.config:type_name -> indexer.EthereumNetworkConfig
-	17,  // 101: indexer.EthereumConfig.tools:type_name -> indexer.ToolsConfig
-	91,  // 102: indexer.EthereumNetworkConfig.repository:type_name -> google.protobuf.StringValue
-	91,  // 103: indexer.EthereumNetworkConfig.branch:type_name -> google.protobuf.StringValue
-	91,  // 104: indexer.EthereumNetworkConfig.path:type_name -> google.protobuf.StringValue
-	18,  // 105: indexer.ToolsConfig.ncli:type_name -> indexer.GitRepositoryConfig
-	18,  // 106: indexer.ToolsConfig.lcli:type_name -> indexer.GitRepositoryConfig
-	19,  // 107: indexer.ToolsConfig.zcli:type_name -> indexer.ZcliConfig
-	91,  // 108: indexer.GitRepositoryConfig.repository:type_name -> google.protobuf.StringValue
-	91,  // 109: indexer.GitRepositoryConfig.branch:type_name -> google.protobuf.StringValue
-	91,  // 110: indexer.ZcliConfig.fork:type_name -> google.protobuf.StringValue
-	91,  // 111: indexer.Blob.kind:type_name -> google.protobuf.StringValue
-	91,  // 112: indexer.Blob.network:type_name -> google.protobuf.StringValue
-	91,  // 113: indexer.Blob.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 114: indexer.Blob.content_hash:type_name -> google.protobuf.StringValue
-	91,  // 115: indexer.Blob.location:type_name -> google.protobuf.StringValue
-	91,  // 116: indexer.Blob.content_encoding:type_name -> google.protobuf.StringValue
-	94,  // 117: indexer.Blob.raw_size:type_name -> google.protobuf.Int64Value
-	94,  // 118: indexer.Blob.compressed_size:type_name -> google.protobuf.Int64Value
-	94,  // 119: indexer.Blob.ref_count:type_name -> google.protobuf.Int64Value
-	91,  // 120: indexer.Blob.state:type_name -> google.protobuf.StringValue
-	94,  // 121: indexer.Blob.generation:type_name -> google.protobuf.Int64Value
-	92,  // 122: indexer.Blob.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 123: indexer.GetBlobRequest.kind:type_name -> google.protobuf.StringValue
-	91,  // 124: indexer.GetBlobRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 125: indexer.GetBlobRequest.dedup_key:type_name -> google.protobuf.StringValue
-	20,  // 126: indexer.GetBlobResponse.blob:type_name -> indexer.Blob
-	91,  // 127: indexer.CreateBlobRequest.kind:type_name -> google.protobuf.StringValue
-	91,  // 128: indexer.CreateBlobRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 129: indexer.CreateBlobRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 130: indexer.CreateBlobRequest.content_hash:type_name -> google.protobuf.StringValue
-	91,  // 131: indexer.CreateBlobRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 132: indexer.CreateBlobRequest.content_encoding:type_name -> google.protobuf.StringValue
-	94,  // 133: indexer.CreateBlobRequest.raw_size:type_name -> google.protobuf.Int64Value
-	94,  // 134: indexer.CreateBlobRequest.compressed_size:type_name -> google.protobuf.Int64Value
-	20,  // 135: indexer.CreateBlobResponse.blob:type_name -> indexer.Blob
-	91,  // 136: indexer.PayloadDivergence.id:type_name -> google.protobuf.StringValue
-	92,  // 137: indexer.PayloadDivergence.observed_at:type_name -> google.protobuf.Timestamp
-	91,  // 138: indexer.PayloadDivergence.network:type_name -> google.protobuf.StringValue
-	91,  // 139: indexer.PayloadDivergence.kind:type_name -> google.protobuf.StringValue
-	91,  // 140: indexer.PayloadDivergence.node:type_name -> google.protobuf.StringValue
-	91,  // 141: indexer.PayloadDivergence.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 142: indexer.PayloadDivergence.expected_hash:type_name -> google.protobuf.StringValue
-	91,  // 143: indexer.PayloadDivergence.actual_hash:type_name -> google.protobuf.StringValue
-	93,  // 144: indexer.PayloadDivergence.slot:type_name -> google.protobuf.UInt64Value
-	91,  // 145: indexer.PayloadDivergence.identifier:type_name -> google.protobuf.StringValue
-	95,  // 146: indexer.PayloadDivergence.attempt:type_name -> google.protobuf.Int32Value
-	91,  // 147: indexer.PayloadDivergence.severity:type_name -> google.protobuf.StringValue
-	91,  // 148: indexer.PayloadDivergence.location:type_name -> google.protobuf.StringValue
-	92,  // 149: indexer.CreatePayloadDivergenceRequest.observed_at:type_name -> google.protobuf.Timestamp
-	91,  // 150: indexer.CreatePayloadDivergenceRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 151: indexer.CreatePayloadDivergenceRequest.kind:type_name -> google.protobuf.StringValue
-	91,  // 152: indexer.CreatePayloadDivergenceRequest.node:type_name -> google.protobuf.StringValue
-	91,  // 153: indexer.CreatePayloadDivergenceRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 154: indexer.CreatePayloadDivergenceRequest.expected_hash:type_name -> google.protobuf.StringValue
-	91,  // 155: indexer.CreatePayloadDivergenceRequest.actual_hash:type_name -> google.protobuf.StringValue
-	93,  // 156: indexer.CreatePayloadDivergenceRequest.slot:type_name -> google.protobuf.UInt64Value
-	91,  // 157: indexer.CreatePayloadDivergenceRequest.identifier:type_name -> google.protobuf.StringValue
-	95,  // 158: indexer.CreatePayloadDivergenceRequest.attempt:type_name -> google.protobuf.Int32Value
-	91,  // 159: indexer.CreatePayloadDivergenceRequest.severity:type_name -> google.protobuf.StringValue
-	91,  // 160: indexer.CreatePayloadDivergenceRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 161: indexer.CreatePayloadDivergenceResponse.id:type_name -> google.protobuf.StringValue
-	92,  // 162: indexer.ListPayloadDivergenceRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 163: indexer.ListPayloadDivergenceRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 164: indexer.ListPayloadDivergenceRequest.pagination:type_name -> indexer.PaginationCursor
-	25,  // 165: indexer.ListPayloadDivergenceResponse.payload_divergences:type_name -> indexer.PayloadDivergence
-	14,  // 166: indexer.GetConfigResponse.config:type_name -> indexer.Config
-	91,  // 167: indexer.CreateBeaconStateRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 168: indexer.CreateBeaconStateRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 169: indexer.CreateBeaconStateRequest.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 170: indexer.CreateBeaconStateRequest.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 171: indexer.CreateBeaconStateRequest.state_root:type_name -> google.protobuf.StringValue
-	91,  // 172: indexer.CreateBeaconStateRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 173: indexer.CreateBeaconStateRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 174: indexer.CreateBeaconStateRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 175: indexer.CreateBeaconStateRequest.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 176: indexer.CreateBeaconStateRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 177: indexer.CreateBeaconStateRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 178: indexer.CreateBeaconStateRequest.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 179: indexer.CreateBeaconStateRequest.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 180: indexer.CreateBeaconStateRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 181: indexer.CreateBeaconStateResponse.id:type_name -> google.protobuf.StringValue
-	91,  // 182: indexer.CreateBeaconBlockRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 183: indexer.CreateBeaconBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 184: indexer.CreateBeaconBlockRequest.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 185: indexer.CreateBeaconBlockRequest.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 186: indexer.CreateBeaconBlockRequest.block_root:type_name -> google.protobuf.StringValue
-	91,  // 187: indexer.CreateBeaconBlockRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 188: indexer.CreateBeaconBlockRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 189: indexer.CreateBeaconBlockRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 190: indexer.CreateBeaconBlockRequest.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 191: indexer.CreateBeaconBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 192: indexer.CreateBeaconBlockRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 193: indexer.CreateBeaconBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 194: indexer.CreateBeaconBlockRequest.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 195: indexer.CreateBeaconBlockRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 196: indexer.CreateBeaconBlockResponse.id:type_name -> google.protobuf.StringValue
-	91,  // 197: indexer.CreateExecutionPayloadEnvelopeRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 198: indexer.CreateExecutionPayloadEnvelopeRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 199: indexer.CreateExecutionPayloadEnvelopeRequest.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 200: indexer.CreateExecutionPayloadEnvelopeRequest.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 201: indexer.CreateExecutionPayloadEnvelopeRequest.block_root:type_name -> google.protobuf.StringValue
-	91,  // 202: indexer.CreateExecutionPayloadEnvelopeRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 203: indexer.CreateExecutionPayloadEnvelopeRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 204: indexer.CreateExecutionPayloadEnvelopeRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 205: indexer.CreateExecutionPayloadEnvelopeRequest.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 206: indexer.CreateExecutionPayloadEnvelopeRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 207: indexer.CreateExecutionPayloadEnvelopeRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 208: indexer.CreateExecutionPayloadEnvelopeRequest.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 209: indexer.CreateExecutionPayloadEnvelopeRequest.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 210: indexer.CreateExecutionPayloadEnvelopeRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 211: indexer.CreateExecutionPayloadEnvelopeResponse.id:type_name -> google.protobuf.StringValue
-	91,  // 212: indexer.CreateBeaconBadBlockRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 213: indexer.CreateBeaconBadBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 214: indexer.CreateBeaconBadBlockRequest.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 215: indexer.CreateBeaconBadBlockRequest.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 216: indexer.CreateBeaconBadBlockRequest.block_root:type_name -> google.protobuf.StringValue
-	91,  // 217: indexer.CreateBeaconBadBlockRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 218: indexer.CreateBeaconBadBlockRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 219: indexer.CreateBeaconBadBlockRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 220: indexer.CreateBeaconBadBlockRequest.beacon_implementation:type_name -> google.protobuf.StringValue
-	91,  // 221: indexer.CreateBeaconBadBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 222: indexer.CreateBeaconBadBlockRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 223: indexer.CreateBeaconBadBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
-	91,  // 224: indexer.CreateBeaconBadBlockResponse.id:type_name -> google.protobuf.StringValue
-	91,  // 225: indexer.CreateBeaconBadBlobRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 226: indexer.CreateBeaconBadBlobRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	93,  // 227: indexer.CreateBeaconBadBlobRequest.slot:type_name -> google.protobuf.UInt64Value
-	93,  // 228: indexer.CreateBeaconBadBlobRequest.epoch:type_name -> google.protobuf.UInt64Value
-	91,  // 229: indexer.CreateBeaconBadBlobRequest.block_root:type_name -> google.protobuf.StringValue
-	91,  // 230: indexer.CreateBeaconBadBlobRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 231: indexer.CreateBeaconBadBlobRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 232: indexer.CreateBeaconBadBlobRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 233: indexer.CreateBeaconBadBlobRequest.beacon_implementation:type_name -> google.protobuf.StringValue
-	93,  // 234: indexer.CreateBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
-	91,  // 235: indexer.CreateBeaconBadBlobRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 236: indexer.CreateBeaconBadBlobRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 237: indexer.CreateBeaconBadBlobRequest.verified_at:type_name -> google.protobuf.Timestamp
-	91,  // 238: indexer.CreateBeaconBadBlobResponse.id:type_name -> google.protobuf.StringValue
-	91,  // 239: indexer.CreateExecutionBlockTraceRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 240: indexer.CreateExecutionBlockTraceRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	91,  // 241: indexer.CreateExecutionBlockTraceRequest.block_hash:type_name -> google.protobuf.StringValue
-	94,  // 242: indexer.CreateExecutionBlockTraceRequest.block_number:type_name -> google.protobuf.Int64Value
-	91,  // 243: indexer.CreateExecutionBlockTraceRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 244: indexer.CreateExecutionBlockTraceRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 245: indexer.CreateExecutionBlockTraceRequest.execution_implementation:type_name -> google.protobuf.StringValue
-	91,  // 246: indexer.CreateExecutionBlockTraceRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 247: indexer.CreateExecutionBlockTraceRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 248: indexer.CreateExecutionBlockTraceRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 249: indexer.CreateExecutionBlockTraceRequest.verified_at:type_name -> google.protobuf.Timestamp
-	92,  // 250: indexer.CreateExecutionBlockTraceRequest.content_matched_at:type_name -> google.protobuf.Timestamp
-	91,  // 251: indexer.CreateExecutionBlockTraceRequest.dedup_key:type_name -> google.protobuf.StringValue
-	91,  // 252: indexer.CreateExecutionBlockTraceResponse.id:type_name -> google.protobuf.StringValue
-	92,  // 253: indexer.ListExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 254: indexer.ListExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 255: indexer.ListExecutionBlockTraceRequest.pagination:type_name -> indexer.PaginationCursor
-	12,  // 256: indexer.ListExecutionBlockTraceResponse.execution_block_traces:type_name -> indexer.ExecutionBlockTrace
-	92,  // 257: indexer.CountExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 258: indexer.CountExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 259: indexer.CountExecutionBlockTraceResponse.count:type_name -> google.protobuf.UInt64Value
-	0,   // 260: indexer.ListUniqueExecutionBlockTraceValuesRequest.fields:type_name -> indexer.ListUniqueExecutionBlockTraceValuesRequest.Field
-	1,   // 261: indexer.ListUniqueBeaconStateValuesRequest.fields:type_name -> indexer.ListUniqueBeaconStateValuesRequest.Field
-	92,  // 262: indexer.ListBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 263: indexer.ListBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 264: indexer.ListBeaconStateRequest.pagination:type_name -> indexer.PaginationCursor
-	7,   // 265: indexer.ListBeaconStateResponse.beacon_states:type_name -> indexer.BeaconState
-	92,  // 266: indexer.CountBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 267: indexer.CountBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 268: indexer.CountBeaconStateResponse.count:type_name -> google.protobuf.UInt64Value
-	2,   // 269: indexer.ListUniqueBeaconBlockValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBlockValuesRequest.Field
-	92,  // 270: indexer.ListBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 271: indexer.ListBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 272: indexer.ListBeaconBlockRequest.pagination:type_name -> indexer.PaginationCursor
-	8,   // 273: indexer.ListBeaconBlockResponse.beacon_blocks:type_name -> indexer.BeaconBlock
-	92,  // 274: indexer.CountBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 275: indexer.CountBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 276: indexer.CountBeaconBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	3,   // 277: indexer.ListUniqueBeaconBadBlockValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBadBlockValuesRequest.Field
-	4,   // 278: indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest.fields:type_name -> indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest.Field
-	92,  // 279: indexer.ListExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 280: indexer.ListExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 281: indexer.ListExecutionPayloadEnvelopeRequest.pagination:type_name -> indexer.PaginationCursor
-	9,   // 282: indexer.ListExecutionPayloadEnvelopeResponse.execution_payload_envelopes:type_name -> indexer.ExecutionPayloadEnvelope
-	92,  // 283: indexer.CountExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 284: indexer.CountExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 285: indexer.CountExecutionPayloadEnvelopeResponse.count:type_name -> google.protobuf.UInt64Value
-	92,  // 286: indexer.ListBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 287: indexer.ListBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 288: indexer.ListBeaconBadBlockRequest.pagination:type_name -> indexer.PaginationCursor
-	10,  // 289: indexer.ListBeaconBadBlockResponse.beacon_bad_blocks:type_name -> indexer.BeaconBadBlock
-	92,  // 290: indexer.CountBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 291: indexer.CountBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 292: indexer.CountBeaconBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	5,   // 293: indexer.ListUniqueBeaconBadBlobValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBadBlobValuesRequest.Field
-	92,  // 294: indexer.ListBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 295: indexer.ListBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 296: indexer.ListBeaconBadBlobRequest.pagination:type_name -> indexer.PaginationCursor
-	93,  // 297: indexer.ListBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
-	11,  // 298: indexer.ListBeaconBadBlobResponse.beacon_bad_blobs:type_name -> indexer.BeaconBadBlob
-	92,  // 299: indexer.CountBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 300: indexer.CountBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 301: indexer.CountBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
-	93,  // 302: indexer.CountBeaconBadBlobResponse.count:type_name -> google.protobuf.UInt64Value
-	91,  // 303: indexer.CreateExecutionBadBlockRequest.node:type_name -> google.protobuf.StringValue
-	92,  // 304: indexer.CreateExecutionBadBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	91,  // 305: indexer.CreateExecutionBadBlockRequest.block_hash:type_name -> google.protobuf.StringValue
-	94,  // 306: indexer.CreateExecutionBadBlockRequest.block_number:type_name -> google.protobuf.Int64Value
-	91,  // 307: indexer.CreateExecutionBadBlockRequest.location:type_name -> google.protobuf.StringValue
-	91,  // 308: indexer.CreateExecutionBadBlockRequest.network:type_name -> google.protobuf.StringValue
-	91,  // 309: indexer.CreateExecutionBadBlockRequest.execution_implementation:type_name -> google.protobuf.StringValue
-	91,  // 310: indexer.CreateExecutionBadBlockRequest.node_version:type_name -> google.protobuf.StringValue
-	91,  // 311: indexer.CreateExecutionBadBlockRequest.block_extra_data:type_name -> google.protobuf.StringValue
-	91,  // 312: indexer.CreateExecutionBadBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
-	91,  // 313: indexer.CreateExecutionBadBlockRequest.content_hash:type_name -> google.protobuf.StringValue
-	92,  // 314: indexer.CreateExecutionBadBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
-	91,  // 315: indexer.CreateExecutionBadBlockResponse.id:type_name -> google.protobuf.StringValue
-	92,  // 316: indexer.ListExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 317: indexer.ListExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	82,  // 318: indexer.ListExecutionBadBlockRequest.pagination:type_name -> indexer.PaginationCursor
-	13,  // 319: indexer.ListExecutionBadBlockResponse.execution_bad_blocks:type_name -> indexer.ExecutionBadBlock
-	92,  // 320: indexer.CountExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	92,  // 321: indexer.CountExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	93,  // 322: indexer.CountExecutionBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	6,   // 323: indexer.ListUniqueExecutionBadBlockValuesRequest.fields:type_name -> indexer.ListUniqueExecutionBadBlockValuesRequest.Field
-	30,  // 324: indexer.Indexer.GetConfig:input_type -> indexer.GetConfigRequest
-	32,  // 325: indexer.Indexer.GetStorageHandshakeToken:input_type -> indexer.GetStorageHandshakeTokenRequest
-	34,  // 326: indexer.Indexer.CreateBeaconState:input_type -> indexer.CreateBeaconStateRequest
-	54,  // 327: indexer.Indexer.ListBeaconState:input_type -> indexer.ListBeaconStateRequest
-	56,  // 328: indexer.Indexer.CountBeaconState:input_type -> indexer.CountBeaconStateRequest
-	52,  // 329: indexer.Indexer.ListUniqueBeaconStateValues:input_type -> indexer.ListUniqueBeaconStateValuesRequest
-	36,  // 330: indexer.Indexer.CreateBeaconBlock:input_type -> indexer.CreateBeaconBlockRequest
-	60,  // 331: indexer.Indexer.ListBeaconBlock:input_type -> indexer.ListBeaconBlockRequest
-	62,  // 332: indexer.Indexer.CountBeaconBlock:input_type -> indexer.CountBeaconBlockRequest
-	58,  // 333: indexer.Indexer.ListUniqueBeaconBlockValues:input_type -> indexer.ListUniqueBeaconBlockValuesRequest
-	38,  // 334: indexer.Indexer.CreateExecutionPayloadEnvelope:input_type -> indexer.CreateExecutionPayloadEnvelopeRequest
-	68,  // 335: indexer.Indexer.ListExecutionPayloadEnvelope:input_type -> indexer.ListExecutionPayloadEnvelopeRequest
-	70,  // 336: indexer.Indexer.CountExecutionPayloadEnvelope:input_type -> indexer.CountExecutionPayloadEnvelopeRequest
-	66,  // 337: indexer.Indexer.ListUniqueExecutionPayloadEnvelopeValues:input_type -> indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest
-	40,  // 338: indexer.Indexer.CreateBeaconBadBlock:input_type -> indexer.CreateBeaconBadBlockRequest
-	72,  // 339: indexer.Indexer.ListBeaconBadBlock:input_type -> indexer.ListBeaconBadBlockRequest
-	74,  // 340: indexer.Indexer.CountBeaconBadBlock:input_type -> indexer.CountBeaconBadBlockRequest
-	64,  // 341: indexer.Indexer.ListUniqueBeaconBadBlockValues:input_type -> indexer.ListUniqueBeaconBadBlockValuesRequest
-	42,  // 342: indexer.Indexer.CreateBeaconBadBlob:input_type -> indexer.CreateBeaconBadBlobRequest
-	78,  // 343: indexer.Indexer.ListBeaconBadBlob:input_type -> indexer.ListBeaconBadBlobRequest
-	80,  // 344: indexer.Indexer.CountBeaconBadBlob:input_type -> indexer.CountBeaconBadBlobRequest
-	76,  // 345: indexer.Indexer.ListUniqueBeaconBadBlobValues:input_type -> indexer.ListUniqueBeaconBadBlobValuesRequest
-	44,  // 346: indexer.Indexer.CreateExecutionBlockTrace:input_type -> indexer.CreateExecutionBlockTraceRequest
-	46,  // 347: indexer.Indexer.ListExecutionBlockTrace:input_type -> indexer.ListExecutionBlockTraceRequest
-	48,  // 348: indexer.Indexer.CountExecutionBlockTrace:input_type -> indexer.CountExecutionBlockTraceRequest
-	50,  // 349: indexer.Indexer.ListUniqueExecutionBlockTraceValues:input_type -> indexer.ListUniqueExecutionBlockTraceValuesRequest
-	83,  // 350: indexer.Indexer.CreateExecutionBadBlock:input_type -> indexer.CreateExecutionBadBlockRequest
-	85,  // 351: indexer.Indexer.ListExecutionBadBlock:input_type -> indexer.ListExecutionBadBlockRequest
-	87,  // 352: indexer.Indexer.CountExecutionBadBlock:input_type -> indexer.CountExecutionBadBlockRequest
-	89,  // 353: indexer.Indexer.ListUniqueExecutionBadBlockValues:input_type -> indexer.ListUniqueExecutionBadBlockValuesRequest
-	21,  // 354: indexer.Indexer.GetBlob:input_type -> indexer.GetBlobRequest
-	23,  // 355: indexer.Indexer.CreateBlob:input_type -> indexer.CreateBlobRequest
-	26,  // 356: indexer.Indexer.CreatePayloadDivergence:input_type -> indexer.CreatePayloadDivergenceRequest
-	28,  // 357: indexer.Indexer.ListPayloadDivergence:input_type -> indexer.ListPayloadDivergenceRequest
-	31,  // 358: indexer.Indexer.GetConfig:output_type -> indexer.GetConfigResponse
-	33,  // 359: indexer.Indexer.GetStorageHandshakeToken:output_type -> indexer.GetStorageHandshakeTokenResponse
-	35,  // 360: indexer.Indexer.CreateBeaconState:output_type -> indexer.CreateBeaconStateResponse
-	55,  // 361: indexer.Indexer.ListBeaconState:output_type -> indexer.ListBeaconStateResponse
-	57,  // 362: indexer.Indexer.CountBeaconState:output_type -> indexer.CountBeaconStateResponse
-	53,  // 363: indexer.Indexer.ListUniqueBeaconStateValues:output_type -> indexer.ListUniqueBeaconStateValuesResponse
-	37,  // 364: indexer.Indexer.CreateBeaconBlock:output_type -> indexer.CreateBeaconBlockResponse
-	61,  // 365: indexer.Indexer.ListBeaconBlock:output_type -> indexer.ListBeaconBlockResponse
-	63,  // 366: indexer.Indexer.CountBeaconBlock:output_type -> indexer.CountBeaconBlockResponse
-	59,  // 367: indexer.Indexer.ListUniqueBeaconBlockValues:output_type -> indexer.ListUniqueBeaconBlockValuesResponse
-	39,  // 368: indexer.Indexer.CreateExecutionPayloadEnvelope:output_type -> indexer.CreateExecutionPayloadEnvelopeResponse
-	69,  // 369: indexer.Indexer.ListExecutionPayloadEnvelope:output_type -> indexer.ListExecutionPayloadEnvelopeResponse
-	71,  // 370: indexer.Indexer.CountExecutionPayloadEnvelope:output_type -> indexer.CountExecutionPayloadEnvelopeResponse
-	67,  // 371: indexer.Indexer.ListUniqueExecutionPayloadEnvelopeValues:output_type -> indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse
-	41,  // 372: indexer.Indexer.CreateBeaconBadBlock:output_type -> indexer.CreateBeaconBadBlockResponse
-	73,  // 373: indexer.Indexer.ListBeaconBadBlock:output_type -> indexer.ListBeaconBadBlockResponse
-	75,  // 374: indexer.Indexer.CountBeaconBadBlock:output_type -> indexer.CountBeaconBadBlockResponse
-	65,  // 375: indexer.Indexer.ListUniqueBeaconBadBlockValues:output_type -> indexer.ListUniqueBeaconBadBlockValuesResponse
-	43,  // 376: indexer.Indexer.CreateBeaconBadBlob:output_type -> indexer.CreateBeaconBadBlobResponse
-	79,  // 377: indexer.Indexer.ListBeaconBadBlob:output_type -> indexer.ListBeaconBadBlobResponse
-	81,  // 378: indexer.Indexer.CountBeaconBadBlob:output_type -> indexer.CountBeaconBadBlobResponse
-	77,  // 379: indexer.Indexer.ListUniqueBeaconBadBlobValues:output_type -> indexer.ListUniqueBeaconBadBlobValuesResponse
-	45,  // 380: indexer.Indexer.CreateExecutionBlockTrace:output_type -> indexer.CreateExecutionBlockTraceResponse
-	47,  // 381: indexer.Indexer.ListExecutionBlockTrace:output_type -> indexer.ListExecutionBlockTraceResponse
-	49,  // 382: indexer.Indexer.CountExecutionBlockTrace:output_type -> indexer.CountExecutionBlockTraceResponse
-	51,  // 383: indexer.Indexer.ListUniqueExecutionBlockTraceValues:output_type -> indexer.ListUniqueExecutionBlockTraceValuesResponse
-	84,  // 384: indexer.Indexer.CreateExecutionBadBlock:output_type -> indexer.CreateExecutionBadBlockResponse
-	86,  // 385: indexer.Indexer.ListExecutionBadBlock:output_type -> indexer.ListExecutionBadBlockResponse
-	88,  // 386: indexer.Indexer.CountExecutionBadBlock:output_type -> indexer.CountExecutionBadBlockResponse
-	90,  // 387: indexer.Indexer.ListUniqueExecutionBadBlockValues:output_type -> indexer.ListUniqueExecutionBadBlockValuesResponse
-	22,  // 388: indexer.Indexer.GetBlob:output_type -> indexer.GetBlobResponse
-	24,  // 389: indexer.Indexer.CreateBlob:output_type -> indexer.CreateBlobResponse
-	27,  // 390: indexer.Indexer.CreatePayloadDivergence:output_type -> indexer.CreatePayloadDivergenceResponse
-	29,  // 391: indexer.Indexer.ListPayloadDivergence:output_type -> indexer.ListPayloadDivergenceResponse
-	358, // [358:392] is the sub-list for method output_type
-	324, // [324:358] is the sub-list for method input_type
-	324, // [324:324] is the sub-list for extension type_name
-	324, // [324:324] is the sub-list for extension extendee
-	0,   // [0:324] is the sub-list for field type_name
+	94,  // 14: indexer.BeaconState.agreement_count:type_name -> google.protobuf.UInt32Value
+	91,  // 15: indexer.BeaconBlock.id:type_name -> google.protobuf.StringValue
+	91,  // 16: indexer.BeaconBlock.node:type_name -> google.protobuf.StringValue
+	92,  // 17: indexer.BeaconBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 18: indexer.BeaconBlock.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 19: indexer.BeaconBlock.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 20: indexer.BeaconBlock.block_root:type_name -> google.protobuf.StringValue
+	91,  // 21: indexer.BeaconBlock.node_version:type_name -> google.protobuf.StringValue
+	91,  // 22: indexer.BeaconBlock.location:type_name -> google.protobuf.StringValue
+	91,  // 23: indexer.BeaconBlock.network:type_name -> google.protobuf.StringValue
+	91,  // 24: indexer.BeaconBlock.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 25: indexer.BeaconBlock.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 26: indexer.BeaconBlock.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 27: indexer.BeaconBlock.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 28: indexer.BeaconBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	94,  // 29: indexer.BeaconBlock.agreement_count:type_name -> google.protobuf.UInt32Value
+	91,  // 30: indexer.ExecutionPayloadEnvelope.id:type_name -> google.protobuf.StringValue
+	91,  // 31: indexer.ExecutionPayloadEnvelope.node:type_name -> google.protobuf.StringValue
+	92,  // 32: indexer.ExecutionPayloadEnvelope.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 33: indexer.ExecutionPayloadEnvelope.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 34: indexer.ExecutionPayloadEnvelope.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 35: indexer.ExecutionPayloadEnvelope.block_root:type_name -> google.protobuf.StringValue
+	91,  // 36: indexer.ExecutionPayloadEnvelope.node_version:type_name -> google.protobuf.StringValue
+	91,  // 37: indexer.ExecutionPayloadEnvelope.location:type_name -> google.protobuf.StringValue
+	91,  // 38: indexer.ExecutionPayloadEnvelope.network:type_name -> google.protobuf.StringValue
+	91,  // 39: indexer.ExecutionPayloadEnvelope.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 40: indexer.ExecutionPayloadEnvelope.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 41: indexer.ExecutionPayloadEnvelope.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 42: indexer.ExecutionPayloadEnvelope.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 43: indexer.ExecutionPayloadEnvelope.content_matched_at:type_name -> google.protobuf.Timestamp
+	94,  // 44: indexer.ExecutionPayloadEnvelope.agreement_count:type_name -> google.protobuf.UInt32Value
+	91,  // 45: indexer.BeaconBadBlock.id:type_name -> google.protobuf.StringValue
+	91,  // 46: indexer.BeaconBadBlock.node:type_name -> google.protobuf.StringValue
+	92,  // 47: indexer.BeaconBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 48: indexer.BeaconBadBlock.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 49: indexer.BeaconBadBlock.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 50: indexer.BeaconBadBlock.block_root:type_name -> google.protobuf.StringValue
+	91,  // 51: indexer.BeaconBadBlock.node_version:type_name -> google.protobuf.StringValue
+	91,  // 52: indexer.BeaconBadBlock.location:type_name -> google.protobuf.StringValue
+	91,  // 53: indexer.BeaconBadBlock.network:type_name -> google.protobuf.StringValue
+	91,  // 54: indexer.BeaconBadBlock.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 55: indexer.BeaconBadBlock.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 56: indexer.BeaconBadBlock.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 57: indexer.BeaconBadBlock.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 58: indexer.BeaconBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 59: indexer.BeaconBadBlob.id:type_name -> google.protobuf.StringValue
+	91,  // 60: indexer.BeaconBadBlob.node:type_name -> google.protobuf.StringValue
+	92,  // 61: indexer.BeaconBadBlob.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 62: indexer.BeaconBadBlob.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 63: indexer.BeaconBadBlob.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 64: indexer.BeaconBadBlob.block_root:type_name -> google.protobuf.StringValue
+	91,  // 65: indexer.BeaconBadBlob.node_version:type_name -> google.protobuf.StringValue
+	91,  // 66: indexer.BeaconBadBlob.location:type_name -> google.protobuf.StringValue
+	91,  // 67: indexer.BeaconBadBlob.network:type_name -> google.protobuf.StringValue
+	91,  // 68: indexer.BeaconBadBlob.beacon_implementation:type_name -> google.protobuf.StringValue
+	93,  // 69: indexer.BeaconBadBlob.index:type_name -> google.protobuf.UInt64Value
+	91,  // 70: indexer.BeaconBadBlob.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 71: indexer.BeaconBadBlob.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 72: indexer.BeaconBadBlob.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 73: indexer.BeaconBadBlob.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 74: indexer.ExecutionBlockTrace.id:type_name -> google.protobuf.StringValue
+	91,  // 75: indexer.ExecutionBlockTrace.node:type_name -> google.protobuf.StringValue
+	92,  // 76: indexer.ExecutionBlockTrace.fetched_at:type_name -> google.protobuf.Timestamp
+	91,  // 77: indexer.ExecutionBlockTrace.block_hash:type_name -> google.protobuf.StringValue
+	95,  // 78: indexer.ExecutionBlockTrace.block_number:type_name -> google.protobuf.Int64Value
+	91,  // 79: indexer.ExecutionBlockTrace.location:type_name -> google.protobuf.StringValue
+	91,  // 80: indexer.ExecutionBlockTrace.network:type_name -> google.protobuf.StringValue
+	91,  // 81: indexer.ExecutionBlockTrace.execution_implementation:type_name -> google.protobuf.StringValue
+	91,  // 82: indexer.ExecutionBlockTrace.node_version:type_name -> google.protobuf.StringValue
+	91,  // 83: indexer.ExecutionBlockTrace.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 84: indexer.ExecutionBlockTrace.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 85: indexer.ExecutionBlockTrace.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 86: indexer.ExecutionBlockTrace.content_matched_at:type_name -> google.protobuf.Timestamp
+	94,  // 87: indexer.ExecutionBlockTrace.agreement_count:type_name -> google.protobuf.UInt32Value
+	91,  // 88: indexer.ExecutionBadBlock.id:type_name -> google.protobuf.StringValue
+	91,  // 89: indexer.ExecutionBadBlock.node:type_name -> google.protobuf.StringValue
+	92,  // 90: indexer.ExecutionBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	91,  // 91: indexer.ExecutionBadBlock.block_hash:type_name -> google.protobuf.StringValue
+	95,  // 92: indexer.ExecutionBadBlock.block_number:type_name -> google.protobuf.Int64Value
+	91,  // 93: indexer.ExecutionBadBlock.location:type_name -> google.protobuf.StringValue
+	91,  // 94: indexer.ExecutionBadBlock.network:type_name -> google.protobuf.StringValue
+	91,  // 95: indexer.ExecutionBadBlock.execution_implementation:type_name -> google.protobuf.StringValue
+	91,  // 96: indexer.ExecutionBadBlock.node_version:type_name -> google.protobuf.StringValue
+	91,  // 97: indexer.ExecutionBadBlock.block_extra_data:type_name -> google.protobuf.StringValue
+	91,  // 98: indexer.ExecutionBadBlock.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 99: indexer.ExecutionBadBlock.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 100: indexer.ExecutionBadBlock.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 101: indexer.ExecutionBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	15,  // 102: indexer.Config.ethereum:type_name -> indexer.EthereumConfig
+	91,  // 103: indexer.EthereumConfig.network:type_name -> google.protobuf.StringValue
+	16,  // 104: indexer.EthereumConfig.config:type_name -> indexer.EthereumNetworkConfig
+	17,  // 105: indexer.EthereumConfig.tools:type_name -> indexer.ToolsConfig
+	91,  // 106: indexer.EthereumNetworkConfig.repository:type_name -> google.protobuf.StringValue
+	91,  // 107: indexer.EthereumNetworkConfig.branch:type_name -> google.protobuf.StringValue
+	91,  // 108: indexer.EthereumNetworkConfig.path:type_name -> google.protobuf.StringValue
+	18,  // 109: indexer.ToolsConfig.ncli:type_name -> indexer.GitRepositoryConfig
+	18,  // 110: indexer.ToolsConfig.lcli:type_name -> indexer.GitRepositoryConfig
+	19,  // 111: indexer.ToolsConfig.zcli:type_name -> indexer.ZcliConfig
+	91,  // 112: indexer.GitRepositoryConfig.repository:type_name -> google.protobuf.StringValue
+	91,  // 113: indexer.GitRepositoryConfig.branch:type_name -> google.protobuf.StringValue
+	91,  // 114: indexer.ZcliConfig.fork:type_name -> google.protobuf.StringValue
+	91,  // 115: indexer.Blob.kind:type_name -> google.protobuf.StringValue
+	91,  // 116: indexer.Blob.network:type_name -> google.protobuf.StringValue
+	91,  // 117: indexer.Blob.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 118: indexer.Blob.content_hash:type_name -> google.protobuf.StringValue
+	91,  // 119: indexer.Blob.location:type_name -> google.protobuf.StringValue
+	91,  // 120: indexer.Blob.content_encoding:type_name -> google.protobuf.StringValue
+	95,  // 121: indexer.Blob.raw_size:type_name -> google.protobuf.Int64Value
+	95,  // 122: indexer.Blob.compressed_size:type_name -> google.protobuf.Int64Value
+	95,  // 123: indexer.Blob.ref_count:type_name -> google.protobuf.Int64Value
+	91,  // 124: indexer.Blob.state:type_name -> google.protobuf.StringValue
+	95,  // 125: indexer.Blob.generation:type_name -> google.protobuf.Int64Value
+	92,  // 126: indexer.Blob.created_at:type_name -> google.protobuf.Timestamp
+	91,  // 127: indexer.GetBlobRequest.kind:type_name -> google.protobuf.StringValue
+	91,  // 128: indexer.GetBlobRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 129: indexer.GetBlobRequest.dedup_key:type_name -> google.protobuf.StringValue
+	20,  // 130: indexer.GetBlobResponse.blob:type_name -> indexer.Blob
+	91,  // 131: indexer.CreateBlobRequest.kind:type_name -> google.protobuf.StringValue
+	91,  // 132: indexer.CreateBlobRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 133: indexer.CreateBlobRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 134: indexer.CreateBlobRequest.content_hash:type_name -> google.protobuf.StringValue
+	91,  // 135: indexer.CreateBlobRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 136: indexer.CreateBlobRequest.content_encoding:type_name -> google.protobuf.StringValue
+	95,  // 137: indexer.CreateBlobRequest.raw_size:type_name -> google.protobuf.Int64Value
+	95,  // 138: indexer.CreateBlobRequest.compressed_size:type_name -> google.protobuf.Int64Value
+	20,  // 139: indexer.CreateBlobResponse.blob:type_name -> indexer.Blob
+	91,  // 140: indexer.PayloadDivergence.id:type_name -> google.protobuf.StringValue
+	92,  // 141: indexer.PayloadDivergence.observed_at:type_name -> google.protobuf.Timestamp
+	91,  // 142: indexer.PayloadDivergence.network:type_name -> google.protobuf.StringValue
+	91,  // 143: indexer.PayloadDivergence.kind:type_name -> google.protobuf.StringValue
+	91,  // 144: indexer.PayloadDivergence.node:type_name -> google.protobuf.StringValue
+	91,  // 145: indexer.PayloadDivergence.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 146: indexer.PayloadDivergence.expected_hash:type_name -> google.protobuf.StringValue
+	91,  // 147: indexer.PayloadDivergence.actual_hash:type_name -> google.protobuf.StringValue
+	93,  // 148: indexer.PayloadDivergence.slot:type_name -> google.protobuf.UInt64Value
+	91,  // 149: indexer.PayloadDivergence.identifier:type_name -> google.protobuf.StringValue
+	96,  // 150: indexer.PayloadDivergence.attempt:type_name -> google.protobuf.Int32Value
+	91,  // 151: indexer.PayloadDivergence.severity:type_name -> google.protobuf.StringValue
+	91,  // 152: indexer.PayloadDivergence.location:type_name -> google.protobuf.StringValue
+	92,  // 153: indexer.CreatePayloadDivergenceRequest.observed_at:type_name -> google.protobuf.Timestamp
+	91,  // 154: indexer.CreatePayloadDivergenceRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 155: indexer.CreatePayloadDivergenceRequest.kind:type_name -> google.protobuf.StringValue
+	91,  // 156: indexer.CreatePayloadDivergenceRequest.node:type_name -> google.protobuf.StringValue
+	91,  // 157: indexer.CreatePayloadDivergenceRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 158: indexer.CreatePayloadDivergenceRequest.expected_hash:type_name -> google.protobuf.StringValue
+	91,  // 159: indexer.CreatePayloadDivergenceRequest.actual_hash:type_name -> google.protobuf.StringValue
+	93,  // 160: indexer.CreatePayloadDivergenceRequest.slot:type_name -> google.protobuf.UInt64Value
+	91,  // 161: indexer.CreatePayloadDivergenceRequest.identifier:type_name -> google.protobuf.StringValue
+	96,  // 162: indexer.CreatePayloadDivergenceRequest.attempt:type_name -> google.protobuf.Int32Value
+	91,  // 163: indexer.CreatePayloadDivergenceRequest.severity:type_name -> google.protobuf.StringValue
+	91,  // 164: indexer.CreatePayloadDivergenceRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 165: indexer.CreatePayloadDivergenceResponse.id:type_name -> google.protobuf.StringValue
+	92,  // 166: indexer.ListPayloadDivergenceRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 167: indexer.ListPayloadDivergenceRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 168: indexer.ListPayloadDivergenceRequest.pagination:type_name -> indexer.PaginationCursor
+	25,  // 169: indexer.ListPayloadDivergenceResponse.payload_divergences:type_name -> indexer.PayloadDivergence
+	14,  // 170: indexer.GetConfigResponse.config:type_name -> indexer.Config
+	91,  // 171: indexer.CreateBeaconStateRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 172: indexer.CreateBeaconStateRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 173: indexer.CreateBeaconStateRequest.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 174: indexer.CreateBeaconStateRequest.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 175: indexer.CreateBeaconStateRequest.state_root:type_name -> google.protobuf.StringValue
+	91,  // 176: indexer.CreateBeaconStateRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 177: indexer.CreateBeaconStateRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 178: indexer.CreateBeaconStateRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 179: indexer.CreateBeaconStateRequest.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 180: indexer.CreateBeaconStateRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 181: indexer.CreateBeaconStateRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 182: indexer.CreateBeaconStateRequest.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 183: indexer.CreateBeaconStateRequest.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 184: indexer.CreateBeaconStateRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 185: indexer.CreateBeaconStateResponse.id:type_name -> google.protobuf.StringValue
+	91,  // 186: indexer.CreateBeaconBlockRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 187: indexer.CreateBeaconBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 188: indexer.CreateBeaconBlockRequest.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 189: indexer.CreateBeaconBlockRequest.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 190: indexer.CreateBeaconBlockRequest.block_root:type_name -> google.protobuf.StringValue
+	91,  // 191: indexer.CreateBeaconBlockRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 192: indexer.CreateBeaconBlockRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 193: indexer.CreateBeaconBlockRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 194: indexer.CreateBeaconBlockRequest.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 195: indexer.CreateBeaconBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 196: indexer.CreateBeaconBlockRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 197: indexer.CreateBeaconBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 198: indexer.CreateBeaconBlockRequest.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 199: indexer.CreateBeaconBlockRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 200: indexer.CreateBeaconBlockResponse.id:type_name -> google.protobuf.StringValue
+	91,  // 201: indexer.CreateExecutionPayloadEnvelopeRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 202: indexer.CreateExecutionPayloadEnvelopeRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 203: indexer.CreateExecutionPayloadEnvelopeRequest.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 204: indexer.CreateExecutionPayloadEnvelopeRequest.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 205: indexer.CreateExecutionPayloadEnvelopeRequest.block_root:type_name -> google.protobuf.StringValue
+	91,  // 206: indexer.CreateExecutionPayloadEnvelopeRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 207: indexer.CreateExecutionPayloadEnvelopeRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 208: indexer.CreateExecutionPayloadEnvelopeRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 209: indexer.CreateExecutionPayloadEnvelopeRequest.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 210: indexer.CreateExecutionPayloadEnvelopeRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 211: indexer.CreateExecutionPayloadEnvelopeRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 212: indexer.CreateExecutionPayloadEnvelopeRequest.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 213: indexer.CreateExecutionPayloadEnvelopeRequest.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 214: indexer.CreateExecutionPayloadEnvelopeRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 215: indexer.CreateExecutionPayloadEnvelopeResponse.id:type_name -> google.protobuf.StringValue
+	91,  // 216: indexer.CreateBeaconBadBlockRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 217: indexer.CreateBeaconBadBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 218: indexer.CreateBeaconBadBlockRequest.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 219: indexer.CreateBeaconBadBlockRequest.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 220: indexer.CreateBeaconBadBlockRequest.block_root:type_name -> google.protobuf.StringValue
+	91,  // 221: indexer.CreateBeaconBadBlockRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 222: indexer.CreateBeaconBadBlockRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 223: indexer.CreateBeaconBadBlockRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 224: indexer.CreateBeaconBadBlockRequest.beacon_implementation:type_name -> google.protobuf.StringValue
+	91,  // 225: indexer.CreateBeaconBadBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 226: indexer.CreateBeaconBadBlockRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 227: indexer.CreateBeaconBadBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
+	91,  // 228: indexer.CreateBeaconBadBlockResponse.id:type_name -> google.protobuf.StringValue
+	91,  // 229: indexer.CreateBeaconBadBlobRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 230: indexer.CreateBeaconBadBlobRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	93,  // 231: indexer.CreateBeaconBadBlobRequest.slot:type_name -> google.protobuf.UInt64Value
+	93,  // 232: indexer.CreateBeaconBadBlobRequest.epoch:type_name -> google.protobuf.UInt64Value
+	91,  // 233: indexer.CreateBeaconBadBlobRequest.block_root:type_name -> google.protobuf.StringValue
+	91,  // 234: indexer.CreateBeaconBadBlobRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 235: indexer.CreateBeaconBadBlobRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 236: indexer.CreateBeaconBadBlobRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 237: indexer.CreateBeaconBadBlobRequest.beacon_implementation:type_name -> google.protobuf.StringValue
+	93,  // 238: indexer.CreateBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
+	91,  // 239: indexer.CreateBeaconBadBlobRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 240: indexer.CreateBeaconBadBlobRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 241: indexer.CreateBeaconBadBlobRequest.verified_at:type_name -> google.protobuf.Timestamp
+	91,  // 242: indexer.CreateBeaconBadBlobResponse.id:type_name -> google.protobuf.StringValue
+	91,  // 243: indexer.CreateExecutionBlockTraceRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 244: indexer.CreateExecutionBlockTraceRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	91,  // 245: indexer.CreateExecutionBlockTraceRequest.block_hash:type_name -> google.protobuf.StringValue
+	95,  // 246: indexer.CreateExecutionBlockTraceRequest.block_number:type_name -> google.protobuf.Int64Value
+	91,  // 247: indexer.CreateExecutionBlockTraceRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 248: indexer.CreateExecutionBlockTraceRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 249: indexer.CreateExecutionBlockTraceRequest.execution_implementation:type_name -> google.protobuf.StringValue
+	91,  // 250: indexer.CreateExecutionBlockTraceRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 251: indexer.CreateExecutionBlockTraceRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 252: indexer.CreateExecutionBlockTraceRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 253: indexer.CreateExecutionBlockTraceRequest.verified_at:type_name -> google.protobuf.Timestamp
+	92,  // 254: indexer.CreateExecutionBlockTraceRequest.content_matched_at:type_name -> google.protobuf.Timestamp
+	91,  // 255: indexer.CreateExecutionBlockTraceRequest.dedup_key:type_name -> google.protobuf.StringValue
+	91,  // 256: indexer.CreateExecutionBlockTraceResponse.id:type_name -> google.protobuf.StringValue
+	92,  // 257: indexer.ListExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 258: indexer.ListExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 259: indexer.ListExecutionBlockTraceRequest.pagination:type_name -> indexer.PaginationCursor
+	12,  // 260: indexer.ListExecutionBlockTraceResponse.execution_block_traces:type_name -> indexer.ExecutionBlockTrace
+	92,  // 261: indexer.CountExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 262: indexer.CountExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 263: indexer.CountExecutionBlockTraceResponse.count:type_name -> google.protobuf.UInt64Value
+	0,   // 264: indexer.ListUniqueExecutionBlockTraceValuesRequest.fields:type_name -> indexer.ListUniqueExecutionBlockTraceValuesRequest.Field
+	1,   // 265: indexer.ListUniqueBeaconStateValuesRequest.fields:type_name -> indexer.ListUniqueBeaconStateValuesRequest.Field
+	92,  // 266: indexer.ListBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 267: indexer.ListBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 268: indexer.ListBeaconStateRequest.pagination:type_name -> indexer.PaginationCursor
+	7,   // 269: indexer.ListBeaconStateResponse.beacon_states:type_name -> indexer.BeaconState
+	92,  // 270: indexer.CountBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 271: indexer.CountBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 272: indexer.CountBeaconStateResponse.count:type_name -> google.protobuf.UInt64Value
+	2,   // 273: indexer.ListUniqueBeaconBlockValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBlockValuesRequest.Field
+	92,  // 274: indexer.ListBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 275: indexer.ListBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 276: indexer.ListBeaconBlockRequest.pagination:type_name -> indexer.PaginationCursor
+	8,   // 277: indexer.ListBeaconBlockResponse.beacon_blocks:type_name -> indexer.BeaconBlock
+	92,  // 278: indexer.CountBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 279: indexer.CountBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 280: indexer.CountBeaconBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	3,   // 281: indexer.ListUniqueBeaconBadBlockValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBadBlockValuesRequest.Field
+	4,   // 282: indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest.fields:type_name -> indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest.Field
+	92,  // 283: indexer.ListExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 284: indexer.ListExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 285: indexer.ListExecutionPayloadEnvelopeRequest.pagination:type_name -> indexer.PaginationCursor
+	9,   // 286: indexer.ListExecutionPayloadEnvelopeResponse.execution_payload_envelopes:type_name -> indexer.ExecutionPayloadEnvelope
+	92,  // 287: indexer.CountExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 288: indexer.CountExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 289: indexer.CountExecutionPayloadEnvelopeResponse.count:type_name -> google.protobuf.UInt64Value
+	92,  // 290: indexer.ListBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 291: indexer.ListBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 292: indexer.ListBeaconBadBlockRequest.pagination:type_name -> indexer.PaginationCursor
+	10,  // 293: indexer.ListBeaconBadBlockResponse.beacon_bad_blocks:type_name -> indexer.BeaconBadBlock
+	92,  // 294: indexer.CountBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 295: indexer.CountBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 296: indexer.CountBeaconBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	5,   // 297: indexer.ListUniqueBeaconBadBlobValuesRequest.fields:type_name -> indexer.ListUniqueBeaconBadBlobValuesRequest.Field
+	92,  // 298: indexer.ListBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 299: indexer.ListBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 300: indexer.ListBeaconBadBlobRequest.pagination:type_name -> indexer.PaginationCursor
+	93,  // 301: indexer.ListBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
+	11,  // 302: indexer.ListBeaconBadBlobResponse.beacon_bad_blobs:type_name -> indexer.BeaconBadBlob
+	92,  // 303: indexer.CountBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 304: indexer.CountBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 305: indexer.CountBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
+	93,  // 306: indexer.CountBeaconBadBlobResponse.count:type_name -> google.protobuf.UInt64Value
+	91,  // 307: indexer.CreateExecutionBadBlockRequest.node:type_name -> google.protobuf.StringValue
+	92,  // 308: indexer.CreateExecutionBadBlockRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	91,  // 309: indexer.CreateExecutionBadBlockRequest.block_hash:type_name -> google.protobuf.StringValue
+	95,  // 310: indexer.CreateExecutionBadBlockRequest.block_number:type_name -> google.protobuf.Int64Value
+	91,  // 311: indexer.CreateExecutionBadBlockRequest.location:type_name -> google.protobuf.StringValue
+	91,  // 312: indexer.CreateExecutionBadBlockRequest.network:type_name -> google.protobuf.StringValue
+	91,  // 313: indexer.CreateExecutionBadBlockRequest.execution_implementation:type_name -> google.protobuf.StringValue
+	91,  // 314: indexer.CreateExecutionBadBlockRequest.node_version:type_name -> google.protobuf.StringValue
+	91,  // 315: indexer.CreateExecutionBadBlockRequest.block_extra_data:type_name -> google.protobuf.StringValue
+	91,  // 316: indexer.CreateExecutionBadBlockRequest.content_encoding:type_name -> google.protobuf.StringValue
+	91,  // 317: indexer.CreateExecutionBadBlockRequest.content_hash:type_name -> google.protobuf.StringValue
+	92,  // 318: indexer.CreateExecutionBadBlockRequest.verified_at:type_name -> google.protobuf.Timestamp
+	91,  // 319: indexer.CreateExecutionBadBlockResponse.id:type_name -> google.protobuf.StringValue
+	92,  // 320: indexer.ListExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 321: indexer.ListExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	82,  // 322: indexer.ListExecutionBadBlockRequest.pagination:type_name -> indexer.PaginationCursor
+	13,  // 323: indexer.ListExecutionBadBlockResponse.execution_bad_blocks:type_name -> indexer.ExecutionBadBlock
+	92,  // 324: indexer.CountExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	92,  // 325: indexer.CountExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	93,  // 326: indexer.CountExecutionBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	6,   // 327: indexer.ListUniqueExecutionBadBlockValuesRequest.fields:type_name -> indexer.ListUniqueExecutionBadBlockValuesRequest.Field
+	30,  // 328: indexer.Indexer.GetConfig:input_type -> indexer.GetConfigRequest
+	32,  // 329: indexer.Indexer.GetStorageHandshakeToken:input_type -> indexer.GetStorageHandshakeTokenRequest
+	34,  // 330: indexer.Indexer.CreateBeaconState:input_type -> indexer.CreateBeaconStateRequest
+	54,  // 331: indexer.Indexer.ListBeaconState:input_type -> indexer.ListBeaconStateRequest
+	56,  // 332: indexer.Indexer.CountBeaconState:input_type -> indexer.CountBeaconStateRequest
+	52,  // 333: indexer.Indexer.ListUniqueBeaconStateValues:input_type -> indexer.ListUniqueBeaconStateValuesRequest
+	36,  // 334: indexer.Indexer.CreateBeaconBlock:input_type -> indexer.CreateBeaconBlockRequest
+	60,  // 335: indexer.Indexer.ListBeaconBlock:input_type -> indexer.ListBeaconBlockRequest
+	62,  // 336: indexer.Indexer.CountBeaconBlock:input_type -> indexer.CountBeaconBlockRequest
+	58,  // 337: indexer.Indexer.ListUniqueBeaconBlockValues:input_type -> indexer.ListUniqueBeaconBlockValuesRequest
+	38,  // 338: indexer.Indexer.CreateExecutionPayloadEnvelope:input_type -> indexer.CreateExecutionPayloadEnvelopeRequest
+	68,  // 339: indexer.Indexer.ListExecutionPayloadEnvelope:input_type -> indexer.ListExecutionPayloadEnvelopeRequest
+	70,  // 340: indexer.Indexer.CountExecutionPayloadEnvelope:input_type -> indexer.CountExecutionPayloadEnvelopeRequest
+	66,  // 341: indexer.Indexer.ListUniqueExecutionPayloadEnvelopeValues:input_type -> indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest
+	40,  // 342: indexer.Indexer.CreateBeaconBadBlock:input_type -> indexer.CreateBeaconBadBlockRequest
+	72,  // 343: indexer.Indexer.ListBeaconBadBlock:input_type -> indexer.ListBeaconBadBlockRequest
+	74,  // 344: indexer.Indexer.CountBeaconBadBlock:input_type -> indexer.CountBeaconBadBlockRequest
+	64,  // 345: indexer.Indexer.ListUniqueBeaconBadBlockValues:input_type -> indexer.ListUniqueBeaconBadBlockValuesRequest
+	42,  // 346: indexer.Indexer.CreateBeaconBadBlob:input_type -> indexer.CreateBeaconBadBlobRequest
+	78,  // 347: indexer.Indexer.ListBeaconBadBlob:input_type -> indexer.ListBeaconBadBlobRequest
+	80,  // 348: indexer.Indexer.CountBeaconBadBlob:input_type -> indexer.CountBeaconBadBlobRequest
+	76,  // 349: indexer.Indexer.ListUniqueBeaconBadBlobValues:input_type -> indexer.ListUniqueBeaconBadBlobValuesRequest
+	44,  // 350: indexer.Indexer.CreateExecutionBlockTrace:input_type -> indexer.CreateExecutionBlockTraceRequest
+	46,  // 351: indexer.Indexer.ListExecutionBlockTrace:input_type -> indexer.ListExecutionBlockTraceRequest
+	48,  // 352: indexer.Indexer.CountExecutionBlockTrace:input_type -> indexer.CountExecutionBlockTraceRequest
+	50,  // 353: indexer.Indexer.ListUniqueExecutionBlockTraceValues:input_type -> indexer.ListUniqueExecutionBlockTraceValuesRequest
+	83,  // 354: indexer.Indexer.CreateExecutionBadBlock:input_type -> indexer.CreateExecutionBadBlockRequest
+	85,  // 355: indexer.Indexer.ListExecutionBadBlock:input_type -> indexer.ListExecutionBadBlockRequest
+	87,  // 356: indexer.Indexer.CountExecutionBadBlock:input_type -> indexer.CountExecutionBadBlockRequest
+	89,  // 357: indexer.Indexer.ListUniqueExecutionBadBlockValues:input_type -> indexer.ListUniqueExecutionBadBlockValuesRequest
+	21,  // 358: indexer.Indexer.GetBlob:input_type -> indexer.GetBlobRequest
+	23,  // 359: indexer.Indexer.CreateBlob:input_type -> indexer.CreateBlobRequest
+	26,  // 360: indexer.Indexer.CreatePayloadDivergence:input_type -> indexer.CreatePayloadDivergenceRequest
+	28,  // 361: indexer.Indexer.ListPayloadDivergence:input_type -> indexer.ListPayloadDivergenceRequest
+	31,  // 362: indexer.Indexer.GetConfig:output_type -> indexer.GetConfigResponse
+	33,  // 363: indexer.Indexer.GetStorageHandshakeToken:output_type -> indexer.GetStorageHandshakeTokenResponse
+	35,  // 364: indexer.Indexer.CreateBeaconState:output_type -> indexer.CreateBeaconStateResponse
+	55,  // 365: indexer.Indexer.ListBeaconState:output_type -> indexer.ListBeaconStateResponse
+	57,  // 366: indexer.Indexer.CountBeaconState:output_type -> indexer.CountBeaconStateResponse
+	53,  // 367: indexer.Indexer.ListUniqueBeaconStateValues:output_type -> indexer.ListUniqueBeaconStateValuesResponse
+	37,  // 368: indexer.Indexer.CreateBeaconBlock:output_type -> indexer.CreateBeaconBlockResponse
+	61,  // 369: indexer.Indexer.ListBeaconBlock:output_type -> indexer.ListBeaconBlockResponse
+	63,  // 370: indexer.Indexer.CountBeaconBlock:output_type -> indexer.CountBeaconBlockResponse
+	59,  // 371: indexer.Indexer.ListUniqueBeaconBlockValues:output_type -> indexer.ListUniqueBeaconBlockValuesResponse
+	39,  // 372: indexer.Indexer.CreateExecutionPayloadEnvelope:output_type -> indexer.CreateExecutionPayloadEnvelopeResponse
+	69,  // 373: indexer.Indexer.ListExecutionPayloadEnvelope:output_type -> indexer.ListExecutionPayloadEnvelopeResponse
+	71,  // 374: indexer.Indexer.CountExecutionPayloadEnvelope:output_type -> indexer.CountExecutionPayloadEnvelopeResponse
+	67,  // 375: indexer.Indexer.ListUniqueExecutionPayloadEnvelopeValues:output_type -> indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse
+	41,  // 376: indexer.Indexer.CreateBeaconBadBlock:output_type -> indexer.CreateBeaconBadBlockResponse
+	73,  // 377: indexer.Indexer.ListBeaconBadBlock:output_type -> indexer.ListBeaconBadBlockResponse
+	75,  // 378: indexer.Indexer.CountBeaconBadBlock:output_type -> indexer.CountBeaconBadBlockResponse
+	65,  // 379: indexer.Indexer.ListUniqueBeaconBadBlockValues:output_type -> indexer.ListUniqueBeaconBadBlockValuesResponse
+	43,  // 380: indexer.Indexer.CreateBeaconBadBlob:output_type -> indexer.CreateBeaconBadBlobResponse
+	79,  // 381: indexer.Indexer.ListBeaconBadBlob:output_type -> indexer.ListBeaconBadBlobResponse
+	81,  // 382: indexer.Indexer.CountBeaconBadBlob:output_type -> indexer.CountBeaconBadBlobResponse
+	77,  // 383: indexer.Indexer.ListUniqueBeaconBadBlobValues:output_type -> indexer.ListUniqueBeaconBadBlobValuesResponse
+	45,  // 384: indexer.Indexer.CreateExecutionBlockTrace:output_type -> indexer.CreateExecutionBlockTraceResponse
+	47,  // 385: indexer.Indexer.ListExecutionBlockTrace:output_type -> indexer.ListExecutionBlockTraceResponse
+	49,  // 386: indexer.Indexer.CountExecutionBlockTrace:output_type -> indexer.CountExecutionBlockTraceResponse
+	51,  // 387: indexer.Indexer.ListUniqueExecutionBlockTraceValues:output_type -> indexer.ListUniqueExecutionBlockTraceValuesResponse
+	84,  // 388: indexer.Indexer.CreateExecutionBadBlock:output_type -> indexer.CreateExecutionBadBlockResponse
+	86,  // 389: indexer.Indexer.ListExecutionBadBlock:output_type -> indexer.ListExecutionBadBlockResponse
+	88,  // 390: indexer.Indexer.CountExecutionBadBlock:output_type -> indexer.CountExecutionBadBlockResponse
+	90,  // 391: indexer.Indexer.ListUniqueExecutionBadBlockValues:output_type -> indexer.ListUniqueExecutionBadBlockValuesResponse
+	22,  // 392: indexer.Indexer.GetBlob:output_type -> indexer.GetBlobResponse
+	24,  // 393: indexer.Indexer.CreateBlob:output_type -> indexer.CreateBlobResponse
+	27,  // 394: indexer.Indexer.CreatePayloadDivergence:output_type -> indexer.CreatePayloadDivergenceResponse
+	29,  // 395: indexer.Indexer.ListPayloadDivergence:output_type -> indexer.ListPayloadDivergenceResponse
+	362, // [362:396] is the sub-list for method output_type
+	328, // [328:362] is the sub-list for method input_type
+	328, // [328:328] is the sub-list for extension type_name
+	328, // [328:328] is the sub-list for extension extendee
+	0,   // [0:328] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_tracoor_indexer_indexer_proto_init() }

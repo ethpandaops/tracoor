@@ -402,6 +402,41 @@ func (i *Indexer) BlobLinksByLocation(ctx context.Context, kind, network string,
 	return links, nil
 }
 
+// AgreementCountsByContentHash returns, per content hash, how many rows currently reference
+// the ready blob carrying those bytes — the number of nodes whose verified payload agrees.
+// A hash with no ready blob is absent from the map: its agreement is unknown, not zero, and
+// the caller must not dress it up as either.
+func (i *Indexer) AgreementCountsByContentHash(ctx context.Context, kind, network string, contentHashes []string) (map[string]int64, error) {
+	counts := make(map[string]int64, len(contentHashes))
+
+	for start := 0; start < len(contentHashes); start += lookupChunkSize {
+		end := start + lookupChunkSize
+		if end > len(contentHashes) {
+			end = len(contentHashes)
+		}
+
+		var rows []struct {
+			ContentHash string
+			Agreement   int64
+		}
+
+		if err := i.db.WithContext(ctx).Model(&Blob{}).
+			Select("content_hash, SUM(ref_count) AS agreement").
+			Where("kind = ? AND network = ? AND content_hash IN ? AND state = ?",
+				kind, network, contentHashes[start:end], BlobStateReady).
+			Group("content_hash").
+			Scan(&rows).Error; err != nil {
+			return nil, err
+		}
+
+		for _, row := range rows {
+			counts[row.ContentHash] = row.Agreement
+		}
+	}
+
+	return counts, nil
+}
+
 // RootDisagreement is one slot on which nodes reported more than one root.
 type RootDisagreement struct {
 	Network string

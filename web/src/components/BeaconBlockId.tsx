@@ -216,6 +216,7 @@ export default function BeaconBlockId({ id }: { id: string }) {
                     contentHash={block?.content_hash}
                     verifiedAt={block?.verified_at}
                     contentMatchedAt={block?.content_matched_at}
+                    agreementCount={block?.agreement_count}
                   />
                   {block?.content_hash && (
                     <span className="flex font-mono">

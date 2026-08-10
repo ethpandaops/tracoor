@@ -11,6 +11,7 @@ export interface BeaconState {
   content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface BeaconBlock {
@@ -26,6 +27,7 @@ export interface BeaconBlock {
   content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface ExecutionPayloadEnvelope {
@@ -41,6 +43,7 @@ export interface ExecutionPayloadEnvelope {
   content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface BeaconBadBlock {
@@ -86,6 +89,7 @@ export interface ExecutionBlockTrace {
   content_hash?: string;
   verified_at?: string;
   content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface ExecutionBadBlock {

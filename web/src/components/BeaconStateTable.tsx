@@ -476,6 +476,7 @@ export default function BeaconStateTable({ id }: { id?: string }) {
                             contentHash={row.content_hash}
                             verifiedAt={row.verified_at}
                             contentMatchedAt={row.content_matched_at}
+                            agreementCount={row.agreement_count}
                           />
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">

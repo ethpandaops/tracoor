@@ -216,6 +216,7 @@ export default function BeaconStateId({ id }: { id: string }) {
                     contentHash={state?.content_hash}
                     verifiedAt={state?.verified_at}
                     contentMatchedAt={state?.content_matched_at}
+                    agreementCount={state?.agreement_count}
                   />
                   {state?.content_hash && (
                     <span className="flex font-mono">

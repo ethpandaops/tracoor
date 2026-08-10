@@ -229,6 +229,7 @@ export default function ExecutionPayloadEnvelopeId({ id }: { id: string }) {
                     contentHash={envelope?.content_hash}
                     verifiedAt={envelope?.verified_at}
                     contentMatchedAt={envelope?.content_matched_at}
+                    agreementCount={envelope?.agreement_count}
                   />
                   {envelope?.content_hash && (
                     <span className="flex font-mono">

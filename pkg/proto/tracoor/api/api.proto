@@ -24,6 +24,10 @@ message BeaconState {
   // Set when the hash was compared against an existing payload and matched.
   google.protobuf.Timestamp content_matched_at = 12
       [ json_name = "content_matched_at" ];
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when the server has no blob to count against.
+  google.protobuf.UInt32Value agreement_count = 13
+      [ json_name = "agreement_count" ];
 }
 
 message BeaconBlock {
@@ -43,6 +47,10 @@ message BeaconBlock {
   // Set when the hash was compared against an existing payload and matched.
   google.protobuf.Timestamp content_matched_at = 12
       [ json_name = "content_matched_at" ];
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when the server has no blob to count against.
+  google.protobuf.UInt32Value agreement_count = 13
+      [ json_name = "agreement_count" ];
 }
 
 message ExecutionPayloadEnvelope {
@@ -62,6 +70,10 @@ message ExecutionPayloadEnvelope {
   // Set when the hash was compared against an existing payload and matched.
   google.protobuf.Timestamp content_matched_at = 12
       [ json_name = "content_matched_at" ];
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when the server has no blob to count against.
+  google.protobuf.UInt32Value agreement_count = 13
+      [ json_name = "agreement_count" ];
 }
 
 message BeaconBadBlock {
@@ -119,6 +131,10 @@ message ExecutionBlockTrace {
   // Set when the hash was compared against an existing payload and matched.
   google.protobuf.Timestamp content_matched_at = 11
       [ json_name = "content_matched_at" ];
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when the server has no blob to count against.
+  google.protobuf.UInt32Value agreement_count = 12
+      [ json_name = "agreement_count" ];
 }
 
 message ExecutionBadBlock {

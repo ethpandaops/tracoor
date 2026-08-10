@@ -466,8 +466,11 @@ type BeaconState struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=verified_at,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=content_matched_at,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when the server has no blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,13,opt,name=agreement_count,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeaconState) Reset() {
@@ -584,6 +587,13 @@ func (x *BeaconState) GetContentMatchedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *BeaconState) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
+	}
+	return nil
+}
+
 type BeaconBlock struct {
 	state                protoimpl.MessageState  `protogen:"open.v1"`
 	Id                   *wrapperspb.StringValue `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -600,8 +610,11 @@ type BeaconBlock struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=verified_at,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=content_matched_at,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when the server has no blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,13,opt,name=agreement_count,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeaconBlock) Reset() {
@@ -718,6 +731,13 @@ func (x *BeaconBlock) GetContentMatchedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *BeaconBlock) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
+	}
+	return nil
+}
+
 type ExecutionPayloadEnvelope struct {
 	state                protoimpl.MessageState  `protogen:"open.v1"`
 	Id                   *wrapperspb.StringValue `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -734,8 +754,11 @@ type ExecutionPayloadEnvelope struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=verified_at,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=content_matched_at,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when the server has no blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,13,opt,name=agreement_count,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExecutionPayloadEnvelope) Reset() {
@@ -848,6 +871,13 @@ func (x *ExecutionPayloadEnvelope) GetVerifiedAt() *timestamppb.Timestamp {
 func (x *ExecutionPayloadEnvelope) GetContentMatchedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ContentMatchedAt
+	}
+	return nil
+}
+
+func (x *ExecutionPayloadEnvelope) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
 	}
 	return nil
 }
@@ -1143,8 +1173,11 @@ type ExecutionBlockTrace struct {
 	VerifiedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=verified_at,proto3" json:"verified_at,omitempty"`
 	// Set when the hash was compared against an existing payload and matched.
 	ContentMatchedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=content_matched_at,proto3" json:"content_matched_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How many nodes' verified payloads share this content hash, this one
+	// included. Unset when the server has no blob to count against.
+	AgreementCount *wrapperspb.UInt32Value `protobuf:"bytes,12,opt,name=agreement_count,proto3" json:"agreement_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExecutionBlockTrace) Reset() {
@@ -1250,6 +1283,13 @@ func (x *ExecutionBlockTrace) GetVerifiedAt() *timestamppb.Timestamp {
 func (x *ExecutionBlockTrace) GetContentMatchedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ContentMatchedAt
+	}
+	return nil
+}
+
+func (x *ExecutionBlockTrace) GetAgreementCount() *wrapperspb.UInt32Value {
+	if x != nil {
+		return x.AgreementCount
 	}
 	return nil
 }
@@ -5113,7 +5153,7 @@ var File_pkg_proto_tracoor_api_api_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpkg/proto/tracoor/api/api.proto\x12\x03api\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe7\x05\n" +
+	"\x1fpkg/proto/tracoor/api/api.proto\x12\x03api\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x06\n" +
 	"\vBeaconState\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5131,7 +5171,8 @@ const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	"\fcontent_hash\x18\n" +
 	" \x01(\v2\x1c.google.protobuf.StringValueR\fcontent_hash\x12<\n" +
 	"\vverified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\vverified_at\x12J\n" +
-	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\xe7\x05\n" +
+	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\x12F\n" +
+	"\x0fagreement_count\x18\r \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0fagreement_count\"\xaf\x06\n" +
 	"\vBeaconBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5149,7 +5190,8 @@ const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	"\fcontent_hash\x18\n" +
 	" \x01(\v2\x1c.google.protobuf.StringValueR\fcontent_hash\x12<\n" +
 	"\vverified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\vverified_at\x12J\n" +
-	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\xf4\x05\n" +
+	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\x12F\n" +
+	"\x0fagreement_count\x18\r \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0fagreement_count\"\xbc\x06\n" +
 	"\x18ExecutionPayloadEnvelope\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5167,7 +5209,8 @@ const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	"\fcontent_hash\x18\n" +
 	" \x01(\v2\x1c.google.protobuf.StringValueR\fcontent_hash\x12<\n" +
 	"\vverified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\vverified_at\x12J\n" +
-	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\xea\x05\n" +
+	"\x12content_matched_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\x12F\n" +
+	"\x0fagreement_count\x18\r \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0fagreement_count\"\xea\x05\n" +
 	"\x0eBeaconBadBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5204,7 +5247,7 @@ const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	" \x01(\v2\x1c.google.protobuf.UInt64ValueR\x05index\x12@\n" +
 	"\fcontent_hash\x18\v \x01(\v2\x1c.google.protobuf.StringValueR\fcontent_hash\x12<\n" +
 	"\vverified_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\vverified_at\x12J\n" +
-	"\x12content_matched_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\xd0\x05\n" +
+	"\x12content_matched_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\x98\x06\n" +
 	"\x13ExecutionBlockTrace\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5221,7 +5264,8 @@ const file_pkg_proto_tracoor_api_api_proto_rawDesc = "" +
 	"\fcontent_hash\x18\t \x01(\v2\x1c.google.protobuf.StringValueR\fcontent_hash\x12<\n" +
 	"\vverified_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\vverified_at\x12J\n" +
-	"\x12content_matched_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\"\x98\x06\n" +
+	"\x12content_matched_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x12content_matched_at\x12F\n" +
+	"\x0fagreement_count\x18\f \x01(\v2\x1c.google.protobuf.UInt32ValueR\x0fagreement_count\"\x98\x06\n" +
 	"\x11ExecutionBadBlock\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.google.protobuf.StringValueR\x02id\x120\n" +
 	"\x04node\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x04node\x12:\n" +
@@ -5762,7 +5806,8 @@ var file_pkg_proto_tracoor_api_api_proto_goTypes = []any{
 	(*wrapperspb.StringValue)(nil),                           // 65: google.protobuf.StringValue
 	(*timestamppb.Timestamp)(nil),                            // 66: google.protobuf.Timestamp
 	(*wrapperspb.UInt64Value)(nil),                           // 67: google.protobuf.UInt64Value
-	(*wrapperspb.Int64Value)(nil),                            // 68: google.protobuf.Int64Value
+	(*wrapperspb.UInt32Value)(nil),                           // 68: google.protobuf.UInt32Value
+	(*wrapperspb.Int64Value)(nil),                            // 69: google.protobuf.Int64Value
 }
 var file_pkg_proto_tracoor_api_api_proto_depIdxs = []int32{
 	65,  // 0: api.BeaconState.id:type_name -> google.protobuf.StringValue
@@ -5777,192 +5822,196 @@ var file_pkg_proto_tracoor_api_api_proto_depIdxs = []int32{
 	65,  // 9: api.BeaconState.content_hash:type_name -> google.protobuf.StringValue
 	66,  // 10: api.BeaconState.verified_at:type_name -> google.protobuf.Timestamp
 	66,  // 11: api.BeaconState.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 12: api.BeaconBlock.id:type_name -> google.protobuf.StringValue
-	65,  // 13: api.BeaconBlock.node:type_name -> google.protobuf.StringValue
-	66,  // 14: api.BeaconBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	67,  // 15: api.BeaconBlock.slot:type_name -> google.protobuf.UInt64Value
-	67,  // 16: api.BeaconBlock.epoch:type_name -> google.protobuf.UInt64Value
-	65,  // 17: api.BeaconBlock.block_root:type_name -> google.protobuf.StringValue
-	65,  // 18: api.BeaconBlock.node_version:type_name -> google.protobuf.StringValue
-	65,  // 19: api.BeaconBlock.network:type_name -> google.protobuf.StringValue
-	65,  // 20: api.BeaconBlock.beacon_implementation:type_name -> google.protobuf.StringValue
-	65,  // 21: api.BeaconBlock.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 22: api.BeaconBlock.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 23: api.BeaconBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 24: api.ExecutionPayloadEnvelope.id:type_name -> google.protobuf.StringValue
-	65,  // 25: api.ExecutionPayloadEnvelope.node:type_name -> google.protobuf.StringValue
-	66,  // 26: api.ExecutionPayloadEnvelope.fetched_at:type_name -> google.protobuf.Timestamp
-	67,  // 27: api.ExecutionPayloadEnvelope.slot:type_name -> google.protobuf.UInt64Value
-	67,  // 28: api.ExecutionPayloadEnvelope.epoch:type_name -> google.protobuf.UInt64Value
-	65,  // 29: api.ExecutionPayloadEnvelope.block_root:type_name -> google.protobuf.StringValue
-	65,  // 30: api.ExecutionPayloadEnvelope.node_version:type_name -> google.protobuf.StringValue
-	65,  // 31: api.ExecutionPayloadEnvelope.network:type_name -> google.protobuf.StringValue
-	65,  // 32: api.ExecutionPayloadEnvelope.beacon_implementation:type_name -> google.protobuf.StringValue
-	65,  // 33: api.ExecutionPayloadEnvelope.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 34: api.ExecutionPayloadEnvelope.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 35: api.ExecutionPayloadEnvelope.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 36: api.BeaconBadBlock.id:type_name -> google.protobuf.StringValue
-	65,  // 37: api.BeaconBadBlock.node:type_name -> google.protobuf.StringValue
-	66,  // 38: api.BeaconBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	67,  // 39: api.BeaconBadBlock.slot:type_name -> google.protobuf.UInt64Value
-	67,  // 40: api.BeaconBadBlock.epoch:type_name -> google.protobuf.UInt64Value
-	65,  // 41: api.BeaconBadBlock.block_root:type_name -> google.protobuf.StringValue
-	65,  // 42: api.BeaconBadBlock.node_version:type_name -> google.protobuf.StringValue
-	65,  // 43: api.BeaconBadBlock.network:type_name -> google.protobuf.StringValue
-	65,  // 44: api.BeaconBadBlock.beacon_implementation:type_name -> google.protobuf.StringValue
-	65,  // 45: api.BeaconBadBlock.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 46: api.BeaconBadBlock.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 47: api.BeaconBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 48: api.BeaconBadBlob.id:type_name -> google.protobuf.StringValue
-	65,  // 49: api.BeaconBadBlob.node:type_name -> google.protobuf.StringValue
-	66,  // 50: api.BeaconBadBlob.fetched_at:type_name -> google.protobuf.Timestamp
-	67,  // 51: api.BeaconBadBlob.slot:type_name -> google.protobuf.UInt64Value
-	67,  // 52: api.BeaconBadBlob.epoch:type_name -> google.protobuf.UInt64Value
-	65,  // 53: api.BeaconBadBlob.block_root:type_name -> google.protobuf.StringValue
-	65,  // 54: api.BeaconBadBlob.node_version:type_name -> google.protobuf.StringValue
-	65,  // 55: api.BeaconBadBlob.network:type_name -> google.protobuf.StringValue
-	65,  // 56: api.BeaconBadBlob.beacon_implementation:type_name -> google.protobuf.StringValue
-	67,  // 57: api.BeaconBadBlob.index:type_name -> google.protobuf.UInt64Value
-	65,  // 58: api.BeaconBadBlob.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 59: api.BeaconBadBlob.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 60: api.BeaconBadBlob.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 61: api.ExecutionBlockTrace.id:type_name -> google.protobuf.StringValue
-	65,  // 62: api.ExecutionBlockTrace.node:type_name -> google.protobuf.StringValue
-	66,  // 63: api.ExecutionBlockTrace.fetched_at:type_name -> google.protobuf.Timestamp
-	65,  // 64: api.ExecutionBlockTrace.block_hash:type_name -> google.protobuf.StringValue
-	68,  // 65: api.ExecutionBlockTrace.block_number:type_name -> google.protobuf.Int64Value
-	65,  // 66: api.ExecutionBlockTrace.network:type_name -> google.protobuf.StringValue
-	65,  // 67: api.ExecutionBlockTrace.execution_implementation:type_name -> google.protobuf.StringValue
-	65,  // 68: api.ExecutionBlockTrace.node_version:type_name -> google.protobuf.StringValue
-	65,  // 69: api.ExecutionBlockTrace.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 70: api.ExecutionBlockTrace.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 71: api.ExecutionBlockTrace.content_matched_at:type_name -> google.protobuf.Timestamp
-	65,  // 72: api.ExecutionBadBlock.id:type_name -> google.protobuf.StringValue
-	65,  // 73: api.ExecutionBadBlock.node:type_name -> google.protobuf.StringValue
-	66,  // 74: api.ExecutionBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
-	65,  // 75: api.ExecutionBadBlock.block_hash:type_name -> google.protobuf.StringValue
-	68,  // 76: api.ExecutionBadBlock.block_number:type_name -> google.protobuf.Int64Value
-	65,  // 77: api.ExecutionBadBlock.network:type_name -> google.protobuf.StringValue
-	65,  // 78: api.ExecutionBadBlock.execution_implementation:type_name -> google.protobuf.StringValue
-	65,  // 79: api.ExecutionBadBlock.node_version:type_name -> google.protobuf.StringValue
-	65,  // 80: api.ExecutionBadBlock.block_extra_data:type_name -> google.protobuf.StringValue
-	65,  // 81: api.ExecutionBadBlock.content_hash:type_name -> google.protobuf.StringValue
-	66,  // 82: api.ExecutionBadBlock.verified_at:type_name -> google.protobuf.Timestamp
-	66,  // 83: api.ExecutionBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
-	17,  // 84: api.GetConfigResponse.config:type_name -> api.Config
-	18,  // 85: api.Config.ethereum:type_name -> api.EthereumConfig
-	19,  // 86: api.EthereumConfig.config:type_name -> api.EthereumNetworkConfig
-	20,  // 87: api.EthereumConfig.tools:type_name -> api.ToolsConfig
-	21,  // 88: api.ToolsConfig.ncli:type_name -> api.GitRepositoryConfig
-	21,  // 89: api.ToolsConfig.lcli:type_name -> api.GitRepositoryConfig
-	22,  // 90: api.ToolsConfig.zcli:type_name -> api.ZcliConfig
-	66,  // 91: api.ListBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 92: api.ListBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 93: api.ListBeaconStateRequest.pagination:type_name -> api.PaginationCursor
-	7,   // 94: api.ListBeaconStateResponse.beacon_states:type_name -> api.BeaconState
-	66,  // 95: api.CountBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 96: api.CountBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 97: api.CountBeaconStateResponse.count:type_name -> google.protobuf.UInt64Value
-	0,   // 98: api.ListUniqueBeaconStateValuesRequest.fields:type_name -> api.ListUniqueBeaconStateValuesRequest.Field
-	66,  // 99: api.ListBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 100: api.ListBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 101: api.ListBeaconBlockRequest.pagination:type_name -> api.PaginationCursor
-	8,   // 102: api.ListBeaconBlockResponse.beacon_blocks:type_name -> api.BeaconBlock
-	66,  // 103: api.CountBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 104: api.CountBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 105: api.CountBeaconBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	1,   // 106: api.ListUniqueBeaconBlockValuesRequest.fields:type_name -> api.ListUniqueBeaconBlockValuesRequest.Field
-	66,  // 107: api.ListExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 108: api.ListExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 109: api.ListExecutionPayloadEnvelopeRequest.pagination:type_name -> api.PaginationCursor
-	9,   // 110: api.ListExecutionPayloadEnvelopeResponse.execution_payload_envelopes:type_name -> api.ExecutionPayloadEnvelope
-	66,  // 111: api.CountExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 112: api.CountExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 113: api.CountExecutionPayloadEnvelopeResponse.count:type_name -> google.protobuf.UInt64Value
-	2,   // 114: api.ListUniqueExecutionPayloadEnvelopeValuesRequest.fields:type_name -> api.ListUniqueExecutionPayloadEnvelopeValuesRequest.Field
-	66,  // 115: api.ListBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 116: api.ListBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 117: api.ListBeaconBadBlockRequest.pagination:type_name -> api.PaginationCursor
-	10,  // 118: api.ListBeaconBadBlockResponse.beacon_bad_blocks:type_name -> api.BeaconBadBlock
-	66,  // 119: api.CountBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 120: api.CountBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 121: api.CountBeaconBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	3,   // 122: api.ListUniqueBeaconBadBlockValuesRequest.fields:type_name -> api.ListUniqueBeaconBadBlockValuesRequest.Field
-	66,  // 123: api.ListBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 124: api.ListBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 125: api.ListBeaconBadBlobRequest.pagination:type_name -> api.PaginationCursor
-	67,  // 126: api.ListBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
-	11,  // 127: api.ListBeaconBadBlobResponse.beacon_bad_blobs:type_name -> api.BeaconBadBlob
-	66,  // 128: api.CountBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 129: api.CountBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 130: api.CountBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
-	67,  // 131: api.CountBeaconBadBlobResponse.count:type_name -> google.protobuf.UInt64Value
-	4,   // 132: api.ListUniqueBeaconBadBlobValuesRequest.fields:type_name -> api.ListUniqueBeaconBadBlobValuesRequest.Field
-	66,  // 133: api.ListExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 134: api.ListExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 135: api.ListExecutionBlockTraceRequest.pagination:type_name -> api.PaginationCursor
-	12,  // 136: api.ListExecutionBlockTraceResponse.execution_block_traces:type_name -> api.ExecutionBlockTrace
-	66,  // 137: api.CountExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 138: api.CountExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 139: api.CountExecutionBlockTraceResponse.count:type_name -> google.protobuf.UInt64Value
-	5,   // 140: api.ListUniqueExecutionBlockTraceValuesRequest.fields:type_name -> api.ListUniqueExecutionBlockTraceValuesRequest.Field
-	66,  // 141: api.ListExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 142: api.ListExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	14,  // 143: api.ListExecutionBadBlockRequest.pagination:type_name -> api.PaginationCursor
-	13,  // 144: api.ListExecutionBadBlockResponse.execution_bad_blocks:type_name -> api.ExecutionBadBlock
-	66,  // 145: api.CountExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
-	66,  // 146: api.CountExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
-	67,  // 147: api.CountExecutionBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
-	6,   // 148: api.ListUniqueExecutionBadBlockValuesRequest.fields:type_name -> api.ListUniqueExecutionBadBlockValuesRequest.Field
-	15,  // 149: api.API.GetConfig:input_type -> api.GetConfigRequest
-	23,  // 150: api.API.ListBeaconState:input_type -> api.ListBeaconStateRequest
-	25,  // 151: api.API.CountBeaconState:input_type -> api.CountBeaconStateRequest
-	27,  // 152: api.API.ListUniqueBeaconStateValues:input_type -> api.ListUniqueBeaconStateValuesRequest
-	29,  // 153: api.API.ListBeaconBlock:input_type -> api.ListBeaconBlockRequest
-	31,  // 154: api.API.CountBeaconBlock:input_type -> api.CountBeaconBlockRequest
-	33,  // 155: api.API.ListUniqueBeaconBlockValues:input_type -> api.ListUniqueBeaconBlockValuesRequest
-	35,  // 156: api.API.ListExecutionPayloadEnvelope:input_type -> api.ListExecutionPayloadEnvelopeRequest
-	37,  // 157: api.API.CountExecutionPayloadEnvelope:input_type -> api.CountExecutionPayloadEnvelopeRequest
-	39,  // 158: api.API.ListUniqueExecutionPayloadEnvelopeValues:input_type -> api.ListUniqueExecutionPayloadEnvelopeValuesRequest
-	41,  // 159: api.API.ListBeaconBadBlock:input_type -> api.ListBeaconBadBlockRequest
-	43,  // 160: api.API.CountBeaconBadBlock:input_type -> api.CountBeaconBadBlockRequest
-	45,  // 161: api.API.ListUniqueBeaconBadBlockValues:input_type -> api.ListUniqueBeaconBadBlockValuesRequest
-	47,  // 162: api.API.ListBeaconBadBlob:input_type -> api.ListBeaconBadBlobRequest
-	49,  // 163: api.API.CountBeaconBadBlob:input_type -> api.CountBeaconBadBlobRequest
-	51,  // 164: api.API.ListUniqueBeaconBadBlobValues:input_type -> api.ListUniqueBeaconBadBlobValuesRequest
-	53,  // 165: api.API.ListExecutionBlockTrace:input_type -> api.ListExecutionBlockTraceRequest
-	55,  // 166: api.API.CountExecutionBlockTrace:input_type -> api.CountExecutionBlockTraceRequest
-	57,  // 167: api.API.ListUniqueExecutionBlockTraceValues:input_type -> api.ListUniqueExecutionBlockTraceValuesRequest
-	59,  // 168: api.API.ListExecutionBadBlock:input_type -> api.ListExecutionBadBlockRequest
-	61,  // 169: api.API.CountExecutionBadBlock:input_type -> api.CountExecutionBadBlockRequest
-	63,  // 170: api.API.ListUniqueExecutionBadBlockValues:input_type -> api.ListUniqueExecutionBadBlockValuesRequest
-	16,  // 171: api.API.GetConfig:output_type -> api.GetConfigResponse
-	24,  // 172: api.API.ListBeaconState:output_type -> api.ListBeaconStateResponse
-	26,  // 173: api.API.CountBeaconState:output_type -> api.CountBeaconStateResponse
-	28,  // 174: api.API.ListUniqueBeaconStateValues:output_type -> api.ListUniqueBeaconStateValuesResponse
-	30,  // 175: api.API.ListBeaconBlock:output_type -> api.ListBeaconBlockResponse
-	32,  // 176: api.API.CountBeaconBlock:output_type -> api.CountBeaconBlockResponse
-	34,  // 177: api.API.ListUniqueBeaconBlockValues:output_type -> api.ListUniqueBeaconBlockValuesResponse
-	36,  // 178: api.API.ListExecutionPayloadEnvelope:output_type -> api.ListExecutionPayloadEnvelopeResponse
-	38,  // 179: api.API.CountExecutionPayloadEnvelope:output_type -> api.CountExecutionPayloadEnvelopeResponse
-	40,  // 180: api.API.ListUniqueExecutionPayloadEnvelopeValues:output_type -> api.ListUniqueExecutionPayloadEnvelopeValuesResponse
-	42,  // 181: api.API.ListBeaconBadBlock:output_type -> api.ListBeaconBadBlockResponse
-	44,  // 182: api.API.CountBeaconBadBlock:output_type -> api.CountBeaconBadBlockResponse
-	46,  // 183: api.API.ListUniqueBeaconBadBlockValues:output_type -> api.ListUniqueBeaconBadBlockValuesResponse
-	48,  // 184: api.API.ListBeaconBadBlob:output_type -> api.ListBeaconBadBlobResponse
-	50,  // 185: api.API.CountBeaconBadBlob:output_type -> api.CountBeaconBadBlobResponse
-	52,  // 186: api.API.ListUniqueBeaconBadBlobValues:output_type -> api.ListUniqueBeaconBadBlobValuesResponse
-	54,  // 187: api.API.ListExecutionBlockTrace:output_type -> api.ListExecutionBlockTraceResponse
-	56,  // 188: api.API.CountExecutionBlockTrace:output_type -> api.CountExecutionBlockTraceResponse
-	58,  // 189: api.API.ListUniqueExecutionBlockTraceValues:output_type -> api.ListUniqueExecutionBlockTraceValuesResponse
-	60,  // 190: api.API.ListExecutionBadBlock:output_type -> api.ListExecutionBadBlockResponse
-	62,  // 191: api.API.CountExecutionBadBlock:output_type -> api.CountExecutionBadBlockResponse
-	64,  // 192: api.API.ListUniqueExecutionBadBlockValues:output_type -> api.ListUniqueExecutionBadBlockValuesResponse
-	171, // [171:193] is the sub-list for method output_type
-	149, // [149:171] is the sub-list for method input_type
-	149, // [149:149] is the sub-list for extension type_name
-	149, // [149:149] is the sub-list for extension extendee
-	0,   // [0:149] is the sub-list for field type_name
+	68,  // 12: api.BeaconState.agreement_count:type_name -> google.protobuf.UInt32Value
+	65,  // 13: api.BeaconBlock.id:type_name -> google.protobuf.StringValue
+	65,  // 14: api.BeaconBlock.node:type_name -> google.protobuf.StringValue
+	66,  // 15: api.BeaconBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	67,  // 16: api.BeaconBlock.slot:type_name -> google.protobuf.UInt64Value
+	67,  // 17: api.BeaconBlock.epoch:type_name -> google.protobuf.UInt64Value
+	65,  // 18: api.BeaconBlock.block_root:type_name -> google.protobuf.StringValue
+	65,  // 19: api.BeaconBlock.node_version:type_name -> google.protobuf.StringValue
+	65,  // 20: api.BeaconBlock.network:type_name -> google.protobuf.StringValue
+	65,  // 21: api.BeaconBlock.beacon_implementation:type_name -> google.protobuf.StringValue
+	65,  // 22: api.BeaconBlock.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 23: api.BeaconBlock.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 24: api.BeaconBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	68,  // 25: api.BeaconBlock.agreement_count:type_name -> google.protobuf.UInt32Value
+	65,  // 26: api.ExecutionPayloadEnvelope.id:type_name -> google.protobuf.StringValue
+	65,  // 27: api.ExecutionPayloadEnvelope.node:type_name -> google.protobuf.StringValue
+	66,  // 28: api.ExecutionPayloadEnvelope.fetched_at:type_name -> google.protobuf.Timestamp
+	67,  // 29: api.ExecutionPayloadEnvelope.slot:type_name -> google.protobuf.UInt64Value
+	67,  // 30: api.ExecutionPayloadEnvelope.epoch:type_name -> google.protobuf.UInt64Value
+	65,  // 31: api.ExecutionPayloadEnvelope.block_root:type_name -> google.protobuf.StringValue
+	65,  // 32: api.ExecutionPayloadEnvelope.node_version:type_name -> google.protobuf.StringValue
+	65,  // 33: api.ExecutionPayloadEnvelope.network:type_name -> google.protobuf.StringValue
+	65,  // 34: api.ExecutionPayloadEnvelope.beacon_implementation:type_name -> google.protobuf.StringValue
+	65,  // 35: api.ExecutionPayloadEnvelope.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 36: api.ExecutionPayloadEnvelope.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 37: api.ExecutionPayloadEnvelope.content_matched_at:type_name -> google.protobuf.Timestamp
+	68,  // 38: api.ExecutionPayloadEnvelope.agreement_count:type_name -> google.protobuf.UInt32Value
+	65,  // 39: api.BeaconBadBlock.id:type_name -> google.protobuf.StringValue
+	65,  // 40: api.BeaconBadBlock.node:type_name -> google.protobuf.StringValue
+	66,  // 41: api.BeaconBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	67,  // 42: api.BeaconBadBlock.slot:type_name -> google.protobuf.UInt64Value
+	67,  // 43: api.BeaconBadBlock.epoch:type_name -> google.protobuf.UInt64Value
+	65,  // 44: api.BeaconBadBlock.block_root:type_name -> google.protobuf.StringValue
+	65,  // 45: api.BeaconBadBlock.node_version:type_name -> google.protobuf.StringValue
+	65,  // 46: api.BeaconBadBlock.network:type_name -> google.protobuf.StringValue
+	65,  // 47: api.BeaconBadBlock.beacon_implementation:type_name -> google.protobuf.StringValue
+	65,  // 48: api.BeaconBadBlock.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 49: api.BeaconBadBlock.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 50: api.BeaconBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	65,  // 51: api.BeaconBadBlob.id:type_name -> google.protobuf.StringValue
+	65,  // 52: api.BeaconBadBlob.node:type_name -> google.protobuf.StringValue
+	66,  // 53: api.BeaconBadBlob.fetched_at:type_name -> google.protobuf.Timestamp
+	67,  // 54: api.BeaconBadBlob.slot:type_name -> google.protobuf.UInt64Value
+	67,  // 55: api.BeaconBadBlob.epoch:type_name -> google.protobuf.UInt64Value
+	65,  // 56: api.BeaconBadBlob.block_root:type_name -> google.protobuf.StringValue
+	65,  // 57: api.BeaconBadBlob.node_version:type_name -> google.protobuf.StringValue
+	65,  // 58: api.BeaconBadBlob.network:type_name -> google.protobuf.StringValue
+	65,  // 59: api.BeaconBadBlob.beacon_implementation:type_name -> google.protobuf.StringValue
+	67,  // 60: api.BeaconBadBlob.index:type_name -> google.protobuf.UInt64Value
+	65,  // 61: api.BeaconBadBlob.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 62: api.BeaconBadBlob.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 63: api.BeaconBadBlob.content_matched_at:type_name -> google.protobuf.Timestamp
+	65,  // 64: api.ExecutionBlockTrace.id:type_name -> google.protobuf.StringValue
+	65,  // 65: api.ExecutionBlockTrace.node:type_name -> google.protobuf.StringValue
+	66,  // 66: api.ExecutionBlockTrace.fetched_at:type_name -> google.protobuf.Timestamp
+	65,  // 67: api.ExecutionBlockTrace.block_hash:type_name -> google.protobuf.StringValue
+	69,  // 68: api.ExecutionBlockTrace.block_number:type_name -> google.protobuf.Int64Value
+	65,  // 69: api.ExecutionBlockTrace.network:type_name -> google.protobuf.StringValue
+	65,  // 70: api.ExecutionBlockTrace.execution_implementation:type_name -> google.protobuf.StringValue
+	65,  // 71: api.ExecutionBlockTrace.node_version:type_name -> google.protobuf.StringValue
+	65,  // 72: api.ExecutionBlockTrace.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 73: api.ExecutionBlockTrace.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 74: api.ExecutionBlockTrace.content_matched_at:type_name -> google.protobuf.Timestamp
+	68,  // 75: api.ExecutionBlockTrace.agreement_count:type_name -> google.protobuf.UInt32Value
+	65,  // 76: api.ExecutionBadBlock.id:type_name -> google.protobuf.StringValue
+	65,  // 77: api.ExecutionBadBlock.node:type_name -> google.protobuf.StringValue
+	66,  // 78: api.ExecutionBadBlock.fetched_at:type_name -> google.protobuf.Timestamp
+	65,  // 79: api.ExecutionBadBlock.block_hash:type_name -> google.protobuf.StringValue
+	69,  // 80: api.ExecutionBadBlock.block_number:type_name -> google.protobuf.Int64Value
+	65,  // 81: api.ExecutionBadBlock.network:type_name -> google.protobuf.StringValue
+	65,  // 82: api.ExecutionBadBlock.execution_implementation:type_name -> google.protobuf.StringValue
+	65,  // 83: api.ExecutionBadBlock.node_version:type_name -> google.protobuf.StringValue
+	65,  // 84: api.ExecutionBadBlock.block_extra_data:type_name -> google.protobuf.StringValue
+	65,  // 85: api.ExecutionBadBlock.content_hash:type_name -> google.protobuf.StringValue
+	66,  // 86: api.ExecutionBadBlock.verified_at:type_name -> google.protobuf.Timestamp
+	66,  // 87: api.ExecutionBadBlock.content_matched_at:type_name -> google.protobuf.Timestamp
+	17,  // 88: api.GetConfigResponse.config:type_name -> api.Config
+	18,  // 89: api.Config.ethereum:type_name -> api.EthereumConfig
+	19,  // 90: api.EthereumConfig.config:type_name -> api.EthereumNetworkConfig
+	20,  // 91: api.EthereumConfig.tools:type_name -> api.ToolsConfig
+	21,  // 92: api.ToolsConfig.ncli:type_name -> api.GitRepositoryConfig
+	21,  // 93: api.ToolsConfig.lcli:type_name -> api.GitRepositoryConfig
+	22,  // 94: api.ToolsConfig.zcli:type_name -> api.ZcliConfig
+	66,  // 95: api.ListBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 96: api.ListBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 97: api.ListBeaconStateRequest.pagination:type_name -> api.PaginationCursor
+	7,   // 98: api.ListBeaconStateResponse.beacon_states:type_name -> api.BeaconState
+	66,  // 99: api.CountBeaconStateRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 100: api.CountBeaconStateRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 101: api.CountBeaconStateResponse.count:type_name -> google.protobuf.UInt64Value
+	0,   // 102: api.ListUniqueBeaconStateValuesRequest.fields:type_name -> api.ListUniqueBeaconStateValuesRequest.Field
+	66,  // 103: api.ListBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 104: api.ListBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 105: api.ListBeaconBlockRequest.pagination:type_name -> api.PaginationCursor
+	8,   // 106: api.ListBeaconBlockResponse.beacon_blocks:type_name -> api.BeaconBlock
+	66,  // 107: api.CountBeaconBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 108: api.CountBeaconBlockRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 109: api.CountBeaconBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	1,   // 110: api.ListUniqueBeaconBlockValuesRequest.fields:type_name -> api.ListUniqueBeaconBlockValuesRequest.Field
+	66,  // 111: api.ListExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 112: api.ListExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 113: api.ListExecutionPayloadEnvelopeRequest.pagination:type_name -> api.PaginationCursor
+	9,   // 114: api.ListExecutionPayloadEnvelopeResponse.execution_payload_envelopes:type_name -> api.ExecutionPayloadEnvelope
+	66,  // 115: api.CountExecutionPayloadEnvelopeRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 116: api.CountExecutionPayloadEnvelopeRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 117: api.CountExecutionPayloadEnvelopeResponse.count:type_name -> google.protobuf.UInt64Value
+	2,   // 118: api.ListUniqueExecutionPayloadEnvelopeValuesRequest.fields:type_name -> api.ListUniqueExecutionPayloadEnvelopeValuesRequest.Field
+	66,  // 119: api.ListBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 120: api.ListBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 121: api.ListBeaconBadBlockRequest.pagination:type_name -> api.PaginationCursor
+	10,  // 122: api.ListBeaconBadBlockResponse.beacon_bad_blocks:type_name -> api.BeaconBadBlock
+	66,  // 123: api.CountBeaconBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 124: api.CountBeaconBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 125: api.CountBeaconBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	3,   // 126: api.ListUniqueBeaconBadBlockValuesRequest.fields:type_name -> api.ListUniqueBeaconBadBlockValuesRequest.Field
+	66,  // 127: api.ListBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 128: api.ListBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 129: api.ListBeaconBadBlobRequest.pagination:type_name -> api.PaginationCursor
+	67,  // 130: api.ListBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
+	11,  // 131: api.ListBeaconBadBlobResponse.beacon_bad_blobs:type_name -> api.BeaconBadBlob
+	66,  // 132: api.CountBeaconBadBlobRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 133: api.CountBeaconBadBlobRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 134: api.CountBeaconBadBlobRequest.index:type_name -> google.protobuf.UInt64Value
+	67,  // 135: api.CountBeaconBadBlobResponse.count:type_name -> google.protobuf.UInt64Value
+	4,   // 136: api.ListUniqueBeaconBadBlobValuesRequest.fields:type_name -> api.ListUniqueBeaconBadBlobValuesRequest.Field
+	66,  // 137: api.ListExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 138: api.ListExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 139: api.ListExecutionBlockTraceRequest.pagination:type_name -> api.PaginationCursor
+	12,  // 140: api.ListExecutionBlockTraceResponse.execution_block_traces:type_name -> api.ExecutionBlockTrace
+	66,  // 141: api.CountExecutionBlockTraceRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 142: api.CountExecutionBlockTraceRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 143: api.CountExecutionBlockTraceResponse.count:type_name -> google.protobuf.UInt64Value
+	5,   // 144: api.ListUniqueExecutionBlockTraceValuesRequest.fields:type_name -> api.ListUniqueExecutionBlockTraceValuesRequest.Field
+	66,  // 145: api.ListExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 146: api.ListExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	14,  // 147: api.ListExecutionBadBlockRequest.pagination:type_name -> api.PaginationCursor
+	13,  // 148: api.ListExecutionBadBlockResponse.execution_bad_blocks:type_name -> api.ExecutionBadBlock
+	66,  // 149: api.CountExecutionBadBlockRequest.before:type_name -> google.protobuf.Timestamp
+	66,  // 150: api.CountExecutionBadBlockRequest.after:type_name -> google.protobuf.Timestamp
+	67,  // 151: api.CountExecutionBadBlockResponse.count:type_name -> google.protobuf.UInt64Value
+	6,   // 152: api.ListUniqueExecutionBadBlockValuesRequest.fields:type_name -> api.ListUniqueExecutionBadBlockValuesRequest.Field
+	15,  // 153: api.API.GetConfig:input_type -> api.GetConfigRequest
+	23,  // 154: api.API.ListBeaconState:input_type -> api.ListBeaconStateRequest
+	25,  // 155: api.API.CountBeaconState:input_type -> api.CountBeaconStateRequest
+	27,  // 156: api.API.ListUniqueBeaconStateValues:input_type -> api.ListUniqueBeaconStateValuesRequest
+	29,  // 157: api.API.ListBeaconBlock:input_type -> api.ListBeaconBlockRequest
+	31,  // 158: api.API.CountBeaconBlock:input_type -> api.CountBeaconBlockRequest
+	33,  // 159: api.API.ListUniqueBeaconBlockValues:input_type -> api.ListUniqueBeaconBlockValuesRequest
+	35,  // 160: api.API.ListExecutionPayloadEnvelope:input_type -> api.ListExecutionPayloadEnvelopeRequest
+	37,  // 161: api.API.CountExecutionPayloadEnvelope:input_type -> api.CountExecutionPayloadEnvelopeRequest
+	39,  // 162: api.API.ListUniqueExecutionPayloadEnvelopeValues:input_type -> api.ListUniqueExecutionPayloadEnvelopeValuesRequest
+	41,  // 163: api.API.ListBeaconBadBlock:input_type -> api.ListBeaconBadBlockRequest
+	43,  // 164: api.API.CountBeaconBadBlock:input_type -> api.CountBeaconBadBlockRequest
+	45,  // 165: api.API.ListUniqueBeaconBadBlockValues:input_type -> api.ListUniqueBeaconBadBlockValuesRequest
+	47,  // 166: api.API.ListBeaconBadBlob:input_type -> api.ListBeaconBadBlobRequest
+	49,  // 167: api.API.CountBeaconBadBlob:input_type -> api.CountBeaconBadBlobRequest
+	51,  // 168: api.API.ListUniqueBeaconBadBlobValues:input_type -> api.ListUniqueBeaconBadBlobValuesRequest
+	53,  // 169: api.API.ListExecutionBlockTrace:input_type -> api.ListExecutionBlockTraceRequest
+	55,  // 170: api.API.CountExecutionBlockTrace:input_type -> api.CountExecutionBlockTraceRequest
+	57,  // 171: api.API.ListUniqueExecutionBlockTraceValues:input_type -> api.ListUniqueExecutionBlockTraceValuesRequest
+	59,  // 172: api.API.ListExecutionBadBlock:input_type -> api.ListExecutionBadBlockRequest
+	61,  // 173: api.API.CountExecutionBadBlock:input_type -> api.CountExecutionBadBlockRequest
+	63,  // 174: api.API.ListUniqueExecutionBadBlockValues:input_type -> api.ListUniqueExecutionBadBlockValuesRequest
+	16,  // 175: api.API.GetConfig:output_type -> api.GetConfigResponse
+	24,  // 176: api.API.ListBeaconState:output_type -> api.ListBeaconStateResponse
+	26,  // 177: api.API.CountBeaconState:output_type -> api.CountBeaconStateResponse
+	28,  // 178: api.API.ListUniqueBeaconStateValues:output_type -> api.ListUniqueBeaconStateValuesResponse
+	30,  // 179: api.API.ListBeaconBlock:output_type -> api.ListBeaconBlockResponse
+	32,  // 180: api.API.CountBeaconBlock:output_type -> api.CountBeaconBlockResponse
+	34,  // 181: api.API.ListUniqueBeaconBlockValues:output_type -> api.ListUniqueBeaconBlockValuesResponse
+	36,  // 182: api.API.ListExecutionPayloadEnvelope:output_type -> api.ListExecutionPayloadEnvelopeResponse
+	38,  // 183: api.API.CountExecutionPayloadEnvelope:output_type -> api.CountExecutionPayloadEnvelopeResponse
+	40,  // 184: api.API.ListUniqueExecutionPayloadEnvelopeValues:output_type -> api.ListUniqueExecutionPayloadEnvelopeValuesResponse
+	42,  // 185: api.API.ListBeaconBadBlock:output_type -> api.ListBeaconBadBlockResponse
+	44,  // 186: api.API.CountBeaconBadBlock:output_type -> api.CountBeaconBadBlockResponse
+	46,  // 187: api.API.ListUniqueBeaconBadBlockValues:output_type -> api.ListUniqueBeaconBadBlockValuesResponse
+	48,  // 188: api.API.ListBeaconBadBlob:output_type -> api.ListBeaconBadBlobResponse
+	50,  // 189: api.API.CountBeaconBadBlob:output_type -> api.CountBeaconBadBlobResponse
+	52,  // 190: api.API.ListUniqueBeaconBadBlobValues:output_type -> api.ListUniqueBeaconBadBlobValuesResponse
+	54,  // 191: api.API.ListExecutionBlockTrace:output_type -> api.ListExecutionBlockTraceResponse
+	56,  // 192: api.API.CountExecutionBlockTrace:output_type -> api.CountExecutionBlockTraceResponse
+	58,  // 193: api.API.ListUniqueExecutionBlockTraceValues:output_type -> api.ListUniqueExecutionBlockTraceValuesResponse
+	60,  // 194: api.API.ListExecutionBadBlock:output_type -> api.ListExecutionBadBlockResponse
+	62,  // 195: api.API.CountExecutionBadBlock:output_type -> api.CountExecutionBadBlockResponse
+	64,  // 196: api.API.ListUniqueExecutionBadBlockValues:output_type -> api.ListUniqueExecutionBadBlockValuesResponse
+	175, // [175:197] is the sub-list for method output_type
+	153, // [153:175] is the sub-list for method input_type
+	153, // [153:153] is the sub-list for extension type_name
+	153, // [153:153] is the sub-list for extension extendee
+	0,   // [0:153] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_tracoor_api_api_proto_init() }

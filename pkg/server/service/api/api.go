@@ -143,6 +143,7 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 			ContentHash:          state.ContentHash,
 			VerifiedAt:           state.VerifiedAt,
 			ContentMatchedAt:     state.ContentMatchedAt,
+			AgreementCount:       state.AgreementCount,
 		}
 	}
 
@@ -271,6 +272,7 @@ func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockReque
 			ContentHash:          block.ContentHash,
 			VerifiedAt:           block.VerifiedAt,
 			ContentMatchedAt:     block.ContentMatchedAt,
+			AgreementCount:       block.AgreementCount,
 		}
 	}
 
@@ -399,6 +401,7 @@ func (i *API) ListExecutionPayloadEnvelope(ctx context.Context, req *api.ListExe
 			ContentHash:          envelope.ContentHash,
 			VerifiedAt:           envelope.VerifiedAt,
 			ContentMatchedAt:     envelope.ContentMatchedAt,
+			AgreementCount:       envelope.AgreementCount,
 		}
 	}
 
@@ -785,6 +788,7 @@ func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutio
 			ContentHash:             trace.ContentHash,
 			VerifiedAt:              trace.VerifiedAt,
 			ContentMatchedAt:        trace.ContentMatchedAt,
+			AgreementCount:          trace.AgreementCount,
 		}
 	}
 

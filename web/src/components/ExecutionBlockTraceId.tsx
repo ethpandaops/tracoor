@@ -199,6 +199,8 @@ export default function ExecutionBlockTraceId({ id }: { id: string }) {
                     contentHash={trace?.content_hash}
                     verifiedAt={trace?.verified_at}
                     contentMatchedAt={trace?.content_matched_at}
+                    agreementCount={trace?.agreement_count}
+                    scope="client"
                   />
                   {trace?.content_hash && (
                     <span className="flex font-mono">
