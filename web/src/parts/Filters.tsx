@@ -10,6 +10,7 @@ import BeaconBlockFilter from '@components/BeaconBlockFilter';
 import BeaconStateFilter from '@components/BeaconStateFilter';
 import ExecutionBadBlockFilter from '@components/ExecutionBadBlockFilter';
 import ExecutionBlockTraceFilter from '@components/ExecutionBlockTraceFilter';
+import ExecutionPayloadEnvelopeFilter from '@components/ExecutionPayloadEnvelopeFilter';
 import useSelection, { Selection } from '@contexts/selection';
 
 export interface V1ListUniqueBeaconStateValuesResponse {
@@ -63,6 +64,12 @@ export default function FilterForm() {
     executionBadBlockNode,
     executionBadBlockNodeImplementation,
     executionBadBlockNodeVersion,
+    executionPayloadEnvelopeSlot,
+    executionPayloadEnvelopeEpoch,
+    executionPayloadEnvelopeBlockRoot,
+    executionPayloadEnvelopeNode,
+    executionPayloadEnvelopeNodeImplementation,
+    executionPayloadEnvelopeNodeVersion,
   ] = watch([
     'beaconStateSlot',
     'beaconStateEpoch',
@@ -99,6 +106,12 @@ export default function FilterForm() {
     'executionBadBlockNode',
     'executionBadBlockNodeImplementation',
     'executionBadBlockNodeVersion',
+    'executionPayloadEnvelopeSlot',
+    'executionPayloadEnvelopeEpoch',
+    'executionPayloadEnvelopeBlockRoot',
+    'executionPayloadEnvelopeNode',
+    'executionPayloadEnvelopeNodeImplementation',
+    'executionPayloadEnvelopeNodeVersion',
   ]);
 
   let form = undefined;
@@ -126,6 +139,19 @@ export default function FilterForm() {
         beaconBlockNode ||
         beaconBlockNodeImplementation ||
         beaconBlockNodeVersion
+      ) {
+        hasFilters = true;
+      }
+      break;
+    case Selection.execution_payload_envelope:
+      form = <ExecutionPayloadEnvelopeFilter />;
+      if (
+        executionPayloadEnvelopeSlot ||
+        executionPayloadEnvelopeEpoch ||
+        executionPayloadEnvelopeBlockRoot ||
+        executionPayloadEnvelopeNode ||
+        executionPayloadEnvelopeNodeImplementation ||
+        executionPayloadEnvelopeNodeVersion
       ) {
         hasFilters = true;
       }
@@ -205,6 +231,29 @@ export default function FilterForm() {
           queryParams.append('beaconBlockNodeImplementation', beaconBlockNodeImplementation);
         if (beaconBlockNodeVersion)
           queryParams.append('beaconBlockNodeVersion', beaconBlockNodeVersion);
+        break;
+      case Selection.execution_payload_envelope:
+        if (executionPayloadEnvelopeSlot)
+          queryParams.append('executionPayloadEnvelopeSlot', executionPayloadEnvelopeSlot);
+        if (executionPayloadEnvelopeEpoch)
+          queryParams.append('executionPayloadEnvelopeEpoch', executionPayloadEnvelopeEpoch);
+        if (executionPayloadEnvelopeBlockRoot)
+          queryParams.append(
+            'executionPayloadEnvelopeBlockRoot',
+            executionPayloadEnvelopeBlockRoot,
+          );
+        if (executionPayloadEnvelopeNode)
+          queryParams.append('executionPayloadEnvelopeNode', executionPayloadEnvelopeNode);
+        if (executionPayloadEnvelopeNodeImplementation)
+          queryParams.append(
+            'executionPayloadEnvelopeNodeImplementation',
+            executionPayloadEnvelopeNodeImplementation,
+          );
+        if (executionPayloadEnvelopeNodeVersion)
+          queryParams.append(
+            'executionPayloadEnvelopeNodeVersion',
+            executionPayloadEnvelopeNodeVersion,
+          );
         break;
       case Selection.beacon_bad_block:
         if (beaconBadBlockSlot) queryParams.append('beaconBadBlockSlot', beaconBadBlockSlot);
@@ -303,6 +352,12 @@ export default function FilterForm() {
     executionBadBlockNode,
     executionBadBlockNodeImplementation,
     executionBadBlockNodeVersion,
+    executionPayloadEnvelopeSlot,
+    executionPayloadEnvelopeEpoch,
+    executionPayloadEnvelopeBlockRoot,
+    executionPayloadEnvelopeNode,
+    executionPayloadEnvelopeNodeImplementation,
+    executionPayloadEnvelopeNodeVersion,
     hasFilters,
     navigate,
   ]);
@@ -324,6 +379,14 @@ export default function FilterForm() {
         setValue('beaconBlockNode', null);
         setValue('beaconBlockNodeImplementation', null);
         setValue('beaconBlockNodeVersion', null);
+        break;
+      case Selection.execution_payload_envelope:
+        setValue('executionPayloadEnvelopeSlot', '');
+        setValue('executionPayloadEnvelopeEpoch', '');
+        setValue('executionPayloadEnvelopeBlockRoot', '');
+        setValue('executionPayloadEnvelopeNode', null);
+        setValue('executionPayloadEnvelopeNodeImplementation', null);
+        setValue('executionPayloadEnvelopeNodeVersion', null);
         break;
       case Selection.beacon_bad_block:
         setValue('beaconBadBlockSlot', '');

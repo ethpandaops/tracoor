@@ -3,7 +3,7 @@ package ethereum
 import (
 	"fmt"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 )
@@ -72,12 +72,13 @@ func (c *Config) Validate() error {
 
 // Features contains feature flags for the agent.
 type Features struct {
-	FetchBeaconState         *bool `yaml:"fetchBeaconState" default:"true"`
-	FetchBeaconBlock         *bool `yaml:"fetchBeaconBlock" default:"true"`
-	FetchBeaconBadBlock      *bool `yaml:"fetchBeaconBadBlock" default:"true"`
-	FetchBeaconBadBlob       *bool `yaml:"fetchBeaconBadBlob" default:"true"`
-	FetchExecutionBlockTrace *bool `yaml:"fetchExecutionBlockTrace" default:"true"`
-	FetchExecutionBadBlock   *bool `yaml:"fetchExecutionBadBlock" default:"true"`
+	FetchBeaconState              *bool `yaml:"fetchBeaconState" default:"true"`
+	FetchBeaconBlock              *bool `yaml:"fetchBeaconBlock" default:"true"`
+	FetchExecutionPayloadEnvelope *bool `yaml:"fetchExecutionPayloadEnvelope" default:"true"`
+	FetchBeaconBadBlock           *bool `yaml:"fetchBeaconBadBlock" default:"true"`
+	FetchBeaconBadBlob            *bool `yaml:"fetchBeaconBadBlob" default:"true"`
+	FetchExecutionBlockTrace      *bool `yaml:"fetchExecutionBlockTrace" default:"true"`
+	FetchExecutionBadBlock        *bool `yaml:"fetchExecutionBadBlock" default:"true"`
 }
 
 func (f Features) Validate() error {
@@ -98,6 +99,14 @@ func (f Features) GetFetchBeaconBlock() bool {
 	}
 
 	return *f.FetchBeaconBlock
+}
+
+func (f Features) GetFetchExecutionPayloadEnvelope() bool {
+	if f.FetchExecutionPayloadEnvelope == nil {
+		return true // default value
+	}
+
+	return *f.FetchExecutionPayloadEnvelope
 }
 
 func (f Features) GetFetchBeaconBadBlock() bool {
@@ -141,6 +150,10 @@ func (f Features) EnabledFlags() []string {
 
 	if f.GetFetchBeaconBlock() {
 		enabled = append(enabled, "FetchBeaconBlock")
+	}
+
+	if f.GetFetchExecutionPayloadEnvelope() {
+		enabled = append(enabled, "FetchExecutionPayloadEnvelope")
 	}
 
 	if f.GetFetchBeaconBadBlock() {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
 type BeaconStateRequest struct {
@@ -12,6 +12,10 @@ type BeaconStateRequest struct {
 }
 
 type BeaconBlockRequest struct {
+	Slot phase0.Slot
+}
+
+type ExecutionPayloadEnvelopeRequest struct {
 	Slot phase0.Slot
 }
 
@@ -47,6 +51,16 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 	}
 
 	s.beaconBlockQueue <- &BeaconBlockRequest{
+		Slot: slot,
+	}
+}
+
+func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) {
+	if !s.Config.Ethereum.Features.GetFetchExecutionPayloadEnvelope() {
+		return
+	}
+
+	s.executionPayloadEnvelopeQueue <- &ExecutionPayloadEnvelopeRequest{
 		Slot: slot,
 	}
 }
@@ -151,6 +165,33 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 
 		s.metrics.ObserveQueueItemProcessingTime(
 			BeaconBlockQueue,
+			time.Since(start),
+			s.Config.Name,
+		)
+	}
+}
+
+func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
+	if !s.Config.Ethereum.Features.GetFetchExecutionPayloadEnvelope() {
+		return
+	}
+
+	for envelopeRequest := range s.executionPayloadEnvelopeQueue {
+		s.metrics.SetQueueSize(ExecutionPayloadEnvelopeQueue, len(s.executionPayloadEnvelopeQueue), s.Config.Name)
+
+		start := time.Now()
+
+		if err := s.fetchAndIndexExecutionPayloadEnvelope(ctx, envelopeRequest.Slot); err != nil {
+			s.log.
+				WithError(err).
+				WithField("slot", envelopeRequest.Slot).
+				Error("Failed to fetch and index execution payload envelope")
+
+			continue
+		}
+
+		s.metrics.ObserveQueueItemProcessingTime(
+			ExecutionPayloadEnvelopeQueue,
 			time.Since(start),
 			s.Config.Name,
 		)

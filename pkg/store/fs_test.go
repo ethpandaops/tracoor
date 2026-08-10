@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	locationBadBeaconBlock = "beacon_bad_block/location.json"
-	locationBeaconBlock    = "beacon_block/location.json"
+	locationBadBeaconBlock           = "beacon_bad_block/location.json"
+	locationBeaconBlock              = "beacon_block/location.json"
+	locationExecutionPayloadEnvelope = "execution_payload_envelope/location.json"
 )
 
 func TestFSStoreOperations(t *testing.T) {
@@ -87,6 +88,37 @@ func TestFSStoreOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		err = fsStore.DeleteBeaconBlock(ctx, location)
+		require.NoError(t, err)
+
+		exists, err := fsStore.Exists(ctx, location)
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("SaveExecutionPayloadEnvelope", func(t *testing.T) {
+		location := locationExecutionPayloadEnvelope
+		data := []byte(`{"block": "data"}`)
+		_, err := fsStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		savedData, err := fsStore.GetExecutionPayloadEnvelope(ctx, location)
+		require.NoError(t, err)
+		require.Equal(t, data, *savedData)
+	})
+
+	t.Run("DeleteExecutionPayloadEnvelope", func(t *testing.T) {
+		location := locationExecutionPayloadEnvelope
+		data := []byte(`{"block": "data"}`)
+		_, err := fsStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
+			Data:     &data,
+			Location: location,
+		})
+		require.NoError(t, err)
+
+		err = fsStore.DeleteExecutionPayloadEnvelope(ctx, location)
 		require.NoError(t, err)
 
 		exists, err := fsStore.Exists(ctx, location)

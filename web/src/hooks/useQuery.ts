@@ -32,6 +32,11 @@ import {
   fetchCountExecutionBlockTrace,
 } from '@api/executionBlockTrace';
 import {
+  fetchListUniqueExecutionPayloadEnvelopeValues,
+  fetchListExecutionPayloadEnvelope,
+  fetchCountExecutionPayloadEnvelope,
+} from '@api/executionPayloadEnvelope';
+import {
   BeaconBadBlock,
   BeaconBadBlob,
   BeaconBadBlockField,
@@ -44,24 +49,29 @@ import {
   ExecutionBadBlockField,
   ExecutionBlockTrace,
   ExecutionBlockTraceField,
+  ExecutionPayloadEnvelope,
+  ExecutionPayloadEnvelopeField,
   V1CountBeaconBadBlockRequest,
   V1CountBeaconBadBlobRequest,
   V1CountBeaconBlockRequest,
   V1CountBeaconStateRequest,
   V1CountExecutionBadBlockRequest,
   V1CountExecutionBlockTraceRequest,
+  V1CountExecutionPayloadEnvelopeRequest,
   V1ListBeaconBadBlockRequest,
   V1ListBeaconBadBlobRequest,
   V1ListBeaconBlockRequest,
   V1ListBeaconStateRequest,
   V1ListExecutionBadBlockRequest,
   V1ListExecutionBlockTraceRequest,
+  V1ListExecutionPayloadEnvelopeRequest,
   V1ListUniqueBeaconBadBlockValuesResponse,
   V1ListUniqueBeaconBadBlobValuesResponse,
   V1ListUniqueBeaconBlockValuesResponse,
   V1ListUniqueBeaconStateValuesResponse,
   V1ListUniqueExecutionBadBlockValuesResponse,
   V1ListUniqueExecutionBlockTraceValuesResponse,
+  V1ListUniqueExecutionPayloadEnvelopeValuesResponse,
   V1GetConfigRequest,
   Config,
 } from '@app/types/api';
@@ -277,6 +287,52 @@ export function useUniqueExecutionBadBlockValues(fields: ExecutionBadBlockField[
   >({
     queryKey: ['list-unqiue-execution-bad-block-values', fields],
     queryFn: () => fetchListUniqueExecutionBadBlockValues({ fields }),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useExecutionPayloadEnvelopes(
+  request: V1ListExecutionPayloadEnvelopeRequest,
+  enabled = true,
+) {
+  return useQuery<
+    ExecutionPayloadEnvelope[],
+    unknown,
+    ExecutionPayloadEnvelope[],
+    [string, V1ListExecutionPayloadEnvelopeRequest]
+  >({
+    queryKey: ['list-execution-payload-envelope', request],
+    queryFn: () => fetchListExecutionPayloadEnvelope(request),
+    enabled,
+    staleTime: 6_000,
+  });
+}
+
+export function useExecutionPayloadEnvelopesCount(
+  request: V1CountExecutionPayloadEnvelopeRequest,
+  enabled = true,
+) {
+  return useQuery<number, unknown, number, [string, V1CountExecutionPayloadEnvelopeRequest]>({
+    queryKey: ['count-execution-payload-envelope', request],
+    queryFn: () => fetchCountExecutionPayloadEnvelope(request),
+    enabled,
+    staleTime: 6_000,
+  });
+}
+
+export function useUniqueExecutionPayloadEnvelopeValues(
+  fields: ExecutionPayloadEnvelopeField[],
+  enabled = true,
+) {
+  return useQuery<
+    V1ListUniqueExecutionPayloadEnvelopeValuesResponse,
+    unknown,
+    V1ListUniqueExecutionPayloadEnvelopeValuesResponse,
+    [string, ExecutionPayloadEnvelopeField[]]
+  >({
+    queryKey: ['list-unqiue-execution-payload-envelope-values', fields],
+    queryFn: () => fetchListUniqueExecutionPayloadEnvelopeValues({ fields }),
     enabled,
     staleTime: 60_000,
   });

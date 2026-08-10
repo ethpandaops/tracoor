@@ -32,6 +32,10 @@ func TestS3StoreOperations(t *testing.T) {
 		testBeaconBlock(ctx, t, store)
 	})
 
+	t.Run("ExecutionPayloadEnvelope", func(t *testing.T) {
+		testExecutionPayloadEnvelope(ctx, t, store)
+	})
+
 	t.Run("BeaconBadBlock", func(t *testing.T) {
 		testBeaconBadBlock(ctx, t, store)
 	})
@@ -153,6 +157,61 @@ func testBeaconBlock(ctx context.Context, t *testing.T, store Store) {
 
 		if err = store.DeleteBeaconBlock(ctx, location); err != nil {
 			t.Fatalf("Failed to delete beacon block: %v", err)
+		}
+
+		exists, err = store.Exists(ctx, location)
+		if err != nil {
+			t.Fatalf("Failed to check existence after deletion: %v", err)
+		}
+
+		if exists {
+			t.Fatal("Expected file to not exist after deletion")
+		}
+	})
+}
+
+func testExecutionPayloadEnvelope(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	location := "execution_payload_envelope/location.json"
+	data := []byte(`"abc": "def"`)
+
+	var err error
+
+	t.Run("ExecutionPayloadEnvelope", func(t *testing.T) {
+		if err = store.Healthy(ctx); err != nil {
+			t.Fatalf("Store is not healthy: %v", err)
+		}
+
+		location, err = store.SaveExecutionPayloadEnvelope(ctx, &SaveParams{
+			Data:            &data,
+			Location:        location,
+			ContentEncoding: "",
+		})
+		if err != nil {
+			t.Fatalf("Failed to save execution payload envelope: %v", err)
+		}
+
+		retrievedData, err := store.GetExecutionPayloadEnvelope(ctx, location)
+		if err != nil {
+			t.Fatalf("Failed to get execution payload envelope: %v", err)
+		}
+
+		if retrievedData == nil {
+			t.Fatal("Retrieved data is nil")
+		}
+
+		exists, err := store.Exists(ctx, location)
+		if err != nil {
+			t.Fatalf("Failed to check existence: %v", err)
+		}
+
+		if !exists {
+			t.Fatal("Expected file to exist")
+		}
+
+		if err = store.DeleteExecutionPayloadEnvelope(ctx, location); err != nil {
+			t.Fatalf("Failed to delete execution payload envelope: %v", err)
 		}
 
 		exists, err = store.Exists(ctx, location)

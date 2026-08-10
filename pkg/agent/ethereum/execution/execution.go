@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/0xsequence/ethkit/ethrpc"
@@ -12,6 +14,10 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution/services"
 	"github.com/sirupsen/logrus"
 )
+
+// ErrBlockNotFound is returned when the execution node does not know about
+// the requested block, e.g. a gloas payload that has not been revealed yet.
+var ErrBlockNotFound = errors.New("execution block not found")
 
 type Node struct {
 	config *Config
@@ -148,6 +154,44 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (
 	s := []byte(data.Result)
 
 	return &s, nil
+}
+
+// GetBlockNumberByHash resolves an execution block number from its hash.
+// Returns ErrBlockNotFound if the node does not (yet) have the block.
+func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, error) {
+	data := jsonrpc.Message{}
+
+	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
+		"eth_getBlockByHash",
+		hash,
+		false,
+	))
+	if err != nil {
+		return 0, err
+	}
+
+	if err = json.Unmarshal(rsp, &data); err != nil {
+		return 0, err
+	}
+
+	if len(data.Result) == 0 || string(data.Result) == "null" {
+		return 0, ErrBlockNotFound
+	}
+
+	block := struct {
+		Number string `json:"number"`
+	}{}
+
+	if err = json.Unmarshal([]byte(data.Result), &block); err != nil {
+		return 0, err
+	}
+
+	number, err := strconv.ParseUint(strings.TrimPrefix(block.Number, "0x"), 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse block number %q: %w", block.Number, err)
+	}
+
+	return number, nil
 }
 
 func (n *Node) GetBadBlocks(ctx context.Context) (*BadBlocksResponse, error) {

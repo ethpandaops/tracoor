@@ -141,6 +141,74 @@ func (r *ListUniqueBeaconBlockValuesRequest) Validate() error {
 	return nil
 }
 
+func (s *ExecutionPayloadEnvelope) Validate() error {
+	if s == nil {
+		return errors.New("execution payload envelope is nil")
+	}
+
+	if s.GetEpoch() == nil {
+		return errors.New("epoch is required")
+	}
+
+	if s.GetSlot() == nil {
+		return errors.New("slot is required")
+	}
+
+	if s.GetBlockRoot().Value == "" {
+		return errors.New("block root is required")
+	}
+
+	if s.GetId() == nil {
+		return errors.New("id is required")
+	}
+
+	if s.GetBeaconImplementation().GetValue() == "" {
+		return errors.New("beacon implementation is required")
+	}
+
+	return nil
+}
+
+func (req *CreateExecutionPayloadEnvelopeRequest) Validate() error {
+	if req.GetLocation().GetValue() == "" {
+		return fmt.Errorf("location is required")
+	}
+
+	if req.GetNode().GetValue() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if req.Epoch == nil {
+		return fmt.Errorf("epoch is required")
+	}
+
+	if req.Slot == nil {
+		return fmt.Errorf("slot is required")
+	}
+
+	if req.GetBlockRoot().Value == "" {
+		return fmt.Errorf("block root is required")
+	}
+
+	if req.GetBeaconImplementation().Value == "" {
+		return fmt.Errorf("beacon implementation is required")
+	}
+
+	return nil
+}
+
+func (r *ListUniqueExecutionPayloadEnvelopeValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}
+
 func (s *BeaconBadBlock) Validate() error {
 	if s == nil {
 		return errors.New("beacon bad block is nil")

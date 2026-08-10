@@ -8,6 +8,7 @@ ethereum:
   # features:
   #   fetchBeaconState: true
   #   fetchBeaconBlock: true
+  #   fetchExecutionPayloadEnvelope: true
   #   fetchBeaconBadBlock: true
   #   fetchBeaconBadBlob: true
   #   fetchExecutionBlockTrace: true

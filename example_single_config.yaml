@@ -15,6 +15,7 @@ server:
         beaconStates: 30m
         executionBlockTraces: 30m
         beaconBlocks: 30m
+        executionPayloadEnvelopes: 30m
   # Use the following to configure Tracoor for a custom network
   # ethereum:
   #   config:
@@ -38,6 +39,7 @@ agents:
       # features:
       #   fetchBeaconState: true
       #   fetchBeaconBlock: true
+      #   fetchExecutionPayloadEnvelope: true
       #   fetchBeaconBadBlock: true
       #   fetchBeaconBadBlob: true
       #   fetchExecutionBlockTrace: true

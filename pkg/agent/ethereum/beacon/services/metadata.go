@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/state"
 	"github.com/ethpandaops/ethwallclock"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/tracoor/pkg/networks"
 	"github.com/go-co-op/gocron"
 	"github.com/sirupsen/logrus"

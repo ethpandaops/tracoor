@@ -59,6 +59,14 @@ type Store interface {
 	GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconBlock deletes a beacon block from the store
 	DeleteBeaconBlock(ctx context.Context, location string) error
+	// SaveExecutionPayloadEnvelope saves an execution payload envelope to the store
+	SaveExecutionPayloadEnvelope(ctx context.Context, params *SaveParams) (string, error)
+	// GetExecutionPayloadEnvelope fetches an execution payload envelope from the store
+	GetExecutionPayloadEnvelope(ctx context.Context, location string) (*[]byte, error)
+	// GetExecutionPayloadEnvelopeURL returns a URL for the execution payload envelope
+	GetExecutionPayloadEnvelopeURL(ctx context.Context, params *GetURLParams) (string, error)
+	// DeleteExecutionPayloadEnvelope deletes an execution payload envelope from the store
+	DeleteExecutionPayloadEnvelope(ctx context.Context, location string) error
 
 	// SaveBeaconBadBlock saves a beacon bad block to the store
 	SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error)

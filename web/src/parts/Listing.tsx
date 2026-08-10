@@ -4,6 +4,7 @@ import BeaconBlockTable from '@components/BeaconBlockTable';
 import BeaconStateTable from '@components/BeaconStateTable';
 import ExecutionBadBlockTable from '@components/ExecutionBadBlockTable';
 import ExecutionBlockTraceTable from '@components/ExecutionBlockTraceTable';
+import ExecutionPayloadEnvelopeTable from '@components/ExecutionPayloadEnvelopeTable';
 import useSelection, { Selection } from '@contexts/selection';
 
 export default function Listing({ id }: { id?: string }) {
@@ -16,6 +17,9 @@ export default function Listing({ id }: { id?: string }) {
       break;
     case Selection.beacon_block:
       table = <BeaconBlockTable id={id} />;
+      break;
+    case Selection.execution_payload_envelope:
+      table = <ExecutionPayloadEnvelopeTable id={id} />;
       break;
     case Selection.beacon_bad_block:
       table = <BeaconBadBlockTable id={id} />;

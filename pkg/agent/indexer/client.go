@@ -100,6 +100,20 @@ func (c *Client) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBlo
 	return c.pb.ListBeaconBlock(ctx, req, grpc.UseCompressor(gzip.Name))
 }
 
+func (c *Client) CreateExecutionPayloadEnvelope(ctx context.Context, req *indexer.CreateExecutionPayloadEnvelopeRequest) (*indexer.CreateExecutionPayloadEnvelopeResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreateExecutionPayloadEnvelope(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
+func (c *Client) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer.ListExecutionPayloadEnvelopeRequest) (*indexer.ListExecutionPayloadEnvelopeResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.ListExecutionPayloadEnvelope(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
 func (c *Client) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateBeaconBadBlockRequest) (*indexer.CreateBeaconBadBlockResponse, error) {
 	md := metadata.New(c.config.Headers)
 	ctx = metadata.NewOutgoingContext(ctx, md)

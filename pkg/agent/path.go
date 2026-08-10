@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
 func CreateBeaconStateFileName(
@@ -31,6 +31,22 @@ func CreateBeaconBlockFileName(
 ) string {
 	return path.Join(
 		"beacon_blocks",
+		network,
+		"slots",
+		fmt.Sprintf("%d", slot),
+		node,
+		blockRoot,
+	)
+}
+
+func CreateExecutionPayloadEnvelopeFileName(
+	node string,
+	network string,
+	slot phase0.Slot,
+	blockRoot string,
+) string {
+	return path.Join(
+		"execution_payload_envelopes",
 		network,
 		"slots",
 		fmt.Sprintf("%d", slot),

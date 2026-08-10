@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/beacon/pkg/beacon/api"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/compression"
 	"github.com/ethpandaops/tracoor/pkg/mime"
@@ -277,6 +279,157 @@ func getBadBlocksFilePattern(client string) (*string, error) {
 	}
 
 	return &pattern, nil
+}
+
+const (
+	executionPayloadEnvelopeFetchAttempts = 5
+	executionPayloadEnvelopeFetchDelay    = 3 * time.Second
+)
+
+// fetchAndIndexExecutionPayloadEnvelope archives the signed execution payload
+// envelope for the block at the given slot. Envelopes exist from the gloas
+// fork onwards and are revealed by the builder after the block arrives, so
+// the fetch retries briefly while the beacon node reports it as not found. A
+// payload that is never revealed leaves the slot without an envelope, which
+// is not an error.
+func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot phase0.Slot) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	spec, err := s.node.Beacon().Node().Spec()
+	if err != nil {
+		return err
+	}
+
+	epoch := uint64(slot) / uint64(spec.SlotsPerEpoch)
+
+	gloas, err := spec.ForkEpochs.GetByName("gloas")
+	if err != nil || uint64(gloas.Epoch) > epoch {
+		// The network has no gloas fork scheduled, or the slot pre-dates it.
+		return nil
+	}
+
+	blockRoot, err := s.node.Beacon().Node().FetchBlockRoot(ctx, fmt.Sprintf("%d", slot))
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch beacon block root")
+	}
+
+	blockRootAsString := blockRoot.String()
+
+	location := CreateExecutionPayloadEnvelopeFileName(
+		s.Config.Name,
+		string(s.node.Beacon().Metadata().Network.Name),
+		slot,
+		blockRootAsString,
+	)
+
+	location = fmt.Sprintf("%s.ssz", location)
+
+	// Check if we've somehow already indexed this envelope
+	rsp, err := s.indexer.ListExecutionPayloadEnvelope(ctx, &indexer.ListExecutionPayloadEnvelopeRequest{
+		Node:      s.Config.Name,
+		BlockRoot: blockRootAsString,
+		Slot:      uint64(slot),
+		Network:   string(s.node.Beacon().Metadata().Network.Name),
+	})
+	if err != nil {
+		s.log.
+			WithField("block_root", blockRootAsString).
+			WithField("slot", slot).
+			WithError(err).
+			Error("Failed to check if execution payload envelope is already indexed")
+	}
+
+	if rsp != nil && len(rsp.ExecutionPayloadEnvelopes) > 0 {
+		s.log.
+			WithField("block_root", blockRootAsString).
+			WithField("slot", slot).
+			Debug("Execution payload envelope already indexed")
+
+		return nil
+	}
+
+	now := time.Now()
+
+	var envelopeRaw []byte
+
+	for attempt := 0; attempt < executionPayloadEnvelopeFetchAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(executionPayloadEnvelopeFetchDelay):
+			}
+		}
+
+		envelopeRaw, err = s.node.Beacon().FetchRawExecutionPayloadEnvelope(ctx, blockRootAsString, string(mime.ContentTypeOctet))
+		if err == nil {
+			break
+		}
+
+		if !goerrors.Is(err, api.ErrNotFound) {
+			return errors.Wrap(err, "failed to fetch execution payload envelope")
+		}
+	}
+
+	if err != nil {
+		s.log.
+			WithField("block_root", blockRootAsString).
+			WithField("slot", slot).
+			Debug("Execution payload envelope not available, payload was likely never revealed")
+
+		return nil
+	}
+
+	// Compress it
+	compressedEnvelope, err := s.compressor.Compress(&envelopeRaw, compression.Gzip)
+	if err != nil {
+		return errors.Wrap(err, "failed to compress execution payload envelope")
+	}
+
+	s.log.WithField("location", location).Debug("Saving execution payload envelope")
+
+	// Upload the envelope to the store
+	location, err = s.store.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
+		Data:            &compressedEnvelope,
+		Location:        location,
+		ContentEncoding: compression.Gzip.ContentEncoding,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Sleep for 1s to give the store time to update
+	time.Sleep(1 * time.Second)
+
+	req := &indexer.CreateExecutionPayloadEnvelopeRequest{
+		Node:            wrapperspb.String(s.Config.Name),
+		Network:         wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
+		Slot:            wrapperspb.UInt64(uint64(slot)),
+		Epoch:           wrapperspb.UInt64(epoch),
+		BlockRoot:       wrapperspb.String(blockRootAsString),
+		Location:        wrapperspb.String(location),
+		ContentEncoding: wrapperspb.String(compression.Gzip.ContentEncoding),
+		NodeVersion:     wrapperspb.String(s.node.Beacon().Metadata().NodeVersion(ctx)),
+		BeaconImplementation: wrapperspb.String(
+			s.node.Beacon().Metadata().Client(ctx),
+		),
+		FetchedAt: timestamppb.New(now),
+	}
+
+	// Index the envelope
+	if _, err := s.indexer.CreateExecutionPayloadEnvelope(ctx, req); err != nil {
+		return err
+	}
+
+	s.metrics.IncrementItemExported(ExecutionPayloadEnvelopeQueue, s.Config.Name)
+
+	s.log.
+		WithField("block_root", blockRootAsString).
+		WithField("slot", slot).
+		Debug("Indexed execution payload envelope")
+
+	return nil
 }
 
 func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) error {

@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "api.proto",
+    "title": "pkg/proto/tracoor/api/api.proto",
     "version": "version not set"
   },
   "tags": [
@@ -223,6 +223,15 @@
         }
       }
     },
+    "apiCountExecutionPayloadEnvelopeResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
     "apiEthereumConfig": {
       "type": "object",
       "properties": {
@@ -309,6 +318,41 @@
           "type": "string"
         },
         "node_version": {
+          "type": "string"
+        }
+      }
+    },
+    "apiExecutionPayloadEnvelope": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "fetched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "slot": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "block_root": {
+          "type": "string"
+        },
+        "node_version": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        },
+        "beacon_implementation": {
           "type": "string"
         }
       }
@@ -400,6 +444,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/apiExecutionBlockTrace"
+          }
+        }
+      }
+    },
+    "apiListExecutionPayloadEnvelopeResponse": {
+      "type": "object",
+      "properties": {
+        "execution_payload_envelopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/apiExecutionPayloadEnvelope"
           }
         }
       }
@@ -768,6 +824,68 @@
           }
         },
         "execution_implementation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "apiListUniqueExecutionPayloadEnvelopeValuesRequestField": {
+      "type": "string",
+      "enum": [
+        "node",
+        "slot",
+        "epoch",
+        "block_root",
+        "node_version",
+        "network",
+        "beacon_implementation"
+      ],
+      "default": "node"
+    },
+    "apiListUniqueExecutionPayloadEnvelopeValuesResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slot": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "epoch": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uint64"
+          }
+        },
+        "block_root": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "node_version": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "beacon_implementation": {
           "type": "array",
           "items": {
             "type": "string"

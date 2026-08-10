@@ -14,6 +14,7 @@ services:
     retention:
       beaconStates: 30m
       beaconBlocks: 30m
+      executionPayloadEnvelopes: 30m
       beaconBadBlocks: 30m
       beaconBadBlobs: 30m
       executionBlockTrace: 30m
