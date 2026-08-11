@@ -427,7 +427,7 @@ func TestExpiryCutoffIsIndependentOfTheProcessZone(t *testing.T) {
 	// Exactly what retention hands the query: now in the host's zone, less the window.
 	before := time.Now().Add(-30 * time.Minute)
 
-	rows, err := indexer.ListExpiringBeaconStates(ctx, before, 100)
+	rows, err := indexer.ListExpiringBeaconStates(ctx, before, 100, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1, "only the row fetched outside the window has expired")
 	require.Equal(t, stale.ID, rows[0].ID)

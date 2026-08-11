@@ -568,6 +568,12 @@ func (s *agent) fetchAndIndexBeaconBadBlocks(ctx context.Context, path string) e
 					WithField("slot", slot).
 					WithError(err).
 					Error("Failed to check if beacon bad block is already indexed")
+
+				// Proceeding on an unknown answer would re-save at the same
+				// location: pre-dedup rows keep gzip bytes there, so a zstd
+				// rewrite corrupts what their row says it serves. The file is
+				// still on disk next pass; skip it for now.
+				continue
 			}
 
 			if rsp != nil && len(rsp.BeaconBadBlocks) > 0 {
@@ -794,6 +800,10 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 					WithField("slot", slot).
 					WithError(err).
 					Error("Failed to check if beacon bad blob is already indexed")
+
+				// Same reasoning as bad blocks: an unknown answer must not
+				// turn into a rewrite of an existing object at this location.
+				continue
 			}
 
 			if rsp != nil && len(rsp.BeaconBadBlobs) > 0 {

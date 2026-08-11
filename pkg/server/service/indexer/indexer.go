@@ -319,27 +319,31 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	}, nil
 }
 
-// agreementRef identifies one verified payload: the network it was observed on and the hash
-// of its bytes. Counts are resolved per ref rather than per row so one blob query covers a
-// whole page of rows that mostly share hashes.
+// agreementRef identifies one verified payload: the network it was observed on and the blob
+// location its row references. The location, not the content hash, is the key — a linked row
+// carries its blob's location, and blobs under different dedupe keys can share bytes (an empty
+// trace is identical JSON on every client build) without their counts being one number. Counts
+// are resolved per ref rather than per row so one blob query covers a whole page of rows that
+// mostly share payloads.
 type agreementRef struct {
-	network string
-	hash    string
+	network  string
+	location string
 }
 
 // verifiedRef builds the ref for a row, or a zero ref for one that carries no evidence — an
-// unverified row or one with no recorded hash has no agreement to count.
-func verifiedRef(network, hash string, verifiedAt *time.Time) agreementRef {
-	if verifiedAt == nil || hash == "" {
+// unverified row, one with no recorded hash, or one with no location has no agreement to
+// count.
+func verifiedRef(network, hash, location string, verifiedAt *time.Time) agreementRef {
+	if verifiedAt == nil || hash == "" || location == "" {
 		return agreementRef{}
 	}
 
-	return agreementRef{network: network, hash: hash}
+	return agreementRef{network: network, location: location}
 }
 
 // agreementCounts resolves how many rows share each referenced payload's bytes, from the
-// ready blobs' reference counts. A missing key means no ready blob backs that hash and the
-// count is unknown. Failures degrade to what has been resolved so far: the count is
+// ready blobs' reference counts. A missing key means no ready blob backs that location and
+// the count is unknown. Failures degrade to what has been resolved so far: the count is
 // decoration on a list response, not data worth failing the request over.
 func (i *Indexer) agreementCounts(ctx context.Context, kind string, refs map[agreementRef]struct{}) map[agreementRef]uint32 {
 	byNetwork := make(map[string][]string)
@@ -349,25 +353,25 @@ func (i *Indexer) agreementCounts(ctx context.Context, kind string, refs map[agr
 			continue
 		}
 
-		byNetwork[ref.network] = append(byNetwork[ref.network], ref.hash)
+		byNetwork[ref.network] = append(byNetwork[ref.network], ref.location)
 	}
 
 	out := make(map[agreementRef]uint32, len(refs))
 
-	for network, hashes := range byNetwork {
-		counts, err := i.db.AgreementCountsByContentHash(ctx, kind, network, hashes)
+	for network, locations := range byNetwork {
+		counts, err := i.db.AgreementCountsByLocation(ctx, kind, network, locations)
 		if err != nil {
 			i.log.WithError(err).WithField("kind", kind).Warn("Failed to resolve payload agreement counts")
 
 			continue
 		}
 
-		for hash, count := range counts {
+		for location, count := range counts {
 			if count < 0 || count > math.MaxUint32 {
 				continue
 			}
 
-			out[agreementRef{network: network, hash: hash}] = uint32(count)
+			out[agreementRef{network: network, location: location}] = uint32(count)
 		}
 	}
 
@@ -443,7 +447,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 
 	refs := make(map[agreementRef]struct{}, len(beaconStates))
 	for _, state := range beaconStates {
-		refs[verifiedRef(state.Network, state.ContentHash, state.VerifiedAt)] = struct{}{}
+		refs[verifiedRef(state.Network, state.ContentHash, state.Location, state.VerifiedAt)] = struct{}{}
 	}
 
 	counts := i.agreementCounts(ctx, persistence.KindBeaconState, refs)
@@ -451,7 +455,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	protoBeaconStates := make([]*indexer.BeaconState, len(beaconStates))
 	for idx, state := range beaconStates {
 		proto := DBBeaconStateToProtoBeaconState(state)
-		if count, ok := counts[verifiedRef(state.Network, state.ContentHash, state.VerifiedAt)]; ok {
+		if count, ok := counts[verifiedRef(state.Network, state.ContentHash, state.Location, state.VerifiedAt)]; ok {
 			proto.AgreementCount = wrapperspb.UInt32(count)
 		}
 
@@ -706,7 +710,7 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 
 	refs := make(map[agreementRef]struct{}, len(beaconBlocks))
 	for _, block := range beaconBlocks {
-		refs[verifiedRef(block.Network, block.ContentHash, block.VerifiedAt)] = struct{}{}
+		refs[verifiedRef(block.Network, block.ContentHash, block.Location, block.VerifiedAt)] = struct{}{}
 	}
 
 	counts := i.agreementCounts(ctx, persistence.KindBeaconBlock, refs)
@@ -714,7 +718,7 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 	protoBeaconBlocks := make([]*indexer.BeaconBlock, len(beaconBlocks))
 	for idx, block := range beaconBlocks {
 		proto := DBBeaconBlockToProtoBeaconBlock(block)
-		if count, ok := counts[verifiedRef(block.Network, block.ContentHash, block.VerifiedAt)]; ok {
+		if count, ok := counts[verifiedRef(block.Network, block.ContentHash, block.Location, block.VerifiedAt)]; ok {
 			proto.AgreementCount = wrapperspb.UInt32(count)
 		}
 
@@ -961,7 +965,7 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 
 	refs := make(map[agreementRef]struct{}, len(envelopes))
 	for _, envelope := range envelopes {
-		refs[verifiedRef(envelope.Network, envelope.ContentHash, envelope.VerifiedAt)] = struct{}{}
+		refs[verifiedRef(envelope.Network, envelope.ContentHash, envelope.Location, envelope.VerifiedAt)] = struct{}{}
 	}
 
 	counts := i.agreementCounts(ctx, persistence.KindExecutionPayloadEnvelope, refs)
@@ -969,7 +973,7 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 	protoEnvelopes := make([]*indexer.ExecutionPayloadEnvelope, len(envelopes))
 	for idx, envelope := range envelopes {
 		proto := DBExecutionPayloadEnvelopeToProtoExecutionPayloadEnvelope(envelope)
-		if count, ok := counts[verifiedRef(envelope.Network, envelope.ContentHash, envelope.VerifiedAt)]; ok {
+		if count, ok := counts[verifiedRef(envelope.Network, envelope.ContentHash, envelope.Location, envelope.VerifiedAt)]; ok {
 			proto.AgreementCount = wrapperspb.UInt32(count)
 		}
 
@@ -1700,7 +1704,7 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 
 	refs := make(map[agreementRef]struct{}, len(executionBlockTraces))
 	for _, trace := range executionBlockTraces {
-		refs[verifiedRef(trace.Network, trace.ContentHash, trace.VerifiedAt)] = struct{}{}
+		refs[verifiedRef(trace.Network, trace.ContentHash, trace.Location, trace.VerifiedAt)] = struct{}{}
 	}
 
 	counts := i.agreementCounts(ctx, persistence.KindExecutionBlockTrace, refs)
@@ -1708,7 +1712,7 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 	protoExecutionBlockTraces := make([]*indexer.ExecutionBlockTrace, len(executionBlockTraces))
 	for idx, trace := range executionBlockTraces {
 		proto := DBExecutionBlockTraceToProtoExecutionBlockTrace(trace)
-		if count, ok := counts[verifiedRef(trace.Network, trace.ContentHash, trace.VerifiedAt)]; ok {
+		if count, ok := counts[verifiedRef(trace.Network, trace.ContentHash, trace.Location, trace.VerifiedAt)]; ok {
 			proto.AgreementCount = wrapperspb.UInt32(count)
 		}
 

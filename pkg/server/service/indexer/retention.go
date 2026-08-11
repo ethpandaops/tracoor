@@ -236,11 +236,13 @@ func (d *disagreementReporter) firstTime(kind, network string, slot, roots int64
 type purgeSpec struct {
 	kind      string
 	retention time.Duration
-	list      func(ctx context.Context, before time.Time, limit int) ([]*persistence.ExpiringArtifact, error)
+	list      func(ctx context.Context, before time.Time, limit, offset int) ([]*persistence.ExpiringArtifact, error)
 	// prepare runs before a page is deleted, for the one kind that has somewhere else to be
 	// first. It returns the rows that may now be purged, which is not always all of them: a
 	// row whose block did not get its turn keeps its object and is offered again next cycle.
-	prepare func(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, error)
+	// stop asks the pass to end here — the page ran out of shared budget, so later pages
+	// would fare no better — as opposed to held-back rows, which the pass steps over.
+	prepare func(ctx context.Context, rows []*persistence.ExpiringArtifact) (purgeable []*persistence.ExpiringArtifact, stop bool, err error)
 }
 
 func (i *Indexer) purgeSpecs() []purgeSpec {
@@ -341,12 +343,17 @@ func (i *Indexer) purgeArtifacts(ctx context.Context, spec purgeSpec) error {
 
 	var purged int64
 
+	// Rows prepare holds back stay in place and sort ahead of everything else, so the pass
+	// steps over them by offset — otherwise one permanently un-archivable row at the head
+	// would be the only row any page ever reads, and the backlog behind it would never drain.
+	offset := 0
+
 	for page := 0; page < maxPagesPerPass; page++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		rows, err := spec.list(ctx, before, purgePageSize)
+		rows, err := spec.list(ctx, before, purgePageSize, offset)
 		if err != nil {
 			return err
 		}
@@ -356,9 +363,10 @@ func (i *Indexer) purgeArtifacts(ctx context.Context, spec purgeSpec) error {
 		}
 
 		purgeable := rows
+		stop := false
 
 		if spec.prepare != nil {
-			purgeable, err = spec.prepare(ctx, rows)
+			purgeable, stop, err = spec.prepare(ctx, rows)
 			if err != nil {
 				return err
 			}
@@ -371,9 +379,9 @@ func (i *Indexer) purgeArtifacts(ctx context.Context, spec purgeSpec) error {
 
 		purged += deleted
 
-		// A page that prepare could not clear in full has to stop the pass: the rows it held
-		// back are the same ones the next page would read.
-		if len(purgeable) < len(rows) {
+		offset += len(rows) - len(purgeable)
+
+		if stop {
 			break
 		}
 
@@ -635,10 +643,14 @@ func (i *Indexer) deleteObjects(ctx context.Context, locations []string) {
 // The whole page shares one budget. A row that is not reached inside it — or whose wait times
 // out, whose block the queue refused, or whose worker failed — is left out of the purge
 // entirely rather than deleted unarchived, so the only cost of a slow permanent store is that
-// these blocks wait for the next cycle, not that the archive silently loses them.
-func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, error) {
+// these blocks wait for the next cycle, not that the archive silently loses them. Held-back
+// rows do not end the pass — the caller steps over them, so a block that can never be
+// archived (its source object is gone for good) cannot pin the head of the queue and starve
+// every block behind it. Only an exhausted budget stops the pass: it is shared, so later
+// pages would fare no better.
+func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, bool, error) {
 	if !i.permanentStore.IsEnabled() {
-		return rows, nil
+		return rows, false, nil
 	}
 
 	deadline := time.Now().Add(i.archiveBudget)
@@ -651,14 +663,14 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 			i.log.WithFields(logrus.Fields{
 				"remaining": len(rows) - index,
 				"budget":    i.archiveBudget,
-			}).Warn("Permanent store archiving ran out of budget; the rest of the page keeps its objects for now")
+			}).Warn("Permanent store archiving ran out of budget; the rest of the pass keeps its objects for now")
 
-			break
+			return archived, true, nil
 		}
 
 		divergent, err := i.rowDivergesFromBlob(ctx, row)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		if divergent {
@@ -693,7 +705,7 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 		case <-ctx.Done():
 			wait.Stop()
 
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
 		case <-wait.C:
 			i.log.WithField(KeyBlockRoot, row.Identifier).Warn("Timed out waiting for permanent store; the row keeps its object for now")
 		}
@@ -709,7 +721,7 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 		archived = append(archived, row)
 	}
 
-	return archived, nil
+	return archived, false, nil
 }
 
 // rowDivergesFromBlob reports whether a block row's bytes are known to disagree with the

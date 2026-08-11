@@ -586,7 +586,7 @@ func TestRetentionKeepsAnObjectSiblingRowsStillPointAt(t *testing.T) {
 		require.NoError(t, cerr)
 	}
 
-	expiring, err := index.db.ListExpiringBeaconBadBlocks(ctx, time.Now(), 10)
+	expiring, err := index.db.ListExpiringBeaconBadBlocks(ctx, time.Now(), 10, 0)
 	require.NoError(t, err)
 	require.Len(t, expiring, 2)
 
@@ -635,11 +635,12 @@ func TestArchivingBeforePurgeIsBoundedPerPage(t *testing.T) {
 
 	start := time.Now()
 
-	archived, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, stop, err := index.archiveBlocksBeforePurge(ctx, rows)
 	require.NoError(t, err)
 
 	require.Less(t, time.Since(start), 5*time.Second, "the page has one budget, not one per row")
 	require.Empty(t, archived, "a row the permanent store never confirmed keeps its object")
+	require.True(t, stop, "an exhausted budget ends the pass; later pages share it")
 }
 
 // A row is only released to the purge once its block is verifiably in the permanent store: a
@@ -668,11 +669,12 @@ func TestArchiveBlocksBeforePurgeHoldsBackFailedArchives(t *testing.T) {
 		{ID: "archivable", Location: goodLocation, Network: network, Slot: 2, Identifier: "root-good"},
 	}
 
-	archived, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, stop, err := index.archiveBlocksBeforePurge(ctx, rows)
 	require.NoError(t, err)
 
 	require.Len(t, archived, 1, "the row whose copy failed is held back")
 	require.Equal(t, "archivable", archived[0].ID)
+	require.False(t, stop, "a held-back row is stepped over, not allowed to end the pass")
 
 	exists, err := index.Store().Exists(ctx, "permanent/"+network+"/root-good.ssz")
 	require.NoError(t, err)
@@ -720,7 +722,7 @@ func TestArchiveBlocksBeforePurgeHoldsBackDivergentRows(t *testing.T) {
 		{ID: "no-blob", Location: orphanLocation, ContentHash: generateRandomContentHash(), Network: network, Slot: 101, Identifier: "root-orphan"},
 	}
 
-	archived, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, _, err := index.archiveBlocksBeforePurge(ctx, rows)
 	require.NoError(t, err)
 
 	ids := make([]string, 0, len(archived))

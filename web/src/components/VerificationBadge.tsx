@@ -50,7 +50,12 @@ const chipIcons: Record<Verdict, typeof CheckBadgeIcon> = {
   unverified: QuestionMarkCircleIcon,
 };
 
-function headline(verdict: Verdict, scope: AgreementScope, agreementCount?: number): string {
+function headline(
+  verdict: Verdict,
+  scope: AgreementScope,
+  agreementCount?: number,
+  hashless?: boolean,
+): string {
   switch (verdict) {
     case 'agreement':
       return scope === 'client'
@@ -59,13 +64,15 @@ function headline(verdict: Verdict, scope: AgreementScope, agreementCount?: numb
     case 'sole':
       return scope === 'client' ? 'Only node running this client' : 'Only copy so far';
     case 'unknown':
-      return 'Verified from this node';
+      // A verified row with no hash predates content verification: it was fetched and
+      // stored, but never hashed, so the popover must not claim hashing happened.
+      return hashless ? 'Fetched from this node' : 'Verified from this node';
     case 'unverified':
       return 'Unverified';
   }
 }
 
-function explanation(verdict: Verdict, scope: AgreementScope): string {
+function explanation(verdict: Verdict, scope: AgreementScope, hashless?: boolean): string {
   switch (verdict) {
     case 'agreement':
       return scope === 'client'
@@ -76,7 +83,9 @@ function explanation(verdict: Verdict, scope: AgreementScope): string {
         ? 'This output is client-specific: each client serializes it differently, so agreement is only expected between nodes running the same client and version — and this is the only node with this build. Expected, not a warning.'
         : "These bytes were read and hashed from this node, but no other node's verified payload shares this hash yet. Normal moments after first capture, or when only one node serves this artifact.";
     case 'unknown':
-      return 'These bytes were read and hashed from this node. Agreement is not counted here — the artifact is node-local, or the stored payload backing this hash has since aged out.';
+      return hashless
+        ? 'This row predates content verification: the payload was fetched and stored from this node, but its bytes were never hashed, so agreement cannot be counted.'
+        : 'These bytes were read and hashed from this node. Agreement is not counted here — the artifact is node-local, or the stored payload backing this hash has since aged out.';
     case 'unverified':
       return 'Nobody has read these bytes back from this node, so this row is a claim rather than evidence.';
   }
@@ -108,6 +117,7 @@ export default function VerificationBadge({
 }) {
   const [copied, setCopied] = useState(false);
   const verdict = verdictFor(verifiedAt, agreementCount);
+  const hashless = !contentHash;
   const soleButExpected = verdict === 'sole' && scope === 'client';
   const Icon = soleButExpected ? ShieldCheckIcon : chipIcons[verdict];
 
@@ -136,7 +146,7 @@ export default function VerificationBadge({
   return (
     <Popover className={classNames('relative inline-flex', className)}>
       <PopoverButton
-        title={headline(verdict, scope, agreementCount)}
+        title={headline(verdict, scope, agreementCount, hashless)}
         className={classNames(
           'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500',
           soleButExpected ? skyChip : chipStyles[verdict],
@@ -161,10 +171,10 @@ export default function VerificationBadge({
             aria-hidden="true"
           />
           <h3 className="text-sm font-bold text-gray-800">
-            {headline(verdict, scope, agreementCount)}
+            {headline(verdict, scope, agreementCount, hashless)}
           </h3>
         </div>
-        <p className="mt-2 text-xs/5 text-gray-500">{explanation(verdict, scope)}</p>
+        <p className="mt-2 text-xs/5 text-gray-500">{explanation(verdict, scope, hashless)}</p>
         {(contentHash || verifiedAt || contentMatchedAt) && (
           <dl className="mt-3 flex flex-col gap-2 border-t border-gray-100 pt-3">
             {contentHash && (
@@ -191,7 +201,7 @@ export default function VerificationBadge({
               </DetailRow>
             )}
             {verifiedAt && (
-              <DetailRow label="Fetched, hashed and verified">
+              <DetailRow label={hashless ? 'Fetched and stored' : 'Fetched, hashed and verified'}>
                 {formatTimestamp(verifiedAt)}
               </DetailRow>
             )}

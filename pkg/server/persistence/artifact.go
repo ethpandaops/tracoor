@@ -165,7 +165,7 @@ func DedupKeyFor(kind string, row *ExpiringArtifact) string {
 	}
 }
 
-func (i *Indexer) listExpiring(ctx context.Context, operation Operation, model any, projection string, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) listExpiring(ctx context.Context, operation Operation, model any, projection string, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	i.metrics.ObserveOperation(operation)
 
 	var rows []*ExpiringArtifact
@@ -176,6 +176,7 @@ func (i *Indexer) listExpiring(ctx context.Context, operation Operation, model a
 		Where("fetched_at <= ?", utcBound(before)).
 		Order("fetched_at ASC").
 		Limit(limit).
+		Offset(offset).
 		Scan(&rows)
 	if result.Error != nil {
 		i.metrics.ObserveOperationError(operation)
@@ -186,39 +187,39 @@ func (i *Indexer) listExpiring(ctx context.Context, operation Operation, model a
 	return rows, nil
 }
 
-func (i *Indexer) ListExpiringBeaconStates(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringBeaconStates(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListBeaconState, &BeaconState{},
-		"id, location, content_hash, network, slot, state_root AS identifier", before, limit)
+		"id, location, content_hash, network, slot, state_root AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringBeaconBlocks(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringBeaconBlocks(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListBeaconBlock, &BeaconBlock{},
-		"id, location, content_hash, network, slot, block_root AS identifier", before, limit)
+		"id, location, content_hash, network, slot, block_root AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringExecutionPayloadEnvelopes(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringExecutionPayloadEnvelopes(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListExecutionPayloadEnvelope, &ExecutionPayloadEnvelope{},
-		"id, location, content_hash, network, slot, block_root AS identifier", before, limit)
+		"id, location, content_hash, network, slot, block_root AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringBeaconBadBlocks(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringBeaconBadBlocks(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListBeaconBadBlock, &BeaconBadBlock{},
-		"id, location, content_hash, network, slot, block_root AS identifier", before, limit)
+		"id, location, content_hash, network, slot, block_root AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringBeaconBadBlobs(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringBeaconBadBlobs(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListBeaconBadBlob, &BeaconBadBlob{},
-		"id, location, content_hash, network, slot, block_root AS identifier", before, limit)
+		"id, location, content_hash, network, slot, block_root AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringExecutionBlockTraces(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringExecutionBlockTraces(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListExecutionBlockTrace, &ExecutionBlockTrace{},
-		"id, location, content_hash, network, block_number, block_hash AS identifier", before, limit)
+		"id, location, content_hash, network, block_number, block_hash AS identifier", before, limit, offset)
 }
 
-func (i *Indexer) ListExpiringExecutionBadBlocks(ctx context.Context, before time.Time, limit int) ([]*ExpiringArtifact, error) {
+func (i *Indexer) ListExpiringExecutionBadBlocks(ctx context.Context, before time.Time, limit, offset int) ([]*ExpiringArtifact, error) {
 	return i.listExpiring(ctx, OperationListExecutionBadBlock, &ExecutionBadBlock{},
-		"id, location, content_hash, network, block_hash AS identifier", before, limit)
+		"id, location, content_hash, network, block_hash AS identifier", before, limit, offset)
 }
 
 // CountExpiring reports how many rows are still past their retention cutoff. It is the purge
@@ -402,35 +403,38 @@ func (i *Indexer) BlobLinksByLocation(ctx context.Context, kind, network string,
 	return links, nil
 }
 
-// AgreementCountsByContentHash returns, per content hash, how many rows currently reference
-// the ready blob carrying those bytes — the number of nodes whose verified payload agrees.
-// A hash with no ready blob is absent from the map: its agreement is unknown, not zero, and
-// the caller must not dress it up as either.
-func (i *Indexer) AgreementCountsByContentHash(ctx context.Context, kind, network string, contentHashes []string) (map[string]int64, error) {
-	counts := make(map[string]int64, len(contentHashes))
+// AgreementCountsByLocation returns, per blob location, how many rows currently reference the
+// ready blob stored there — the number of nodes whose verified payload agrees. A linked row
+// carries its blob's location, so the location is the row→blob join that stays inside one
+// dedupe key: grouping by content hash instead would merge blobs that happen to share bytes
+// across keys — routine for traces, where an empty trace is identical JSON on every client
+// build, yet the count is presented per build. A location with no ready blob is absent from
+// the map: its agreement is unknown, not zero, and the caller must not dress it up as either.
+func (i *Indexer) AgreementCountsByLocation(ctx context.Context, kind, network string, locations []string) (map[string]int64, error) {
+	counts := make(map[string]int64, len(locations))
 
-	for start := 0; start < len(contentHashes); start += lookupChunkSize {
+	for start := 0; start < len(locations); start += lookupChunkSize {
 		end := start + lookupChunkSize
-		if end > len(contentHashes) {
-			end = len(contentHashes)
+		if end > len(locations) {
+			end = len(locations)
 		}
 
 		var rows []struct {
-			ContentHash string
-			Agreement   int64
+			Location  string
+			Agreement int64
 		}
 
 		if err := i.db.WithContext(ctx).Model(&Blob{}).
-			Select("content_hash, SUM(ref_count) AS agreement").
-			Where("kind = ? AND network = ? AND content_hash IN ? AND state = ?",
-				kind, network, contentHashes[start:end], BlobStateReady).
-			Group("content_hash").
+			Select("location, SUM(ref_count) AS agreement").
+			Where("kind = ? AND network = ? AND location IN ? AND state = ?",
+				kind, network, locations[start:end], BlobStateReady).
+			Group("location").
 			Scan(&rows).Error; err != nil {
 			return nil, err
 		}
 
 		for _, row := range rows {
-			counts[row.ContentHash] = row.Agreement
+			counts[row.Location] = row.Agreement
 		}
 	}
 
