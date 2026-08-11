@@ -69,7 +69,13 @@ func (f *stateRootPinnedFetcher) Upload(ctx context.Context, location string) (s
 
 	if cerr := f.confirm(ctx); cerr != nil {
 		if f.discard != nil {
-			if derr := f.discard(ctx, saved); derr != nil {
+			// The payload was already stored, so removing it must survive
+			// whatever ended the attempt's context: a dead context here would
+			// strand the staged object forever.
+			dctx, cancel := finalizeContext(ctx)
+			defer cancel()
+
+			if derr := f.discard(dctx, saved); derr != nil {
 				return "", streamResult{}, fmt.Errorf("%w (and its payload could not be removed: %w)", cerr, derr)
 			}
 		}

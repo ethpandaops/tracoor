@@ -84,7 +84,10 @@ func TestDedupLocations(t *testing.T) {
 
 	hash := strings.Repeat("a", 64)
 
-	require.Equal(t, "beacon_states/testnet/slots/12/0xroot-aaaaaaaa.ssz", target.finalLocation(hash))
+	// The compression extension rides on the name: it is the only hint left
+	// once a download loses its Content-Encoding, and the fallback for rows
+	// with no recorded encoding.
+	require.Equal(t, "beacon_states/testnet/slots/12/0xroot-aaaaaaaa.ssz.zst", target.finalLocation(hash))
 
 	staged := target.stagingLocation("node-a")
 	require.True(t, strings.HasPrefix(staged, "beacon_states/testnet/slots/12/.tmp-node-a-"))
@@ -113,7 +116,13 @@ func newFakeIndexer() *fakeIndexer {
 	return &fakeIndexer{blobs: make(map[string]*indexer.Blob)}
 }
 
-func (f *fakeIndexer) GetBlob(_ context.Context, req *indexer.GetBlobRequest) (*indexer.GetBlobResponse, error) {
+func (f *fakeIndexer) GetBlob(ctx context.Context, req *indexer.GetBlobRequest) (*indexer.GetBlobResponse, error) {
+	// A real gRPC client refuses a dead context before anything reaches the
+	// wire, and the finalization guarantees lean on exactly that.
+	if err := ctx.Err(); err != nil {
+		return nil, status.FromContextError(err).Err()
+	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -127,7 +136,11 @@ func (f *fakeIndexer) GetBlob(_ context.Context, req *indexer.GetBlobRequest) (*
 	return &indexer.GetBlobResponse{Blob: blob}, nil
 }
 
-func (f *fakeIndexer) CreateBlob(_ context.Context, req *indexer.CreateBlobRequest) (*indexer.CreateBlobResponse, error) {
+func (f *fakeIndexer) CreateBlob(ctx context.Context, req *indexer.CreateBlobRequest) (*indexer.CreateBlobResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, status.FromContextError(err).Err()
+	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -841,6 +854,27 @@ func TestDedupSuppressesASecondDivergenceWhenTheRefetchAgrees(t *testing.T) {
 		divergences[0].GetActualHash().GetValue(),
 		"a divergence record whose two hashes agree asserts nothing",
 	)
+}
+
+func TestDedupFinalizesAFullyReadPayloadWhoseFetchBudgetExpired(t *testing.T) {
+	data := payload(8192)
+	f := newDedupFixture(t, "finalize-detached").withPayload(data)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// The fetch budget dies while the payload is being read; the read itself
+	// still completes. Everything after it — publishing the staged object,
+	// removing it, recording the blob — must survive the dead context.
+	f.fetcher.beforeUpload = cancel
+
+	claim, err := f.agent.claimByUploading(ctx, f.target, f.fetcher)
+	require.NoError(t, err)
+	require.NotNil(t, claim.own)
+
+	require.Equal(t, 1, f.indexer.createBlobs, "the payload was recorded, so something references the object")
+	require.Equal(t, []string{claim.own.Location}, storedObjects(t, f.base),
+		"the staged copy is removed and the final object published despite the expired budget")
 }
 
 func TestDedupCountsAPayloadWithNoLengthToVerify(t *testing.T) {

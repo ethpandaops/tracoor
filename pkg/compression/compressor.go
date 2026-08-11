@@ -2,6 +2,7 @@ package compression
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,13 @@ var (
 		Extension:       ".zst",
 		ContentEncoding: "zstd",
 	}
+	// Gzip is decode-only: nothing writes it anymore, but objects stored before the move to
+	// zstd carry it and must stay readable and correctly labelled forever.
+	Gzip = &CompressionAlgorithm{
+		Name:            "gzip",
+		Extension:       ".gz",
+		ContentEncoding: "gzip",
+	}
 	None = &CompressionAlgorithm{
 		Name:            "none",
 		Extension:       "",
@@ -39,7 +47,7 @@ var Default = Zstd
 
 // decodable lists the algorithms that leave a recognisable extension behind, newest first.
 // None is deliberately absent: its empty extension matches every filename.
-var decodable = []*CompressionAlgorithm{Zstd}
+var decodable = []*CompressionAlgorithm{Zstd, Gzip}
 
 // Compressor provides methods for compressing and decompressing data.
 //
@@ -140,6 +148,13 @@ func (c *Compressor) NewReader(algorithm *CompressionAlgorithm, src io.Reader) (
 		}
 
 		return r.IOReadCloser(), nil
+	case Gzip.Name:
+		r, err := gzip.NewReader(src)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+
+		return r, nil
 	case None.Name:
 		return io.NopCloser(src), nil
 	default:
@@ -235,7 +250,7 @@ func AddExtension(filename string, algorithm *CompressionAlgorithm) string {
 // RemoveExtension removes the compression extension from the filename if it's present.
 func RemoveExtension(filename string) string {
 	for _, algorithm := range decodable {
-		if trimmed := strings.TrimSuffix(filename, algorithm.Extension); trimmed != filename {
+		if trimmed, ok := strings.CutSuffix(filename, algorithm.Extension); ok {
 			return trimmed
 		}
 	}
@@ -277,7 +292,7 @@ func GetCompressionAlgorithm(filename string) (*CompressionAlgorithm, error) {
 
 // GetCompressionAlgorithmFromContentEncoding resolves the algorithm a Content-Encoding names.
 func GetCompressionAlgorithmFromContentEncoding(contentEncoding string) (*CompressionAlgorithm, error) {
-	for _, algorithm := range []*CompressionAlgorithm{Zstd, None} {
+	for _, algorithm := range []*CompressionAlgorithm{Zstd, Gzip, None} {
 		if contentEncoding == algorithm.ContentEncoding {
 			return algorithm, nil
 		}

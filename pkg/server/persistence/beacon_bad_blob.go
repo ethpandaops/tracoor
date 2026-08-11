@@ -364,32 +364,3 @@ func (i *Indexer) DeleteBeaconBadBlob(ctx context.Context, id string) error {
 
 	return nil
 }
-
-func (i *Indexer) UpdateBeaconBadBlob(ctx context.Context, blob *BeaconBadBlob) error {
-	operation := OperationUpdateBeaconBadBlob
-
-	i.metrics.ObserveOperation(operation)
-
-	query := i.db.WithContext(ctx)
-
-	result := query.Save(blob)
-	if result.Error != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon blob not found")
-	}
-
-	if result.RowsAffected != 1 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon blob update affected more than one row")
-	}
-
-	return nil
-}

@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	dropReasonAttemptsExhausted = "attempts_exhausted"
-	dropReasonCircuitOpen       = "circuit_open"
-	dropReasonDivergent         = "divergent"
-	dropReasonNotAvailable      = "not_available"
-	dropReasonStale             = "stale"
-	dropReasonStoreUnavailable  = "store_unavailable"
-	dropReasonUnsupported       = "unsupported"
+	dropReasonAttemptsExhausted  = "attempts_exhausted"
+	dropReasonCircuitOpen        = "circuit_open"
+	dropReasonDivergent          = "divergent"
+	dropReasonIndexerUnavailable = "indexer_unavailable"
+	dropReasonNotAvailable       = "not_available"
+	dropReasonStale              = "stale"
+	dropReasonStoreUnavailable   = "store_unavailable"
+	dropReasonUnsupported        = "unsupported"
 
 	defaultAttemptBudget = 1
 )
@@ -34,6 +35,11 @@ var (
 	// record was already written, which was the point; retrying would only
 	// write it again.
 	errPayloadDivergent = goerrors.New("payload diverged from the stored copy")
+
+	// errIndexerUnavailable marks a failure that belongs to the indexer rather
+	// than to the node: a lookup or record RPC failed. Like a store outage it
+	// hits every node at once, so it is never held against the node.
+	errIndexerUnavailable = goerrors.New("indexer unavailable")
 )
 
 // attemptBudgets bounds how many times a single queued item may be attempted.
@@ -124,6 +130,15 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 			break
 		}
 
+		if goerrors.Is(err, errIndexerUnavailable) {
+			// The indexer could not answer for or record the payload. Like a
+			// store outage it is shared by every node, so retrying the read and
+			// blaming the node are both wrong.
+			reason = dropReasonIndexerUnavailable
+
+			break
+		}
+
 		class, retryAfter = classifyFailure(kind, err)
 		if class == failurePermanent {
 			reason = dropReasonUnsupported
@@ -138,11 +153,13 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 	// neither outcome is held against it. Nor is a divergence: the node answered
 	// perfectly well, it just answered differently, and pausing it would stop
 	// collecting the very evidence that makes the finding useful. Nor is a store
-	// outage, which would otherwise pause every node in the fleet at once.
+	// or indexer outage, either of which would otherwise pause every node in the
+	// fleet at once.
 	if reason != dropReasonStale &&
 		reason != dropReasonNotAvailable &&
 		reason != dropReasonDivergent &&
-		reason != dropReasonStoreUnavailable {
+		reason != dropReasonStoreUnavailable &&
+		reason != dropReasonIndexerUnavailable {
 		if s.breaker.RecordFailure(kind, class, retryAfter) {
 			s.metrics.IncrementArtifactUnsupported(kind, s.Config.Name)
 

@@ -57,13 +57,15 @@ func (b *Blob) BeforeSave(*gorm.DB) error {
 }
 
 // BlobCandidate is a blob that looks collectable: no references, old enough that no agent can
-// still be mid-upload against it.
+// still be mid-upload against it. State distinguishes a blob that still needs tombstoning from
+// one tombstoned on an earlier pass whose object delete failed and is owed another attempt.
 type BlobCandidate struct {
 	Kind       string
 	Network    string
 	DedupKey   string
 	Location   string
 	Generation int64
+	State      string
 }
 
 // BlobTombstoneOutcome is what the tombstone attempt decided.
@@ -85,6 +87,11 @@ const (
 // than the grace period. The count is only a hint: every candidate is re-checked against the
 // artifact tables before anything is deleted.
 //
+// Tombstoned blobs past the cutoff are candidates too: a blob whose object delete failed after
+// tombstoning has nothing else left to drive a retry, and a resurrected blob re-enters with a
+// fresh created_at and generation, so neither the grace period nor the generation guard is
+// weakened by offering them again.
+//
 // The offset is how the caller steps over candidates it has already decided it cannot collect.
 // The order is oldest first and a candidate that is not collected does not go away, so without
 // it a single unevaluable row would occupy the head of every page for ever and nothing behind
@@ -93,8 +100,9 @@ func (i *Indexer) ListCollectableBlobs(ctx context.Context, createdBefore time.T
 	var candidates []*BlobCandidate
 
 	query := i.db.WithContext(ctx).Model(&Blob{}).
-		Select("kind, network, dedup_key, location, generation").
-		Where("state = ? AND ref_count <= 0 AND created_at < ?", BlobStateReady, utcBound(createdBefore)).
+		Select("kind, network, dedup_key, location, generation, state").
+		Where("state IN ? AND ref_count <= 0 AND created_at < ?",
+			[]string{BlobStateReady, BlobStateDeleting}, utcBound(createdBefore)).
 		Order("created_at ASC").
 		Limit(limit)
 

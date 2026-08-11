@@ -2,6 +2,7 @@ package compression_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"strings"
@@ -20,7 +21,24 @@ const (
 	// to reject rather than guess at.
 	testFilenameUnknown = "test.br"
 	testFilenameZst     = "test.zst"
+	testFilenameGz      = "test.gz"
 )
+
+// gzipCompress produces gzip bytes the way the pre-zstd releases did, since the Compressor
+// itself no longer writes gzip.
+func gzipCompress(t *testing.T, data []byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	w := gzip.NewWriter(&buf)
+
+	_, err := w.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	return buf.Bytes()
+}
 
 func TestNewCompressor(t *testing.T) {
 	c := compression.NewCompressor()
@@ -41,6 +59,13 @@ func TestCompressor_Compress(t *testing.T) {
 			data:      []byte("test data"),
 			algorithm: compression.Zstd,
 			wantErr:   false,
+		},
+		{
+			// Gzip is decode-only: old objects must stay readable, but nothing writes it.
+			name:      "Compress with Gzip is retired",
+			data:      []byte("test data"),
+			algorithm: compression.Gzip,
+			wantErr:   true,
 		},
 		{
 			name:      "Compress with nil algorithm",
@@ -90,6 +115,12 @@ func TestCompressor_Decompress(t *testing.T) {
 			name:     "Decompress Zstd",
 			data:     compressedZstd,
 			filename: testFilenameZst,
+			wantErr:  false,
+		},
+		{
+			name:     "Decompress legacy Gzip",
+			data:     gzipCompress(t, testData),
+			filename: testFilenameGz,
 			wantErr:  false,
 		},
 		{
@@ -177,6 +208,12 @@ func TestRemoveExtension(t *testing.T) {
 			algorithm: compression.Zstd,
 			want:      "test.ssz",
 		},
+		{
+			name:      "Remove legacy Gzip extension",
+			filename:  "test.ssz.gz",
+			algorithm: compression.Gzip,
+			want:      "test.ssz",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -252,6 +289,12 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 			name:     "Get Zstd algorithm",
 			filename: testFilenameZst,
 			want:     compression.Zstd,
+			wantErr:  false,
+		},
+		{
+			name:     "Get legacy Gzip algorithm",
+			filename: testFilenameGz,
+			want:     compression.Gzip,
 			wantErr:  false,
 		},
 		{
@@ -338,10 +381,10 @@ func TestGetCompressionAlgorithmFromContentEncoding(t *testing.T) {
 		wantErr         bool
 	}{
 		{
-			// Nothing writes gzip, and nothing stored carries it.
+			// Nothing writes gzip anymore, but objects stored before zstd carry it.
 			name:            "Gzip encoding",
 			contentEncoding: "gzip",
-			wantErr:         true,
+			want:            compression.Gzip,
 		},
 		{
 			name:            "Zstd encoding",
@@ -391,7 +434,7 @@ func TestHasAnyCompressionExtension(t *testing.T) {
 	}{
 		{name: "Zstd", filename: testFilenameZst, want: true},
 		{name: "Suffixed Zstd", filename: "test.ssz.zst", want: true},
-		{name: "Gzip", filename: "test.gz", want: false},
+		{name: "Gzip", filename: testFilenameGz, want: true},
 		{name: "No extension", filename: testFilename, want: false},
 		{name: "Uncompressed extension", filename: "test.ssz", want: false},
 		{name: "Empty filename", filename: "", want: false},

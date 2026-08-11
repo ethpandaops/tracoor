@@ -121,8 +121,11 @@ func (s *agent) enqueueBeaconState(ctx context.Context, slot phase0.Slot) {
 		return
 	}
 
+	// A collision here means a reorg (or a second block at this slot) asked for
+	// bytes the pending item may have resolved too early, so the item is marked
+	// to run again rather than dropped.
 	key := pendingKey(BeaconStateQueue, slotIdentifier(slot))
-	if !s.claimQueueItem(BeaconStateQueue, key) {
+	if !s.claimQueueItem(BeaconStateQueue, key, true) {
 		return
 	}
 
@@ -137,7 +140,7 @@ func (s *agent) enqueueBeaconBlock(ctx context.Context, slot phase0.Slot) {
 	}
 
 	key := pendingKey(BeaconBlockQueue, slotIdentifier(slot))
-	if !s.claimQueueItem(BeaconBlockQueue, key) {
+	if !s.claimQueueItem(BeaconBlockQueue, key, true) {
 		return
 	}
 
@@ -152,7 +155,7 @@ func (s *agent) enqueueExecutionPayloadEnvelope(ctx context.Context, slot phase0
 	}
 
 	key := pendingKey(ExecutionPayloadEnvelopeQueue, slotIdentifier(slot))
-	if !s.claimQueueItem(ExecutionPayloadEnvelopeQueue, key) {
+	if !s.claimQueueItem(ExecutionPayloadEnvelopeQueue, key, true) {
 		return
 	}
 
@@ -166,8 +169,10 @@ func (s *agent) enqueueBeaconBadBlock(ctx context.Context, path string) {
 		return
 	}
 
+	// A colliding scan carries nothing the pending one does not, so it is a
+	// plain duplicate rather than a redo.
 	key := pendingKey(BeaconBadBlockQueue, path)
-	if !s.claimQueueItem(BeaconBadBlockQueue, key) {
+	if !s.claimQueueItem(BeaconBadBlockQueue, key, false) {
 		return
 	}
 
@@ -182,7 +187,7 @@ func (s *agent) enqueueBeaconBadBlob(ctx context.Context, path string) {
 	}
 
 	key := pendingKey(BeaconBadBlobQueue, path)
-	if !s.claimQueueItem(BeaconBadBlobQueue, key) {
+	if !s.claimQueueItem(BeaconBadBlobQueue, key, false) {
 		return
 	}
 
@@ -197,7 +202,7 @@ func (s *agent) enqueueExecutionBlockTrace(ctx context.Context, blockID string) 
 	}
 
 	key := pendingKey(ExecutionBlockTraceQueue, blockID)
-	if !s.claimQueueItem(ExecutionBlockTraceQueue, key) {
+	if !s.claimQueueItem(ExecutionBlockTraceQueue, key, true) {
 		return
 	}
 
@@ -214,7 +219,7 @@ func (s *agent) enqueueExecutionBadBlock(ctx context.Context) {
 	// The execution node only ever reports its current bad blocks, so there is
 	// one item to have outstanding, not one per identifier.
 	key := pendingKey(ExecutionBadBlockQueue, "")
-	if !s.claimQueueItem(ExecutionBadBlockQueue, key) {
+	if !s.claimQueueItem(ExecutionBadBlockQueue, key, false) {
 		return
 	}
 
@@ -233,9 +238,18 @@ func slotIdentifier(slot phase0.Slot) string {
 // so an item that is dropped, skipped or abandoned half way is measured the same
 // as one that succeeded — a handler that returns early is exactly the case the
 // numbers need to include.
-func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue <-chan T, handle func(item T)) {
+//
+// Releasing the claim can report that a reorg asked for the item again while it
+// was held; requeue then puts it back through the normal claim path, once. It
+// runs off the worker because the queue can be full, and the worker blocking on
+// a send into the queue it alone drains would deadlock it.
+func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue <-chan T, requeue func(item T), handle func(item T)) {
 	drainQueue(ctx, queue, func(item T) {
-		defer s.releaseQueueItem(item.claimKey())
+		defer func() {
+			if s.releaseQueueItem(item.claimKey()) && requeue != nil {
+				s.workers.Go(func() { requeue(item) })
+			}
+		}()
 
 		s.metrics.SetQueueSize(kind, len(queue), s.Config.Name)
 		s.metrics.ObserveQueueWaitTime(kind, time.Since(item.acceptedAt()), s.Config.Name)
@@ -255,7 +269,11 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, func(stateRequest *BeaconStateRequest) {
+	requeue := func(stateRequest *BeaconStateRequest) {
+		s.enqueueBeaconState(ctx, stateRequest.Slot)
+	}
+
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(stateRequest *BeaconStateRequest) {
 		_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
 		if err != nil {
 			s.log.WithError(err).Error("Failed to get current time")
@@ -287,7 +305,11 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconBlockQueue, s.beaconBlockQueue, func(blockRequest *BeaconBlockRequest) {
+	requeue := func(blockRequest *BeaconBlockRequest) {
+		s.enqueueBeaconBlock(ctx, blockRequest.Slot)
+	}
+
+	runWorker(ctx, s, BeaconBlockQueue, s.beaconBlockQueue, requeue, func(blockRequest *BeaconBlockRequest) {
 		logCtx := s.log.WithField("slot", blockRequest.Slot)
 
 		s.runQueueItem(ctx, BeaconBlockQueue, logCtx, func(ctx context.Context) error {
@@ -301,7 +323,11 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, ExecutionPayloadEnvelopeQueue, s.executionPayloadEnvelopeQueue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
+	requeue := func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
+		s.enqueueExecutionPayloadEnvelope(ctx, envelopeRequest.Slot)
+	}
+
+	runWorker(ctx, s, ExecutionPayloadEnvelopeQueue, s.executionPayloadEnvelopeQueue, requeue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
 		logCtx := s.log.WithField("slot", envelopeRequest.Slot)
 
 		s.runQueueItem(ctx, ExecutionPayloadEnvelopeQueue, logCtx, func(ctx context.Context) error {
@@ -315,7 +341,7 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconBadBlockQueue, s.beaconBadBlockQueue, func(badBlockRequest *BeaconBadBlockRequest) {
+	runWorker(ctx, s, BeaconBadBlockQueue, s.beaconBadBlockQueue, nil, func(badBlockRequest *BeaconBadBlockRequest) {
 		if err := s.fetchAndIndexBeaconBadBlocks(ctx, badBlockRequest.Path); err != nil {
 			s.log.
 				WithError(err).
@@ -329,7 +355,7 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconBadBlobQueue, s.beaconBadBlobQueue, func(badBlobRequest *BeaconBadBlobRequest) {
+	runWorker(ctx, s, BeaconBadBlobQueue, s.beaconBadBlobQueue, nil, func(badBlobRequest *BeaconBadBlobRequest) {
 		if err := s.fetchAndIndexBeaconBadBlobs(ctx, badBlobRequest.Path); err != nil {
 			s.log.
 				WithError(err).
@@ -343,7 +369,11 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, ExecutionBlockTraceQueue, s.executionBlockTraceQueue, func(traceRequest *ExecutionBlockTraceRequest) {
+	requeue := func(traceRequest *ExecutionBlockTraceRequest) {
+		s.enqueueExecutionBlockTrace(ctx, traceRequest.BlockID)
+	}
+
+	runWorker(ctx, s, ExecutionBlockTraceQueue, s.executionBlockTraceQueue, requeue, func(traceRequest *ExecutionBlockTraceRequest) {
 		logCtx := s.log.WithField("block_id", traceRequest.BlockID)
 
 		s.runQueueItem(ctx, ExecutionBlockTraceQueue, logCtx, func(ctx context.Context) error {
@@ -366,7 +396,7 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, ExecutionBadBlockQueue, s.executionBadBlockQueue, func(_ *ExecutionBadBlockRequest) {
+	runWorker(ctx, s, ExecutionBadBlockQueue, s.executionBadBlockQueue, nil, func(_ *ExecutionBadBlockRequest) {
 		if err := s.fetchAndIndexExecutionBadBlocks(ctx); err != nil {
 			s.log.
 				WithError(err).

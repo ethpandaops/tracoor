@@ -17,12 +17,13 @@ const (
 // much as the successes: a collector that keeps deciding not to collect is the failure mode
 // that would otherwise be invisible.
 type Metrics struct {
-	rowsPurged     *prometheus.CounterVec
-	purgeDuration  *prometheus.HistogramVec
-	purgeBacklog   *prometheus.GaugeVec
-	blobsCollected prometheus.Counter
-	blobGCSkipped  *prometheus.CounterVec
-	rootDivergence *prometheus.CounterVec
+	rowsPurged      *prometheus.CounterVec
+	purgeDuration   *prometheus.HistogramVec
+	purgeBacklog    *prometheus.GaugeVec
+	blobsCollected  prometheus.Counter
+	blobGCSkipped   *prometheus.CounterVec
+	rootDivergence  *prometheus.CounterVec
+	archiveHoldback *prometheus.CounterVec
 }
 
 var (
@@ -66,6 +67,11 @@ func NewMetrics(namespace string) *Metrics {
 				Name:      "root_divergence_total",
 				Help:      "Distinct slot observations with more than one root, by what explains them",
 			}, []string{labelNetwork, labelKind, labelCause}),
+			archiveHoldback: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "permanent_archive_holdback_total",
+				Help:      "Block rows retention held back from purge because their archive was not confirmed, by reason",
+			}, []string{labelReason}),
 		}
 
 		prometheus.MustRegister(
@@ -75,6 +81,7 @@ func NewMetrics(namespace string) *Metrics {
 			m.blobsCollected,
 			m.blobGCSkipped,
 			m.rootDivergence,
+			m.archiveHoldback,
 		)
 
 		metricsInstance = m
@@ -105,4 +112,15 @@ func (m *Metrics) ObserveBlobGCSkipped(reason string) {
 
 func (m *Metrics) ObserveRootDivergence(network, kind, cause string) {
 	m.rootDivergence.WithLabelValues(network, kind, cause).Inc()
+}
+
+// ObserveArchiveHoldback records block rows a purge pass left in place because the permanent
+// store had not confirmed them. A rising count is the archive falling behind retention — the
+// failure mode that silently lost blocks before rows were held back.
+func (m *Metrics) ObserveArchiveHoldback(reason string, count int64) {
+	if count <= 0 {
+		return
+	}
+
+	m.archiveHoldback.WithLabelValues(reason).Add(float64(count))
 }

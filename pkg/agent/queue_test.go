@@ -22,7 +22,7 @@ func TestRunWorkerMeasuresAnItemTheHandlerGaveUpOn(t *testing.T) {
 
 	s.beaconStateQueue <- &BeaconStateRequest{Slot: 3, queueItem: newQueueItem(pendingKey(BeaconStateQueue, "3"))}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, func(*BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) {
 		// A handler that returns without doing the work is the case the timing
 		// used to miss entirely.
 		cancel()
@@ -38,13 +38,13 @@ func TestRunWorkerReleasesTheClaimWhateverHappens(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	key := pendingKey(BeaconStateQueue, "9")
-	require.True(t, s.pending.claim(key))
+	require.True(t, s.pending.claim(key, false))
 
 	s.beaconStateQueue <- &BeaconStateRequest{Slot: 9, queueItem: newQueueItem(key)}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, func(*BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) {
 		cancel()
 	})
 
-	require.True(t, s.pending.claim(key), "an item the worker gave up on must still release its claim")
+	require.True(t, s.pending.claim(key, false), "an item the worker gave up on must still release its claim")
 }

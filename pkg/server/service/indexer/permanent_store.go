@@ -14,13 +14,24 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/store"
 )
 
+// PermanentStoreResult is what became of a queued block. Archived is true only when the
+// block is known to be present in the permanent store; a full queue, a lost lock or a
+// worker error all report false, so a waiter can hold its row back rather than purge an
+// object the archive never received.
+type PermanentStoreResult struct {
+	Archived bool
+}
+
 // PermanentStoreBlock contains the minimal information needed to identify a block.
 type PermanentStoreBlock struct {
-	Location      string
-	BlockRoot     string
-	Network       string
-	Slot          phase0.Slot
-	ProcessedChan chan struct{}
+	Location  string
+	BlockRoot string
+	Network   string
+	Slot      phase0.Slot
+	// ProcessedChan, when non-nil, receives exactly one result and is then closed. It must
+	// be buffered: the send never blocks, so on an unbuffered channel a waiter that has
+	// already given up costs the result its value and the close reads as not archived.
+	ProcessedChan chan PermanentStoreResult
 }
 
 // PermanentStore ensures that at least one copy of each block per network is retained
@@ -109,17 +120,18 @@ func (p *PermanentStore) IsEnabled() bool {
 }
 
 // QueueBlock adds a block to the queue for processing. Every path that does not hand the block
-// to a worker closes ProcessedChan itself, so a caller waiting on it is never stranded.
+// to a worker signals ProcessedChan itself — with a not-archived result — so a caller waiting
+// on it is never stranded and never mistakes a dropped block for an archived one.
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	// Check if the permanent store is enabled
 	if !p.IsEnabled() {
-		closeProcessed(block)
+		signalProcessed(block, false)
 
 		return
 	}
 
 	if p.stopped {
-		closeProcessed(block)
+		signalProcessed(block, false)
 
 		return
 	}
@@ -132,7 +144,7 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			KeyLocation:  block.Location,
 		}).Debug("Queued block for permanent storage")
 	default:
-		closeProcessed(block)
+		signalProcessed(block, false)
 
 		p.log.WithFields(logrus.Fields{
 			KeyBlockRoot: block.BlockRoot,
@@ -142,10 +154,20 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 	}
 }
 
-func closeProcessed(block PermanentStoreBlock) {
-	if block.ProcessedChan != nil {
-		close(block.ProcessedChan)
+// signalProcessed delivers a block's result exactly once. The send never blocks — a waiter
+// that has already timed out must not strand a worker — and the close still wakes any
+// receiver the send could not reach, reading as a zero (not archived) result.
+func signalProcessed(block PermanentStoreBlock, archived bool) {
+	if block.ProcessedChan == nil {
+		return
 	}
+
+	select {
+	case block.ProcessedChan <- PermanentStoreResult{Archived: archived}:
+	default:
+	}
+
+	close(block.ProcessedChan)
 }
 
 // processQueue processes blocks from the queue.
@@ -162,7 +184,7 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 			// Skip empty blocks
 			if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
-				closeProcessed(block)
+				signalProcessed(block, false)
 
 				continue
 			}
@@ -183,8 +205,12 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	// Create a cache key for this block
 	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
 
-	// Close the processed channel so that the caller can wait for the block to be processed
-	defer closeProcessed(block)
+	// The result is delivered on the way out. archived flips to true only once the block is
+	// known to be in the permanent store, so a waiter never releases a row on a lost lock or
+	// a failed copy.
+	archived := false
+
+	defer func() { signalProcessed(block, archived) }()
 
 	// Check if we've already processed this block
 	if _, ok := p.cache.Get(cacheKey); ok {
@@ -192,6 +218,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			KeyBlockRoot: block.BlockRoot,
 			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit)")
+
+		archived = true
 
 		return nil
 	}
@@ -265,6 +293,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit after lock)")
 
+		archived = true
+
 		return nil
 	}
 
@@ -283,6 +313,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 		// Add to cache to avoid future checks
 		p.cache.Add(cacheKey, true)
+
+		archived = true
 
 		return nil
 	}
@@ -305,6 +337,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 		// Add to cache to avoid future checks
 		p.cache.Add(cacheKey, true)
+
+		archived = true
 
 		// Ensure the block is recorded in the database even if it already exists in storage
 		if perr := p.recordPermanentBlock(ctx, block); perr != nil {
@@ -333,6 +367,10 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		"from":       block.Location,
 		"to":         permanentLocation,
 	}).Info("Copied block to permanent location")
+
+	// The object is in the permanent location; a failure to record it below is recoverable
+	// and must not hold the source row back.
+	archived = true
 
 	// Record the block in the database
 	if perr := p.recordPermanentBlock(ctx, block); perr != nil {

@@ -63,7 +63,7 @@ func TestExecutionBlockTraceLocationsSeparateDistinctDedupKeys(t *testing.T) {
 	}
 
 	require.Equal(t, base, locationFor("geth", "geth/v1.14.0", false, false, false), "the same key always resolves to the same object")
-	require.True(t, strings.HasSuffix(base, "-"+hash[:contentHashSuffixLength]+".json"), "the content hash still separates disagreeing payloads")
+	require.True(t, strings.HasSuffix(base, "-"+hash[:contentHashSuffixLength]+".json.zst"), "the content hash still separates disagreeing payloads, and the compression stays readable off the name")
 	require.Contains(t, base, blockHash, "the block a trace belongs to stays readable in its path")
 }
 
@@ -76,7 +76,7 @@ func TestConsensusLocationsAreUnaffectedByTheTraceIdentity(t *testing.T) {
 		{directory: ExecutionPayloadEnvelopeDirectory("testnet", 12), identity: "0xblockroot", extension: ".ssz"},
 	} {
 		require.Equal(t,
-			target.directory+"/"+target.identity+"-"+hash[:contentHashSuffixLength]+target.extension,
+			target.directory+"/"+target.identity+"-"+hash[:contentHashSuffixLength]+target.extension+".zst",
 			target.finalLocation(hash),
 			"an artifact whose dedup key is fully described by its identity keeps its location",
 		)

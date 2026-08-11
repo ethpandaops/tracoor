@@ -110,27 +110,6 @@ func TestListBeaconBadBlob(t *testing.T) {
 	assert.Equal(t, blob.Node, blobs[0].Node)
 }
 
-func TestUpdateBeaconBadBlob(t *testing.T) {
-	indexer, mock, err := NewMockIndexer()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	blob := generateRandomBeaconBadBlob()
-
-	err = indexer.InsertBeaconBadBlob(ctx, blob)
-	assert.NoError(t, err)
-
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE").WithArgs(
-		blob.ID, blob.Node, blob.Slot, blob.Epoch, blob.BlockRoot, blob.FetchedAt,
-		blob.BeaconImplementation, blob.NodeVersion, blob.Location, blob.Network, blob.Index,
-	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	err = indexer.UpdateBeaconBadBlob(ctx, blob)
-	assert.NoError(t, err)
-}
-
 //nolint:gocyclo // Test is long but manageable
 func TestBeaconBadBlobFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {

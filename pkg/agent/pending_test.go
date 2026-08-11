@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,9 @@ func TestEnqueueCollapsesDuplicates(t *testing.T) {
 	}
 
 	require.Len(t, s.beaconStateQueue, 1, "a slot already queued must not be queued again")
-	require.Equal(t, float64(4), droppedCount(s, BeaconStateQueue, dropReasonDuplicate))
+	require.Equal(t, float64(4), droppedCount(s, BeaconStateQueue, dropReasonRedoRequested),
+		"a collision on a slot queue is folded into the pending item rather than discarded")
+	require.Zero(t, droppedCount(s, BeaconStateQueue, dropReasonDuplicate))
 }
 
 func TestEnqueueKeepsDistinctIdentifiersApart(t *testing.T) {
@@ -92,8 +95,49 @@ func TestEnqueueReleasesTheClaimWhenTheQueueIsAbandoned(t *testing.T) {
 	s.enqueueBeaconState(ctx, phase0.Slot(5))
 
 	require.Len(t, s.beaconStateQueue, 1)
-	require.False(t, s.pending.claim(pendingKey(BeaconStateQueue, "4")), "the queued item still holds its claim")
-	require.True(t, s.pending.claim(pendingKey(BeaconStateQueue, "5")), "the abandoned item must not hold one")
+	require.False(t, s.pending.claim(pendingKey(BeaconStateQueue, "4"), false), "the queued item still holds its claim")
+	require.True(t, s.pending.claim(pendingKey(BeaconStateQueue, "5"), false), "the abandoned item must not hold one")
+}
+
+func TestPendingItemsReportsARedoOnRelease(t *testing.T) {
+	p := newPendingItems()
+
+	require.True(t, p.claim("k", false))
+	require.False(t, p.claim("k", true), "a colliding claim is still refused")
+	require.True(t, p.release("k"), "the collision asked for the item to run again")
+
+	require.True(t, p.claim("k", false), "the release freed the key")
+	require.False(t, p.claim("k", false), "a plain duplicate does not request a redo")
+	require.False(t, p.release("k"))
+}
+
+func TestRunWorkerReenqueuesAnItemARedoWasRequestedFor(t *testing.T) {
+	s := newQueueTestAgent("redo", 4)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.enqueueBeaconState(ctx, phase0.Slot(7))
+	// The reorg's re-enqueue collides with the item above while it is still
+	// held, which is the collision that must not be lost.
+	s.enqueueBeaconState(ctx, phase0.Slot(7))
+
+	requeue := func(item *BeaconStateRequest) {
+		s.enqueueBeaconState(ctx, item.Slot)
+	}
+
+	handled := 0
+
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(*BeaconStateRequest) {
+		handled++
+
+		if handled == 2 {
+			cancel()
+		}
+	})
+
+	require.Equal(t, 2, handled, "the collision re-runs the item exactly once")
+	require.True(t, s.workers.Wait(time.Second), "the requeue worker has nothing left to do")
 }
 
 func TestEnqueueExecutionBadBlockHasASingleOutstandingItem(t *testing.T) {

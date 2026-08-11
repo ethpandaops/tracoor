@@ -61,6 +61,13 @@ const (
 	skipReasonQuarantined = "quarantined"
 )
 
+// Why a block row was held back from purge instead of released with its page.
+const (
+	holdbackReasonBudgetExhausted = "budget_exhausted"
+	holdbackReasonDivergent       = "divergent"
+	holdbackReasonUnconfirmed     = "unconfirmed"
+)
+
 // Why a slot ended up with more than one root.
 const (
 	// causeReorg is the ordinary explanation: the chain reorganised and nodes recorded both
@@ -623,11 +630,12 @@ func (i *Indexer) deleteObjects(ctx context.Context, locations []string) {
 }
 
 // archiveBlocksBeforePurge gives the permanent store its chance at a block before the block's
-// object goes away, and returns the rows that had their turn.
+// object goes away, and returns only the rows whose archive is confirmed.
 //
-// The whole page shares one budget. A row that is not reached inside it is left out of the
-// purge entirely rather than deleted unarchived, so the only cost of a slow permanent store is
-// that these blocks wait for the next cycle — not that every other kind waits for them.
+// The whole page shares one budget. A row that is not reached inside it — or whose wait times
+// out, whose block the queue refused, or whose worker failed — is left out of the purge
+// entirely rather than deleted unarchived, so the only cost of a slow permanent store is that
+// these blocks wait for the next cycle, not that the archive silently loses them.
 func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, error) {
 	if !i.permanentStore.IsEnabled() {
 		return rows, nil
@@ -639,6 +647,7 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 
 	for index, row := range rows {
 		if remaining := time.Until(deadline); remaining <= 0 {
+			i.metrics.ObserveArchiveHoldback(holdbackReasonBudgetExhausted, int64(len(rows)-index))
 			i.log.WithFields(logrus.Fields{
 				"remaining": len(rows) - index,
 				"budget":    i.archiveBudget,
@@ -647,11 +656,27 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 			break
 		}
 
+		divergent, err := i.rowDivergesFromBlob(ctx, row)
+		if err != nil {
+			return nil, err
+		}
+
+		if divergent {
+			i.metrics.ObserveArchiveHoldback(holdbackReasonDivergent, 1)
+			i.log.WithFields(logrus.Fields{
+				KeyBlockRoot: row.Identifier,
+				KeyNetwork:   row.Network,
+			}).Warn("Holding back a block whose bytes disagree with the canonical payload; a canonical row archives this root instead")
+
+			continue
+		}
+
 		block := PermanentStoreBlock{
-			Location:      row.Location,
-			BlockRoot:     row.Identifier,
-			Network:       row.Network,
-			ProcessedChan: make(chan struct{}),
+			Location:  row.Location,
+			BlockRoot: row.Identifier,
+			Network:   row.Network,
+			// Buffered so the worker's result survives a waiter that has already timed out.
+			ProcessedChan: make(chan PermanentStoreResult, 1),
 			//nolint:gosec // This is a valid conversion
 			Slot: phase0.Slot(row.Slot),
 		}
@@ -660,22 +685,56 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 
 		wait := time.NewTimer(min(permanentStoreWaitTimeout, time.Until(deadline)))
 
+		confirmed := false
+
 		select {
-		case <-block.ProcessedChan:
+		case result := <-block.ProcessedChan:
+			confirmed = result.Archived
 		case <-ctx.Done():
 			wait.Stop()
 
 			return nil, ctx.Err()
 		case <-wait.C:
-			i.log.WithField(KeyBlockRoot, row.Identifier).Warn("Timed out waiting for permanent store")
+			i.log.WithField(KeyBlockRoot, row.Identifier).Warn("Timed out waiting for permanent store; the row keeps its object for now")
 		}
 
 		wait.Stop()
+
+		if !confirmed {
+			i.metrics.ObserveArchiveHoldback(holdbackReasonUnconfirmed, 1)
+
+			continue
+		}
 
 		archived = append(archived, row)
 	}
 
 	return archived, nil
+}
+
+// rowDivergesFromBlob reports whether a block row's bytes are known to disagree with the
+// canonical payload for its root, in which case archiving it would preserve a divergent copy
+// as the permanent record. A row with no recorded hash predates verification and is taken at
+// face value. A hashed row whose blob is already gone is archived as-is: when only divergent
+// copies were ever captured, keeping those bytes beats losing the block entirely — at the
+// cost that the archive cannot tell such a copy apart from a clean one.
+func (i *Indexer) rowDivergesFromBlob(ctx context.Context, row *persistence.ExpiringArtifact) (bool, error) {
+	if row.ContentHash == "" {
+		return false, nil
+	}
+
+	dedupKey := persistence.DedupKeyFor(persistence.KindBeaconBlock, row)
+
+	blob, err := i.db.GetBlob(ctx, persistence.KindBeaconBlock, row.Network, dedupKey)
+	if err != nil {
+		if errors.Is(err, persistence.ErrBlobNotFound) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return blob.ContentHash != "" && blob.ContentHash != row.ContentHash, nil
 }
 
 // purgeOrphanedBlobs collects payloads nothing references any more.
@@ -736,15 +795,52 @@ func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCa
 		return false
 	}
 
-	outcome, err := i.db.TombstoneBlob(ctx, candidate)
-	if err != nil {
-		i.metrics.ObserveBlobGCSkipped(skipReasonError)
+	// A candidate already in the deleting state was tombstoned on an earlier pass whose object
+	// delete failed; it owes the store another attempt, not another tombstone. Its generation
+	// was captured back then, so the resurrect guard below still holds.
+	if candidate.State != persistence.BlobStateDeleting {
+		outcome, err := i.db.TombstoneBlob(ctx, candidate)
+		if err != nil {
+			i.metrics.ObserveBlobGCSkipped(skipReasonError)
 
+			if i.blobs.fail(quarantineKey) {
+				i.log.WithError(err).WithFields(logFields).
+					Error("Giving up on collecting this payload; it will be skipped until the process restarts")
+			} else {
+				i.log.WithError(err).WithFields(logFields).Error("Failed to tombstone payload")
+			}
+
+			return false
+		}
+
+		i.blobs.forget(quarantineKey)
+
+		switch outcome {
+		case persistence.BlobTombstoneReferenced:
+			i.metrics.ObserveBlobGCSkipped(skipReasonReferenced)
+			i.log.WithFields(logFields).Debug("Payload is still referenced; repaired its reference count")
+
+			return true
+		case persistence.BlobTombstoneRaced:
+			i.metrics.ObserveBlobGCSkipped(skipReasonRaced)
+
+			return false
+		case persistence.BlobTombstoneMarked:
+		}
+	}
+
+	// Outside the transaction on purpose: the object delete cannot be rolled back, so the
+	// tombstone has to be durable before it happens.
+	if derr := i.store.DeleteMany(ctx, []string{candidate.Location}); derr != nil {
+		i.metrics.ObserveBlobGCSkipped(skipReasonStoreError)
+
+		// The row stays tombstoned and is offered again, within the same bounded allowance a
+		// payload that cannot be evaluated gets.
 		if i.blobs.fail(quarantineKey) {
-			i.log.WithError(err).WithFields(logFields).
-				Error("Giving up on collecting this payload; it will be skipped until the process restarts")
+			i.log.WithError(derr).WithFields(logFields).
+				Error("Giving up on deleting this payload's object; it will be skipped until the process restarts")
 		} else {
-			i.log.WithError(err).WithFields(logFields).Error("Failed to tombstone payload")
+			i.log.WithError(derr).WithFields(logFields).Warn("Failed to delete payload object; leaving it tombstoned for the next pass")
 		}
 
 		return false
@@ -752,35 +848,14 @@ func (i *Indexer) collectBlob(ctx context.Context, candidate *persistence.BlobCa
 
 	i.blobs.forget(quarantineKey)
 
-	switch outcome {
-	case persistence.BlobTombstoneReferenced:
-		i.metrics.ObserveBlobGCSkipped(skipReasonReferenced)
-		i.log.WithFields(logFields).Debug("Payload is still referenced; repaired its reference count")
-
-		return true
-	case persistence.BlobTombstoneRaced:
-		i.metrics.ObserveBlobGCSkipped(skipReasonRaced)
-
-		return false
-	case persistence.BlobTombstoneMarked:
-	}
-
-	// Outside the transaction on purpose: the object delete cannot be rolled back, so the
-	// tombstone has to be durable before it happens.
-	if derr := i.store.DeleteMany(ctx, []string{candidate.Location}); derr != nil {
-		i.metrics.ObserveBlobGCSkipped(skipReasonStoreError)
-		i.log.WithError(derr).WithFields(logFields).Warn("Failed to delete payload object; leaving it tombstoned for the next pass")
-
-		// The row is tombstoned, so it is no longer offered as a candidate either way.
-		return true
-	}
-
 	removed, err := i.db.DeleteTombstonedBlob(ctx, candidate)
 	if err != nil {
 		i.metrics.ObserveBlobGCSkipped(skipReasonError)
 		i.log.WithError(err).WithFields(logFields).Error("Failed to remove tombstoned payload")
 
-		return true
+		// The row stays tombstoned; the next pass retries the delete, which tolerates the
+		// object already being gone.
+		return false
 	}
 
 	if !removed {

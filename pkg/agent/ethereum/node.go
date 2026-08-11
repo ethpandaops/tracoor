@@ -20,8 +20,14 @@ type Node struct {
 
 	onReadyCallbacks []func(ctx context.Context) error
 
+	// readyMu guards the readiness flags and readyFired: beacon and execution
+	// readiness land on separate goroutines, and the OnReady callbacks must run
+	// exactly once — with whichever readiness arrives last — because they start
+	// the agent's worker set.
+	readyMu        sync.Mutex
 	executionReady bool
 	beaconReady    bool
+	readyFired     bool
 
 	syncToleranceSlots phase0.Slot
 
@@ -64,17 +70,13 @@ func (n *Node) Beacon() *beacon.Node {
 
 func (n *Node) Start(ctx context.Context) error {
 	n.beacon.OnReady(ctx, func(ctx context.Context) error {
-		n.beaconReady = true
-
-		n.checkReadyPublish(ctx)
+		n.markBeaconReady(ctx)
 
 		return nil
 	})
 
 	n.execution.OnReady(ctx, func(ctx context.Context) error {
-		n.executionReady = true
-
-		n.checkReadyPublish(ctx)
+		n.markExecutionReady(ctx)
 
 		return nil
 	})
@@ -107,12 +109,42 @@ func (n *Node) OnReady(_ context.Context, callback func(ctx context.Context) err
 	n.onReadyCallbacks = append(n.onReadyCallbacks, callback)
 }
 
+func (n *Node) markBeaconReady(ctx context.Context) {
+	n.readyMu.Lock()
+	n.beaconReady = true
+	n.readyMu.Unlock()
+
+	n.checkReadyPublish(ctx)
+}
+
+func (n *Node) markExecutionReady(ctx context.Context) {
+	n.readyMu.Lock()
+	n.executionReady = true
+	n.readyMu.Unlock()
+
+	n.checkReadyPublish(ctx)
+}
+
+// checkReadyPublish fires the OnReady callbacks once both nodes are ready.
+// readyFired is claimed under the lock so the callbacks run exactly once, on
+// whichever readiness landed last; they run outside it because they are the
+// caller's code and may block.
 func (n *Node) checkReadyPublish(ctx context.Context) {
-	if n.beaconReady && n.executionReady {
-		for _, callback := range n.onReadyCallbacks {
-			if err := callback(ctx); err != nil {
-				n.log.WithError(err).Error("error executing on_ready callback")
-			}
+	n.readyMu.Lock()
+
+	if !n.beaconReady || !n.executionReady || n.readyFired {
+		n.readyMu.Unlock()
+
+		return
+	}
+
+	n.readyFired = true
+
+	n.readyMu.Unlock()
+
+	for _, callback := range n.onReadyCallbacks {
+		if err := callback(ctx); err != nil {
+			n.log.WithError(err).Error("error executing on_ready callback")
 		}
 	}
 }

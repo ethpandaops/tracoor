@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,4 +99,42 @@ func TestBlobGetMissing(t *testing.T) {
 
 	_, err = indexer.GetBlob(context.Background(), "beacon_state", "mainnet", "missing")
 	require.ErrorIs(t, err, ErrBlobNotFound)
+}
+
+// A tombstoned blob stays a candidate: its object delete may have failed, and nothing else
+// ever drives a retry for a row in the deleting state.
+func TestListCollectableBlobsOffersTombstonedBlobs(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	blob := &Blob{
+		Kind:        "beacon_state",
+		Network:     "mainnet",
+		DedupKey:    "500/0xcccc",
+		ContentHash: generateRandomString(64),
+		Location:    "states/tombstoned",
+		CreatedAt:   time.Now().UTC().Add(-time.Hour),
+	}
+
+	_, err = indexer.InsertBlob(ctx, blob)
+	require.NoError(t, err)
+
+	cutoff := time.Now().UTC()
+
+	candidates, err := indexer.ListCollectableBlobs(ctx, cutoff, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	assert.Equal(t, BlobStateReady, candidates[0].State)
+
+	outcome, err := indexer.TombstoneBlob(ctx, candidates[0])
+	require.NoError(t, err)
+	require.Equal(t, BlobTombstoneMarked, outcome)
+
+	candidates, err = indexer.ListCollectableBlobs(ctx, cutoff, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1, "a tombstoned blob is offered again so its object delete can be retried")
+	assert.Equal(t, BlobStateDeleting, candidates[0].State)
+	assert.Equal(t, blob.Generation, candidates[0].Generation, "the generation guard carries through the retry")
 }

@@ -346,32 +346,3 @@ func (i *Indexer) DeleteExecutionPayloadEnvelope(ctx context.Context, id string)
 
 	return nil
 }
-
-func (i *Indexer) UpdateExecutionPayloadEnvelope(ctx context.Context, envelope *ExecutionPayloadEnvelope) error {
-	operation := OperationUpdateExecutionPayloadEnvelope
-
-	i.metrics.ObserveOperation(operation)
-
-	query := i.db.WithContext(ctx)
-
-	result := query.Save(envelope)
-	if result.Error != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("execution payload envelope not found")
-	}
-
-	if result.RowsAffected != 1 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("execution payload envelope update affected more than one row")
-	}
-
-	return nil
-}

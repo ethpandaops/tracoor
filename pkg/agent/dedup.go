@@ -43,7 +43,21 @@ const (
 	// will lend to another node's upload before giving up on it and reading its
 	// own node instead. Half leaves enough budget to actually do that.
 	dedupFlightBudgetShare = 2
+
+	// finalizeTimeout bounds the work that remains once a payload has been read
+	// in full: publishing the staged object, removing it, and recording what
+	// was stored.
+	finalizeTimeout = 30 * time.Second
 )
+
+// finalizeContext detaches finalization from the attempt's fetch budget. That
+// budget bounds reads of the node; letting it also kill the steps after a
+// completed read strands a fully-read payload half-published — a staged object
+// nothing references, or a published object no row records — on every deadline
+// expiry or shutdown that lands between the read and the record.
+func finalizeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), finalizeTimeout)
+}
 
 // dedupFlight collapses the compress-and-upload work for one dedup key. In
 // single mode every agent in the process reacts to the same event for the same
@@ -83,14 +97,17 @@ func (t *dedupTarget) flightKey() string {
 
 // finalLocation is where a payload with this content hash belongs. Two nodes
 // that disagree under one dedup key land on different objects, so neither can
-// overwrite the evidence the other left.
+// overwrite the evidence the other left. The compression extension rides on
+// the name so a downloaded copy still says what its bytes are when the
+// Content-Encoding header is lost, and so a row missing its encoding can fall
+// back to the location.
 func (t *dedupTarget) finalLocation(contentHash string) string {
 	suffix := contentHash
 	if len(suffix) > contentHashSuffixLength {
 		suffix = suffix[:contentHashSuffixLength]
 	}
 
-	return path.Join(t.directory, fmt.Sprintf("%s-%s%s", t.identity, suffix, t.extension))
+	return path.Join(t.directory, fmt.Sprintf("%s-%s%s%s", t.identity, suffix, t.extension, compression.Default.Extension))
 }
 
 // stagingLocation is where a payload is written while its content hash is still
@@ -245,7 +262,18 @@ func (s *agent) indexDeduplicated(
 		return err
 	}
 
-	err = create(ctx, outcome)
+	// The payload is read and its objects are settled by the time a row is
+	// written, so each write runs on a finalization clock of its own: an item
+	// whose fetch budget expired during the read can still be indexed instead
+	// of leaving its object recorded by a blob and referenced by no row.
+	createFinal := func(outcome *dedupOutcome) error {
+		fctx, cancel := finalizeContext(ctx)
+		defer cancel()
+
+		return create(fctx, outcome)
+	}
+
+	err = createFinal(outcome)
 
 	switch status.Code(err) { //nolint:exhaustive // only these codes change what happens next.
 	case codes.OK, codes.AlreadyExists:
@@ -272,15 +300,17 @@ func (s *agent) indexDeduplicated(
 			return herr
 		}
 
-		if cerr := create(ctx, outcome); cerr != nil && status.Code(cerr) != codes.AlreadyExists {
-			return cerr
+		if cerr := createFinal(outcome); cerr != nil && status.Code(cerr) != codes.AlreadyExists {
+			return fmt.Errorf("%w: failed to index artifact: %w", errIndexerUnavailable, cerr)
 		}
 
 		s.recordIndexed(target, outcome)
 
 		return nil
 	default:
-		return err
+		// The row write is an indexer RPC, so its failure describes the server
+		// rather than the node the payload was read from.
+		return fmt.Errorf("%w: failed to index artifact: %w", errIndexerUnavailable, err)
 	}
 }
 
@@ -445,7 +475,13 @@ func (s *agent) claimByUploading(ctx context.Context, target *dedupTarget, fetch
 		return nil, err
 	}
 
-	rsp, err := s.indexer.CreateBlob(ctx, &indexer.CreateBlobRequest{
+	// The payload is published; recording it runs on the finalization clock so
+	// a fetch budget that expired during the read cannot leave the object
+	// referenced by nothing.
+	fctx, cancel := finalizeContext(ctx)
+	defer cancel()
+
+	rsp, err := s.indexer.CreateBlob(fctx, &indexer.CreateBlobRequest{
 		Kind:            wrapperspb.String(string(target.kind)),
 		Network:         wrapperspb.String(target.network),
 		DedupKey:        wrapperspb.String(target.dedupKey),
@@ -459,7 +495,7 @@ func (s *agent) claimByUploading(ctx context.Context, target *dedupTarget, fetch
 		// The object stays where it is. Removing it would destroy a payload
 		// other rows may already point at if the call did land and only its
 		// response was lost.
-		return nil, fmt.Errorf("failed to record payload: %w", err)
+		return nil, fmt.Errorf("%w: failed to record payload: %w", errIndexerUnavailable, err)
 	}
 
 	if rsp.GetBlob() == nil {
@@ -471,8 +507,13 @@ func (s *agent) claimByUploading(ctx context.Context, target *dedupTarget, fetch
 
 // settleOwnUpload decides what a row should point at when this node did the
 // storing. Winning outright is the common case; the rest is what happens when
-// another agent claimed the same key first.
+// another agent claimed the same key first. Everything here runs after the
+// payload was read and stored, so it runs on the finalization clock rather
+// than the fetch budget.
 func (s *agent) settleOwnUpload(ctx context.Context, target *dedupTarget, claim *blobClaim) (*dedupOutcome, error) {
+	ctx, cancel := finalizeContext(ctx)
+	defer cancel()
+
 	var (
 		now      = time.Now()
 		ours     = claim.own
@@ -631,18 +672,25 @@ func (s *agent) uploadPayload(ctx context.Context, target *dedupTarget, fetcher 
 		return nil, err
 	}
 
+	// The node's part is over: the payload is read in full and staged. What
+	// remains is against the store alone, and runs on the finalization clock —
+	// a fetch budget that expired during the read, or a shutdown, must not
+	// strand the staged object with nothing referencing it.
+	fctx, cancel := finalizeContext(ctx)
+	defer cancel()
+
 	final := target.finalLocation(result.ContentHash)
 
-	if err := s.store.Copy(ctx, &store.CopyParams{Source: saved, Destination: final}); err != nil {
+	if err := s.store.Copy(fctx, &store.CopyParams{Source: saved, Destination: final}); err != nil {
 		// Nothing points at the staged object, so it is safe to take with us.
-		if rerr := target.remove(ctx, saved); rerr != nil {
+		if rerr := target.remove(fctx, saved); rerr != nil {
 			s.log.WithField("location", saved).WithError(rerr).Debug("Failed to remove a staged payload")
 		}
 
 		return nil, fmt.Errorf("%w: failed to publish payload: %w", errStoreUnavailable, err)
 	}
 
-	if err := target.remove(ctx, saved); err != nil {
+	if err := target.remove(fctx, saved); err != nil {
 		s.log.WithField("location", saved).WithError(err).Warn("Failed to remove a staged payload")
 	}
 
@@ -701,7 +749,7 @@ func (s *agent) getBlob(ctx context.Context, target *dedupTarget) (*indexer.Blob
 			return nil, false, nil
 		}
 
-		return nil, false, fmt.Errorf("failed to look up payload: %w", err)
+		return nil, false, fmt.Errorf("%w: failed to look up payload: %w", errIndexerUnavailable, err)
 	}
 
 	blob := rsp.GetBlob()
@@ -735,6 +783,12 @@ func (s *agent) recordDivergence(
 		WithField("actual_hash", actual).
 		WithField("attempt", attempt).
 		Warn("Node served a payload that does not match the one already stored")
+
+	// The mismatch is already observed by the time it is recorded, so the record runs on the
+	// finalization clock: divergence evidence must not be lost to a fetch budget that expired
+	// during the read that produced it.
+	ctx, cancel := finalizeContext(ctx)
+	defer cancel()
 
 	if _, err := s.indexer.CreatePayloadDivergence(ctx, &indexer.CreatePayloadDivergenceRequest{
 		ObservedAt:   timestamppb.New(time.Now()),

@@ -619,7 +619,7 @@ func TestArchivingBeforePurgeIsBoundedPerPage(t *testing.T) {
 
 	defer func() { require.NoError(t, cleanup()) }()
 
-	// The permanent store is never started, so nothing ever reports a block as processed.
+	// The permanent store is never started, so nothing ever reports a block as archived.
 	index.archiveBudget = 50 * time.Millisecond
 
 	rows := make([]*persistence.ExpiringArtifact, 0, 20)
@@ -639,8 +639,211 @@ func TestArchivingBeforePurgeIsBoundedPerPage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Less(t, time.Since(start), 5*time.Second, "the page has one budget, not one per row")
-	require.NotEmpty(t, archived)
-	require.Less(t, len(archived), len(rows), "the rows that did not get their turn keep their objects")
+	require.Empty(t, archived, "a row the permanent store never confirmed keeps its object")
+}
+
+// A row is only released to the purge once its block is verifiably in the permanent store: a
+// worker failure — here, a source object that is already gone — holds the row back for the
+// next cycle instead of letting the purge delete the only copy.
+func TestArchiveBlocksBeforePurgeHoldsBackFailedArchives(t *testing.T) {
+	ctx := context.Background()
+
+	config := expireImmediately()
+	config.PermanentStore.Blocks.Enabled = true
+
+	index, cleanup, err := NewMockIndexer(ctx, config)
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cleanup()) }()
+
+	require.NoError(t, index.permanentStore.Start(ctx))
+
+	network := generateRandomString(6)
+	goodLocation := "blocks/" + generateRandomString(8) + ".ssz"
+
+	saveObject(ctx, t, index, goodLocation)
+
+	rows := []*persistence.ExpiringArtifact{
+		{ID: "missing-object", Location: "blocks/" + generateRandomString(8) + ".ssz", Network: network, Slot: 1, Identifier: "root-missing"},
+		{ID: "archivable", Location: goodLocation, Network: network, Slot: 2, Identifier: "root-good"},
+	}
+
+	archived, err := index.archiveBlocksBeforePurge(ctx, rows)
+	require.NoError(t, err)
+
+	require.Len(t, archived, 1, "the row whose copy failed is held back")
+	require.Equal(t, "archivable", archived[0].ID)
+
+	exists, err := index.Store().Exists(ctx, "permanent/"+network+"/root-good.ssz")
+	require.NoError(t, err)
+	require.True(t, exists, "the released row's block is in the permanent store")
+}
+
+// A block whose bytes are known to disagree with the canonical payload must not become the
+// permanent record for its root; a canonical row archives it instead. A hashed row whose blob
+// is already gone is archived as-is — losing the block entirely would be worse.
+func TestArchiveBlocksBeforePurgeHoldsBackDivergentRows(t *testing.T) {
+	ctx := context.Background()
+
+	config := expireImmediately()
+	config.PermanentStore.Blocks.Enabled = true
+
+	index, cleanup, err := NewMockIndexer(ctx, config)
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cleanup()) }()
+
+	require.NoError(t, index.permanentStore.Start(ctx))
+
+	network := generateRandomString(6)
+	canonicalHash := generateRandomContentHash()
+	canonicalLocation := "blocks/" + generateRandomString(8) + ".ssz"
+	divergentLocation := "blocks/" + generateRandomString(8) + ".ssz"
+	orphanLocation := "blocks/" + generateRandomString(8) + ".ssz"
+
+	for _, location := range []string{canonicalLocation, divergentLocation, orphanLocation} {
+		saveObject(ctx, t, index, location)
+	}
+
+	_, err = index.db.InsertBlob(ctx, &persistence.Blob{
+		Kind:        persistence.KindBeaconBlock,
+		Network:     network,
+		DedupKey:    "100/root-shared",
+		ContentHash: canonicalHash,
+		Location:    canonicalLocation,
+	})
+	require.NoError(t, err)
+
+	rows := []*persistence.ExpiringArtifact{
+		{ID: "divergent", Location: divergentLocation, ContentHash: generateRandomContentHash(), Network: network, Slot: 100, Identifier: "root-shared"},
+		{ID: "canonical", Location: canonicalLocation, ContentHash: canonicalHash, Network: network, Slot: 100, Identifier: "root-shared"},
+		{ID: "no-blob", Location: orphanLocation, ContentHash: generateRandomContentHash(), Network: network, Slot: 101, Identifier: "root-orphan"},
+	}
+
+	archived, err := index.archiveBlocksBeforePurge(ctx, rows)
+	require.NoError(t, err)
+
+	ids := make([]string, 0, len(archived))
+	for _, row := range archived {
+		ids = append(ids, row.ID)
+	}
+
+	require.ElementsMatch(t, []string{"canonical", "no-blob"}, ids,
+		"the divergent copy is held back; the canonical row and the blob-less fallback archive")
+}
+
+// A blob tombstoned by a pass whose object delete failed must be offered again: nothing else
+// ever retries that delete, and the row and its object would otherwise leak for ever.
+func TestBlobCollectionRetriesTombstonedBlobs(t *testing.T) {
+	ctx := context.Background()
+
+	index, cleanup, err := NewMockIndexer(ctx, expireImmediately())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cleanup()) }()
+
+	network := generateRandomString(6)
+	location := "states/" + generateRandomString(8) + ".ssz"
+	dedupKey := "1100/root-f"
+
+	saveObject(ctx, t, index, location)
+
+	_, err = index.db.InsertBlob(ctx, &persistence.Blob{
+		Kind:        persistence.KindBeaconState,
+		Network:     network,
+		DedupKey:    dedupKey,
+		ContentHash: generateRandomContentHash(),
+		Location:    location,
+		CreatedAt:   time.Now().UTC().Add(-time.Hour),
+	})
+	require.NoError(t, err)
+
+	// Tombstone as an earlier pass would have, and leave the object in place to simulate its
+	// delete having failed after the tombstone became durable.
+	outcome, err := index.db.TombstoneBlob(ctx, &persistence.BlobCandidate{
+		Kind:     persistence.KindBeaconState,
+		Network:  network,
+		DedupKey: dedupKey,
+		Location: location,
+	})
+	require.NoError(t, err)
+	require.Equal(t, persistence.BlobTombstoneMarked, outcome)
+
+	require.NoError(t, index.purgeOrphanedBlobs(ctx))
+
+	exists, err := index.Store().Exists(ctx, location)
+	require.NoError(t, err)
+	require.False(t, exists, "the next pass retries and completes the object delete")
+
+	candidates, err := index.db.ListCollectableBlobs(ctx, time.Now().UTC().Add(time.Hour), 10, 0)
+	require.NoError(t, err)
+	require.Empty(t, candidates, "the tombstoned row is gone once its object is")
+}
+
+// A stale tombstone retry must not touch a blob that has been resurrected since: the new
+// generation owns a new object and only the old generation's location may be emptied.
+func TestBlobCollectionRetryLeavesResurrectedBlobsAlone(t *testing.T) {
+	ctx := context.Background()
+
+	index, cleanup, err := NewMockIndexer(ctx, expireImmediately())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cleanup()) }()
+
+	network := generateRandomString(6)
+	oldLocation := "states/" + generateRandomString(8) + ".ssz"
+	newLocation := "states/" + generateRandomString(8) + ".ssz"
+	dedupKey := "1200/root-g"
+
+	saveObject(ctx, t, index, oldLocation)
+	saveObject(ctx, t, index, newLocation)
+
+	_, err = index.db.InsertBlob(ctx, &persistence.Blob{
+		Kind:        persistence.KindBeaconState,
+		Network:     network,
+		DedupKey:    dedupKey,
+		ContentHash: generateRandomContentHash(),
+		Location:    oldLocation,
+		CreatedAt:   time.Now().UTC().Add(-time.Hour),
+	})
+	require.NoError(t, err)
+
+	stale := &persistence.BlobCandidate{
+		Kind:     persistence.KindBeaconState,
+		Network:  network,
+		DedupKey: dedupKey,
+		Location: oldLocation,
+		State:    persistence.BlobStateDeleting,
+	}
+
+	outcome, err := index.db.TombstoneBlob(ctx, stale)
+	require.NoError(t, err)
+	require.Equal(t, persistence.BlobTombstoneMarked, outcome)
+
+	// The blob comes back at a new location while the stale candidate is still in hand.
+	revived, err := index.db.InsertBlob(ctx, &persistence.Blob{
+		Kind:        persistence.KindBeaconState,
+		Network:     network,
+		DedupKey:    dedupKey,
+		ContentHash: generateRandomContentHash(),
+		Location:    newLocation,
+	})
+	require.NoError(t, err)
+	require.Equal(t, persistence.BlobStateReady, revived.State)
+
+	require.True(t, index.collectBlob(ctx, stale), "the stale candidate leaves the candidate set")
+
+	blob, err := index.db.GetBlob(ctx, persistence.KindBeaconState, network, dedupKey)
+	require.NoError(t, err)
+	require.Equal(t, newLocation, blob.Location, "the resurrected generation survives untouched")
+
+	exists, err := index.Store().Exists(ctx, newLocation)
+	require.NoError(t, err)
+	require.True(t, exists, "the new generation's object survives")
+
+	exists, err = index.Store().Exists(ctx, oldLocation)
+	require.NoError(t, err)
+	require.False(t, exists, "the old generation's object is emptied as the tombstone promised")
 }
 
 // The divergence log is written by every node on every mismatch, so it needs a bound of its own.

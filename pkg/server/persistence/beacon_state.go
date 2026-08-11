@@ -345,32 +345,3 @@ func (i *Indexer) DeleteBeaconState(ctx context.Context, id string) error {
 
 	return nil
 }
-
-func (i *Indexer) UpdateBeaconState(ctx context.Context, state *BeaconState) error {
-	operation := OperationUpdateBeaconState
-
-	i.metrics.ObserveOperation(operation)
-
-	query := i.db.WithContext(ctx)
-
-	result := query.Save(state)
-	if result.Error != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon state not found")
-	}
-
-	if result.RowsAffected != 1 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon state update affected more than one row")
-	}
-
-	return nil
-}
