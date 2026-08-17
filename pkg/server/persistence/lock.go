@@ -2,12 +2,12 @@ package persistence
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -15,97 +15,54 @@ const (
 	logKeyOwner = "owner"
 )
 
-// DistributedLock represents a lock in the database.
+// DistributedLock is acquired by a single atomic conditional upsert. There is no
+// soft delete: a released lock is a deleted row.
 type DistributedLock struct {
-	gorm.Model
-	Key       string `gorm:"uniqueIndex"`
-	Owner     string
-	ExpiresAt time.Time
+	Key       string    `gorm:"primaryKey"`
+	Owner     string    `gorm:"not null;default:''"`
+	ExpiresAt time.Time `gorm:"not null;index:ix_distributed_locks_expires_at"`
 }
 
-// AcquireLock attempts to acquire a lock with the given key.
-// It returns true if the lock was acquired, false otherwise.
-func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error) {
-	// First, clean up expired locks
-	if err := i.cleanupExpiredLocks(ctx); err != nil {
-		return false, errors.Wrap(err, "failed to cleanup expired locks")
-	}
+// BeforeSave keeps the lease in UTC, so a lock taken by one process is honoured by another
+// whatever zone either of them runs in.
+func (l *DistributedLock) BeforeSave(*gorm.DB) error {
+	l.ExpiresAt = utcBound(l.ExpiresAt)
 
-	// Try to acquire the lock
-	expiresAt := time.Now().Add(ttl)
-	lock := &DistributedLock{
+	return nil
+}
+
+// AcquireLock attempts to acquire the lock with the given key, taking it over when the
+// current holder's lease has expired and extending it when the caller already owns it.
+// A lock held by someone else is reported as (false, nil), not an error.
+func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error) {
+	now := time.Now().UTC()
+	expiresAt := now.Add(ttl)
+
+	result := i.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"owner":      owner,
+			"expires_at": expiresAt,
+		}),
+		Where: clause.Where{Exprs: []clause.Expression{
+			gorm.Expr("distributed_locks.expires_at < ? OR distributed_locks.owner = ?", now, owner),
+		}},
+	}).Create(&DistributedLock{
 		Key:       key,
 		Owner:     owner,
 		ExpiresAt: expiresAt,
+	})
+	if result.Error != nil {
+		return false, errors.Wrap(result.Error, "failed to acquire lock")
 	}
 
-	// Use a transaction to ensure atomicity
-	err := i.db.Transaction(func(tx *gorm.DB) error {
-		// Check if the lock exists (including soft-deleted records)
-		var existingLock DistributedLock
-
-		result := tx.Unscoped().Where("key = ?", key).First(&existingLock)
-		if result.Error != nil {
-			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				// Lock doesn't exist, create it
-				if err := tx.Create(lock).Error; err != nil {
-					return errors.Wrap(err, "failed to create lock")
-				}
-
-				return nil
-			}
-
-			return errors.Wrap(result.Error, "failed to check if lock exists")
-		}
-
-		// If the lock was soft-deleted, permanently delete it and create a new one
-		if existingLock.DeletedAt.Valid {
-			if err := tx.Unscoped().Delete(&existingLock).Error; err != nil {
-				return errors.Wrap(err, "failed to delete soft-deleted lock")
-			}
-
-			if err := tx.Create(lock).Error; err != nil {
-				return errors.Wrap(err, "failed to create lock after deleting soft-deleted lock")
-			}
-
-			return nil
-		}
-
-		// Lock exists, check if it's expired
-		if existingLock.ExpiresAt.Before(time.Now()) {
-			// Lock is expired, update it
-			existingLock.Owner = owner
-			existingLock.ExpiresAt = expiresAt
-
-			if err := tx.Save(&existingLock).Error; err != nil {
-				return errors.Wrap(err, "failed to update expired lock")
-			}
-
-			return nil
-		}
-
-		// Lock exists and is not expired, check if we own it
-		if existingLock.Owner == owner {
-			// We own the lock, extend it
-			existingLock.ExpiresAt = expiresAt
-			if err := tx.Save(&existingLock).Error; err != nil {
-				return errors.Wrap(err, "failed to extend lock")
-			}
-
-			return nil
-		}
-
-		// Lock is owned by someone else
-		return fmt.Errorf("lock is owned by %s until %s", existingLock.Owner, existingLock.ExpiresAt)
-	})
-	if err != nil {
+	if result.RowsAffected == 0 {
 		i.log.WithFields(logrus.Fields{
 			logKeyLock:  key,
 			logKeyOwner: owner,
-			"error":     err.Error(),
-		}).Debug("Failed to acquire lock")
+		}).Debug("Lock is held by another owner")
 
-		return false, errors.Wrap(err, "failed to acquire lock")
+		return false, nil
 	}
 
 	i.log.WithFields(logrus.Fields{
@@ -119,7 +76,7 @@ func (i *Indexer) AcquireLock(ctx context.Context, key, owner string, ttl time.D
 
 // ReleaseLock releases a lock with the given key if it's owned by the given owner.
 func (i *Indexer) ReleaseLock(ctx context.Context, key, owner string) error {
-	result := i.db.Where("key = ? AND owner = ?", key, owner).Delete(&DistributedLock{})
+	result := i.db.WithContext(ctx).Where("key = ? AND owner = ?", key, owner).Delete(&DistributedLock{})
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "failed to release lock")
 	}
@@ -141,10 +98,10 @@ func (i *Indexer) ReleaseLock(ctx context.Context, key, owner string) error {
 	return nil
 }
 
-// cleanupExpiredLocks removes all expired locks from the database.
-func (i *Indexer) cleanupExpiredLocks(_ context.Context) error {
-	// Use Unscoped() to permanently delete the records instead of soft-deleting them
-	result := i.db.Unscoped().Where("expires_at < ?", time.Now()).Delete(&DistributedLock{})
+// cleanupExpiredLocks removes all expired locks from the database. Acquisition does not
+// depend on it; it only keeps abandoned rows from accumulating.
+func (i *Indexer) cleanupExpiredLocks(ctx context.Context) error {
+	result := i.db.WithContext(ctx).Where("expires_at < ?", time.Now().UTC()).Delete(&DistributedLock{})
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "failed to cleanup expired locks")
 	}

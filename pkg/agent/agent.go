@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	//nolint:gosec // only exposed if pprofAddr config is set
@@ -31,6 +28,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// indexerClient is the part of the indexer the agent actually calls. It is
+// named here rather than in the client package so the fetch paths can be
+// exercised without a server on the other end.
+type indexerClient interface {
+	CreateBeaconState(ctx context.Context, req *pIndexer.CreateBeaconStateRequest) (*pIndexer.CreateBeaconStateResponse, error)
+	ListBeaconState(ctx context.Context, req *pIndexer.ListBeaconStateRequest) (*pIndexer.ListBeaconStateResponse, error)
+	CreateBeaconBlock(ctx context.Context, req *pIndexer.CreateBeaconBlockRequest) (*pIndexer.CreateBeaconBlockResponse, error)
+	ListBeaconBlock(ctx context.Context, req *pIndexer.ListBeaconBlockRequest) (*pIndexer.ListBeaconBlockResponse, error)
+	CreateExecutionPayloadEnvelope(ctx context.Context, req *pIndexer.CreateExecutionPayloadEnvelopeRequest) (*pIndexer.CreateExecutionPayloadEnvelopeResponse, error)
+	ListExecutionPayloadEnvelope(ctx context.Context, req *pIndexer.ListExecutionPayloadEnvelopeRequest) (*pIndexer.ListExecutionPayloadEnvelopeResponse, error)
+	CreateBeaconBadBlock(ctx context.Context, req *pIndexer.CreateBeaconBadBlockRequest) (*pIndexer.CreateBeaconBadBlockResponse, error)
+	ListBeaconBadBlock(ctx context.Context, req *pIndexer.ListBeaconBadBlockRequest) (*pIndexer.ListBeaconBadBlockResponse, error)
+	CreateBeaconBadBlob(ctx context.Context, req *pIndexer.CreateBeaconBadBlobRequest) (*pIndexer.CreateBeaconBadBlobResponse, error)
+	ListBeaconBadBlob(ctx context.Context, req *pIndexer.ListBeaconBadBlobRequest) (*pIndexer.ListBeaconBadBlobResponse, error)
+	CreateExecutionBlockTrace(ctx context.Context, req *pIndexer.CreateExecutionBlockTraceRequest) (*pIndexer.CreateExecutionBlockTraceResponse, error)
+	ListExecutionBlockTrace(ctx context.Context, req *pIndexer.ListExecutionBlockTraceRequest) (*pIndexer.ListExecutionBlockTraceResponse, error)
+	CreateExecutionBadBlock(ctx context.Context, req *pIndexer.CreateExecutionBadBlockRequest) (*pIndexer.CreateExecutionBadBlockResponse, error)
+	ListExecutionBadBlock(ctx context.Context, req *pIndexer.ListExecutionBadBlockRequest) (*pIndexer.ListExecutionBadBlockResponse, error)
+	GetStorageHandshakeToken(ctx context.Context, req *pIndexer.GetStorageHandshakeTokenRequest) (*pIndexer.GetStorageHandshakeTokenResponse, error)
+	GetBlob(ctx context.Context, req *pIndexer.GetBlobRequest) (*pIndexer.GetBlobResponse, error)
+	CreateBlob(ctx context.Context, req *pIndexer.CreateBlobRequest) (*pIndexer.CreateBlobResponse, error)
+	CreatePayloadDivergence(ctx context.Context, req *pIndexer.CreatePayloadDivergenceRequest) (*pIndexer.CreatePayloadDivergenceResponse, error)
+}
+
+var _ indexerClient = (*indexer.Client)(nil)
+
 type agent struct {
 	Config *Config
 
@@ -42,7 +65,7 @@ type agent struct {
 
 	scheduler *gocron.Scheduler
 
-	indexer *indexer.Client
+	indexer indexerClient
 
 	store store.Store
 
@@ -55,6 +78,16 @@ type agent struct {
 	executionBadBlockQueue        chan *ExecutionBadBlockRequest
 
 	compressor *compression.Compressor
+
+	breaker *circuitBreaker
+
+	// pending collapses duplicate work: a reorg re-derives the same slots for
+	// every artifact kind, and the queues block on send.
+	pending *pendingItems
+
+	// workers tracks every background loop the agent owns so a shutdown can
+	// wait for them instead of abandoning them mid-fetch.
+	workers workerGroup
 }
 
 const (
@@ -64,7 +97,12 @@ const (
 	logKeySlot    = "slot"
 	labelAgent    = "agent"
 	labelQueue    = "queue"
+	labelReason   = "reason"
 )
+
+// blockSettleDelay is how long after a block event the slot's artifacts are
+// fetched, giving the beacon node time to make the state and block queryable.
+const blockSettleDelay = 2 * time.Second
 
 func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, error) {
 	if config == nil {
@@ -103,10 +141,18 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		executionBlockTraceQueue:      make(chan *ExecutionBlockTraceRequest, 1000),
 		executionBadBlockQueue:        make(chan *ExecutionBadBlockRequest, 1000),
 		compressor:                    compression.NewCompressor(),
+		breaker:                       newCircuitBreaker(),
+		pending:                       newPendingItems(),
 	}, nil
 }
 
 func (s *agent) Start(ctx context.Context) error {
+	// Everything this agent owns hangs off a context of its own so that a node
+	// that becomes unusable can stop this agent's workers without disturbing
+	// whatever else shares the process.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	if s.Config.MetricsAddr != "" {
 		observability.StartMetricsServer(ctx, s.Config.MetricsAddr)
 	}
@@ -127,8 +173,8 @@ func (s *agent) Start(ctx context.Context) error {
 	s.node.OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Ethereum node is ready, setting up beacon and execution events")
 
-		go s.processExecutionBlockTraceQueue(ctx)
-		go s.processExecutionBadBlockQueue(ctx)
+		s.workers.Go(func() { s.processExecutionBlockTraceQueue(ctx) })
+		s.workers.Go(func() { s.processExecutionBadBlockQueue(ctx) })
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			if !s.Config.Ethereum.Features.GetFetchExecutionBlockTrace() {
@@ -155,11 +201,7 @@ func (s *agent) Start(ctx context.Context) error {
 				return nil
 			}
 
-			if err := s.enqueueExecutionBlockTraceForBeaconBlock(ctx, fmt.Sprintf("%#x", event.Block)); err != nil {
-				logCtx.WithError(err).Error("Failed to queue execution block trace from beacon block event")
-
-				return err
-			}
+			s.enqueueExecutionBlockTrace(ctx, fmt.Sprintf("%#x", event.Block))
 
 			return nil
 		})
@@ -170,15 +212,18 @@ func (s *agent) Start(ctx context.Context) error {
 	s.node.Beacon().OnReady(ctx, func(ctx context.Context) error {
 		s.log.Info("Beacon node is ready, setting up events that only depend on the beacon node")
 
-		go s.processBeaconStateQueue(ctx)
-		go s.processBeaconBlockQueue(ctx)
-		go s.processExecutionPayloadEnvelopeQueue(ctx)
-		go s.processBeaconBadBlockQueue(ctx)
-		go s.processBeaconBadBlobQueue(ctx)
-
+		// Everything this agent records is addressed by network, so without one
+		// there is nothing worth starting. This agent stops; the process, and
+		// every other agent in it, is none the wiser.
 		if s.node.Beacon().Metadata().Network.Name == networks.NetworkNameUnknown {
-			s.log.Fatal("Unable to determine Ethereum network. Provide an override network name via ethereum.overrideNetworkName")
+			return errors.New("unable to determine ethereum network, provide an override network name via ethereum.overrideNetworkName")
 		}
+
+		s.workers.Go(func() { s.processBeaconStateQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBlockQueue(ctx) })
+		s.workers.Go(func() { s.processExecutionPayloadEnvelopeQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBadBlockQueue(ctx) })
+		s.workers.Go(func() { s.processBeaconBadBlobQueue(ctx) })
 
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			logCtx := s.log.WithFields(logrus.Fields{
@@ -198,11 +243,23 @@ func (s *agent) Start(ctx context.Context) error {
 				return nil
 			}
 
-			time.Sleep(2000 * time.Millisecond)
+			// The settle delay runs on a tracked worker rather than in this
+			// callback: the beacon library dispatches events synchronously, so
+			// sleeping here would hold up every later event from this node.
+			s.workers.Go(func() {
+				timer := time.NewTimer(blockSettleDelay)
+				defer timer.Stop()
 
-			s.enqueueBeaconState(ctx, event.Slot)
-			s.enqueueBeaconBlock(ctx, event.Slot)
-			s.enqueueExecutionPayloadEnvelope(ctx, event.Slot)
+				select {
+				case <-ctx.Done():
+					return
+				case <-timer.C:
+				}
+
+				s.enqueueBeaconState(ctx, event.Slot)
+				s.enqueueBeaconBlock(ctx, event.Slot)
+				s.enqueueExecutionPayloadEnvelope(ctx, event.Slot)
+			})
 
 			return nil
 		})
@@ -245,15 +302,11 @@ func (s *agent) Start(ctx context.Context) error {
 					continue
 				}
 
-				logCtx := logrus.WithField("target_slot", slot)
+				logrus.
+					WithField("target_slot", slot).
+					Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
 
-				logCtx.Info("Queueing up a fresh execution block trace index after a beacon chain reorg")
-
-				if err := s.enqueueExecutionBlockTraceForBeaconBlock(ctx, fmt.Sprintf("%d", slot)); err != nil {
-					logCtx.WithError(err).Error("Failed to queue execution block trace after a beacon chain reorg")
-
-					return err
-				}
+				s.enqueueExecutionBlockTrace(ctx, fmt.Sprintf("%d", slot))
 			}
 
 			return nil
@@ -307,13 +360,27 @@ func (s *agent) Start(ctx context.Context) error {
 		return err
 	}
 
-	cancel := make(chan os.Signal, 1)
-	signal.Notify(cancel, syscall.SIGTERM, syscall.SIGINT)
+	var runErr error
 
-	sig := <-cancel
-	s.log.Printf("Caught signal: %v", sig)
+	select {
+	case <-ctx.Done():
+		s.log.Info("Shutting down tracoor agent")
+	case err := <-s.node.Failed():
+		// The node this agent exists to watch is unusable. Only this agent
+		// stops: whatever else shares the process still has healthy nodes of
+		// its own to serve.
+		s.log.WithError(err).Error("Ethereum node is unusable, stopping this agent")
 
-	return nil
+		runErr = err
+
+		// The workers unwind on cancellation, which the failure did not do for
+		// us the way a shutdown would have.
+		cancel()
+	}
+
+	s.shutdown(ctx)
+
+	return runErr
 }
 
 func (s *agent) performTokenHandshake(ctx context.Context) error {
@@ -374,89 +441,90 @@ func (s *agent) ServePProf(ctx context.Context) error {
 	go func() {
 		s.log.Infof("Serving pprof at %s", *s.Config.PProfAddr)
 
-		if err := pprofServer.ListenAndServe(); err != nil {
-			s.log.Fatal(err)
+		// pprof is a debugging convenience. Losing it costs a diagnostic, so it
+		// is not worth a single artifact, let alone the process.
+		if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.log.WithError(err).Error("Failed to serve pprof")
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+
+		// The shutdown is triggered by ctx being cancelled, so it cannot itself
+		// run under ctx.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pprofShutdownTimeout)
+		defer cancel()
+
+		if err := pprofServer.Shutdown(shutdownCtx); err != nil {
+			s.log.WithError(err).Debug("Failed to stop the pprof server")
 		}
 	}()
 
 	return nil
 }
 
-const (
-	executionBlockNumberResolveAttempts = 5
-	executionBlockNumberResolveDelay    = 3 * time.Second
-)
+const executionBlockResolveTimeout = 30 * time.Second
 
-// enqueueExecutionBlockTraceForBeaconBlock resolves the execution block a
-// beacon block commits to and queues a trace fetch for it. Pre-gloas blocks
-// embed the execution payload, so the block number is read straight off the
-// block. Gloas (ePBS) blocks only commit to the payload's block hash via the
-// bid, so the number is resolved from the execution node with a bounded
-// retry to give the builder time to reveal the payload.
-func (s *agent) enqueueExecutionBlockTraceForBeaconBlock(ctx context.Context, blockID string) error {
+// resolveExecutionBlock resolves the execution block a beacon block commits to.
+// Pre-gloas blocks embed the execution payload, so the hash and number are read
+// straight off the block. Gloas (ePBS) blocks only commit to the payload's
+// block hash via the bid, so the number comes from the execution node, which
+// only knows it once the builder has revealed the payload. This runs on the
+// queue worker rather than the beacon event callback: a node that is slow to
+// reveal must not stall event processing for every other artifact.
+func (s *agent) resolveExecutionBlock(ctx context.Context, blockID string) (hash string, number uint64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, executionBlockResolveTimeout)
+	defer cancel()
+
 	block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, blockID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch beacon block: %w", err)
+		return "", 0, fmt.Errorf("failed to fetch beacon block: %w", err)
 	}
 
 	if block == nil {
-		return errors.New("beacon node returned a nil block")
+		return "", 0, errors.New("beacon node returned a nil block")
 	}
 
 	payload := block.Data.Message.Body.ExecutionPayload
 	if payload.BlockHash != "" {
 		blockNumber, perr := strconv.ParseUint(payload.BlockNumber, 10, 64)
 		if perr != nil {
-			return fmt.Errorf("failed to parse execution block number: %w", perr)
+			return "", 0, fmt.Errorf("failed to parse execution block number: %w", perr)
 		}
 
-		s.enqueueExecutionBlockTrace(ctx, payload.BlockHash, blockNumber)
-
-		return nil
+		return payload.BlockHash, blockNumber, nil
 	}
 
 	bidBlockHash := block.Data.Message.Body.SignedExecutionPayloadBid.Message.BlockHash
 	if bidBlockHash == "" {
-		return errors.New("beacon block contains no execution payload or execution payload bid")
+		return "", 0, errors.New("beacon block contains no execution payload or execution payload bid")
 	}
 
-	blockNumber, err := s.resolveExecutionBlockNumber(ctx, bidBlockHash)
+	blockNumber, err := s.node.Execution().GetBlockNumberByHash(ctx, bidBlockHash)
 	if err != nil {
-		return fmt.Errorf("failed to resolve execution block number for bid block hash %s: %w", bidBlockHash, err)
+		if errors.Is(err, execution.ErrBlockNotFound) {
+			return "", 0, fmt.Errorf("%w: execution block %s has not been revealed", errItemNotAvailable, bidBlockHash)
+		}
+
+		return "", 0, fmt.Errorf("failed to resolve execution block number for bid block hash %s: %w", bidBlockHash, err)
 	}
 
-	s.enqueueExecutionBlockTrace(ctx, bidBlockHash, blockNumber)
-
-	return nil
+	return bidBlockHash, blockNumber, nil
 }
 
-// resolveExecutionBlockNumber looks up an execution block number by hash,
-// retrying while the execution node reports the block as unknown.
-func (s *agent) resolveExecutionBlockNumber(ctx context.Context, blockHash string) (uint64, error) {
-	var lastErr error
+// executionBlockTraceStale reports whether the execution node has moved so far
+// past this block that it can no longer re-execute it.
+func (s *agent) executionBlockTraceStale(ctx context.Context, blockNumber uint64) bool {
+	ctx, cancel := context.WithTimeout(ctx, executionBlockResolveTimeout)
+	defer cancel()
 
-	for attempt := 0; attempt < executionBlockNumberResolveAttempts; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return 0, ctx.Err()
-			case <-time.After(executionBlockNumberResolveDelay):
-			}
-		}
-
-		number, err := s.node.Execution().GetBlockNumberByHash(ctx, blockHash)
-		if err == nil {
-			return number, nil
-		}
-
-		if !errors.Is(err, execution.ErrBlockNotFound) {
-			return 0, err
-		}
-
-		lastErr = err
+	head, err := s.node.Execution().BlockNumber(ctx)
+	if err != nil || head <= blockNumber {
+		return false
 	}
 
-	return 0, lastErr
+	return head-blockNumber > s.Config.Ethereum.GetExecutionBlockTraceAgeThresholdBlocks()
 }
 
 func rootAsString(r phase0.Root) string {

@@ -136,9 +136,7 @@ func (n *Node) getDebugBlockTraceParms(ctx context.Context, client string) map[s
 }
 
 func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (*[]byte, error) {
-	data := jsonrpc.Message{}
-
-	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
+	trace, err := n.rawResult(ctx, ethrpc.NewCall(
 		"debug_traceBlockByHash",
 		hash,
 		n.getDebugBlockTraceParms(ctx, client),
@@ -147,13 +145,29 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (
 		return nil, err
 	}
 
+	return &trace, nil
+}
+
+// rawResult performs call and returns its JSON-RPC result. The envelope is
+// roughly as large as the result it carries, so it is confined to this frame
+// and unreachable by the time the caller works with the result.
+func (n *Node) rawResult(ctx context.Context, call ethrpc.Call) ([]byte, error) {
+	rsp, err := n.rpc.Do(ctx, call)
+	if err != nil {
+		return nil, err
+	}
+
+	data := jsonrpc.Message{}
 	if err := json.Unmarshal(rsp, &data); err != nil {
 		return nil, err
 	}
 
-	s := []byte(data.Result)
+	return data.Result, nil
+}
 
-	return &s, nil
+// BlockNumber returns the execution node's current head block number.
+func (n *Node) BlockNumber(ctx context.Context) (uint64, error) {
+	return n.rpc.BlockNumber(ctx)
 }
 
 // GetBlockNumberByHash resolves an execution block number from its hash.

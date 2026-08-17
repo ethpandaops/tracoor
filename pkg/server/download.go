@@ -147,14 +147,7 @@ func (d *ObjectDownloader) beaconStateHandler(w http.ResponseWriter, r *http.Req
 
 	filename := filepath.Base(state.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, state.Location.Value, state.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -235,14 +228,7 @@ func (d *ObjectDownloader) beaconBlockHandler(w http.ResponseWriter, r *http.Req
 
 	filename := filepath.Base(block.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, block.Location.Value, block.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -323,14 +309,7 @@ func (d *ObjectDownloader) executionPayloadEnvelopeHandler(w http.ResponseWriter
 
 	filename := filepath.Base(envelope.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(envelope.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(envelope.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, envelope.Location.Value, envelope.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -411,14 +390,7 @@ func (d *ObjectDownloader) beaconBadBlockHandler(w http.ResponseWriter, r *http.
 
 	filename := filepath.Base(block.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(block.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(block.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, block.Location.Value, block.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -499,14 +471,7 @@ func (d *ObjectDownloader) beaconBadBlobHandler(w http.ResponseWriter, r *http.R
 
 	filename := filepath.Base(blob.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(blob.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(blob.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, blob.Location.Value, blob.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -587,14 +552,7 @@ func (d *ObjectDownloader) executionBlockTraceHandler(w http.ResponseWriter, r *
 
 	filename := filepath.Base(state.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasCompressionExtension(state.Location.Value, algo) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, state.Location.Value, state.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -675,14 +633,7 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 
 	filename := filepath.Base(state.Location.Value)
 
-	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(state.ContentEncoding.GetValue())
-	if err == nil {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-	} else if compression.HasAnyCompressionExtension(state.Location.Value) {
-		w.Header().Set("Content-Encoding", algo.ContentEncoding)
-
-		filename = compression.RemoveExtension(filename)
-	}
+	filename = d.applyContentEncoding(w, state.Location.Value, state.ContentEncoding.GetValue(), filename)
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
@@ -690,6 +641,43 @@ func (d *ObjectDownloader) executionBadBlock(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		d.writeJSONError(w, "Failed to write response", http.StatusInternalServerError)
 	}
+}
+
+// applyContentEncoding sets the Content-Encoding header for a stored object and returns the
+// filename to advertise in Content-Disposition.
+//
+// The indexed row is the source of truth. Objects written before the column existed carry their
+// encoding only in the location's extension, so that is the fallback, and the extension is
+// stripped from the advertised filename when it is used. An encoding neither source recognises
+// is served verbatim with no Content-Encoding header: the bytes are still whatever the store
+// holds, and refusing the download outright would be a worse answer than an unlabelled one.
+func (d *ObjectDownloader) applyContentEncoding(w http.ResponseWriter, location, contentEncoding, filename string) string {
+	algo, err := compression.GetCompressionAlgorithmFromContentEncoding(contentEncoding)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		return filename
+	}
+
+	algo, err = compression.GetCompressionAlgorithm(location)
+	if err == nil {
+		w.Header().Set("Content-Encoding", algo.ContentEncoding)
+
+		return compression.RemoveExtension(filename)
+	}
+
+	log := d.log.WithFields(logrus.Fields{
+		"location":         location,
+		"content_encoding": contentEncoding,
+	})
+
+	if contentEncoding == "" {
+		log.Debug("Object has no recorded content encoding, serving it verbatim")
+	} else {
+		log.Warn("Unrecognised content encoding, serving the object verbatim")
+	}
+
+	return filename
 }
 
 func (d *ObjectDownloader) writeJSONError(w http.ResponseWriter, message string, statusCode int) {

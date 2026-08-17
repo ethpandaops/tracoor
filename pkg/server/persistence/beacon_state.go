@@ -3,28 +3,43 @@ package persistence
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
 )
 
 type BeaconState struct {
-	gorm.Model
 	ID   string `gorm:"primaryKey"`
-	Node string `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:1"`
+	Node string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:4;index:ix_beacon_states_network_node_fetched_at,priority:2"`
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64 `gorm:"index:idx_beacon_state_slot,where:deleted_at IS NULL;index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:2"`
-	Epoch                int64
-	StateRoot            string    `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:3"`
-	FetchedAt            time.Time `gorm:"index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:5;index:idx_beacon_state_fetchedat,where:deleted_at IS NULL;index:idx_beacon_state_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	BeaconImplementation string
-	NodeVersion          string `gorm:"not null;default:''"`
-	ContentEncoding      string `gorm:"not null;default:''"`
-	Location             string `gorm:"not null;default:''"`
-	Network              string `gorm:"not null;default:'';index;index:idx_beacon_state_node_slot_stateroot_network_fetchedat,where:deleted_at IS NULL,priority:4;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_network,where:deleted_at IS NULL;index:idx_beacon_state_fetchedat_network,where:deleted_at IS NULL,priority:2"`
+	Slot                 int64     `gorm:"not null;default:0;uniqueIndex:ux_beacon_states_dedupe,priority:2"`
+	Epoch                int64     `gorm:"not null;default:0"`
+	StateRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:3"`
+	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_states_fetched_at;index:ix_beacon_states_network_node_fetched_at,priority:3;index:ix_beacon_states_network_fetched_at,priority:2"`
+	BeaconImplementation string    `gorm:"not null;default:''"`
+	NodeVersion          string    `gorm:"not null;default:''"`
+	ContentEncoding      string    `gorm:"not null;default:''"`
+	Location             string    `gorm:"not null;default:''"`
+	ContentHash          string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:1;index:ix_beacon_states_network_node_fetched_at,priority:1;index:ix_beacon_states_network_fetched_at,priority:1"`
+}
+
+// BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
+// the value itself carries, so a row written by a process in another zone would neither order
+// nor compare against the rest of the table.
+func (a *BeaconState) BeforeSave(*gorm.DB) error {
+	a.FetchedAt = utcBound(a.FetchedAt)
+	a.VerifiedAt = utcBoundPtr(a.VerifiedAt)
+	a.ContentMatchedAt = utcBoundPtr(a.ContentMatchedAt)
+
+	return nil
 }
 
 type BeaconStateFilter struct {
@@ -85,24 +100,6 @@ func (f *BeaconStateFilter) AddBeaconImplementation(beaconImplementation string)
 	f.BeaconImplementation = &beaconImplementation
 }
 
-func (f *BeaconStateFilter) Validate() error {
-	if f.ID == nil &&
-		f.Node == nil &&
-		f.Before == nil &&
-		f.After == nil &&
-		f.Slot == nil &&
-		f.Epoch == nil &&
-		f.StateRoot == nil &&
-		f.NodeVersion == nil &&
-		f.Location == nil &&
-		f.BeaconImplementation == nil &&
-		f.Network == nil {
-		return errors.New("no filter specified")
-	}
-
-	return nil
-}
-
 func (f *BeaconStateFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	if f.ID != nil {
 		query = query.Where("id = ?", f.ID)
@@ -113,11 +110,11 @@ func (f *BeaconStateFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", timestampFormatForDB(*f.Before))
+		query = query.Where("fetched_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", timestampFormatForDB(*f.After))
+		query = query.Where("fetched_at >= ?", utcBound(*f.After))
 	}
 
 	if f.Slot != nil {
@@ -215,7 +212,14 @@ func (i *Indexer) ListBeaconState(ctx context.Context, filter *BeaconStateFilter
 	if page != nil {
 		query = page.ApplyOffsetLimit(query)
 
-		query = page.ApplyOrderBy(query)
+		ordered, err := page.ApplyOrderBy(query)
+		if err != nil {
+			i.metrics.ObserveOperationError(operation)
+
+			return nil, err
+		}
+
+		query = ordered
 	}
 
 	query, err := filter.ApplyToQuery(query)
@@ -246,8 +250,25 @@ type DistinctBeaconStateValueResults struct {
 	BeaconImplementation []string
 }
 
-//nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string) (*DistinctBeaconStateValueResults, error) {
+// beaconStateDistinct declares how each requested field's distinct values are resolved.
+// Loose-scannable fields lead an index right after network: node via
+// ix_beacon_states_network_node_fetched_at(network, node, fetched_at), slot via
+// ux_beacon_states_dedupe(network, slot, state_root, node), and network leads both.
+var beaconStateDistinct = distinctTable{
+	name: "beacon_states",
+	fields: map[string]distinctStrategy{
+		KeyNode:                 distinctLooseScan,
+		KeySlot:                 distinctLooseScan,
+		KeyNetwork:              distinctLooseScan,
+		KeyEpoch:                distinctFullScan,
+		KeyStateRoot:            distinctFullScan,
+		KeyNodeVersion:          distinctFullScan,
+		KeyLocation:             distinctFullScan,
+		KeyBeaconImplementation: distinctFullScan,
+	},
+}
+
+func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string, network string) (*DistinctBeaconStateValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -262,69 +283,41 @@ func (i *Indexer) DistinctBeaconStateValues(ctx context.Context, fields []string
 		Network:              make([]string, 0),
 		BeaconImplementation: make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&BeaconState{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
-	rows, err := query.Rows()
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
+	seen := make(map[string]bool, len(fields))
 
-		return nil, err
-	}
-	defer rows.Close()
-
-	valueSets := make(map[string]map[interface{}]bool)
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
-	}
-
-	var values []interface{}
-	for rows.Next() {
-		values = make([]interface{}, len(fields))
-		valuePtrs := make([]interface{}, len(fields))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
+		if seen[field] {
+			continue
 		}
 
-		err := rows.Scan(valuePtrs...)
+		seen[field] = true
+
+		values, err := i.distinctFieldValues(ctx, beaconStateDistinct, field, network)
 		if err != nil {
 			i.metrics.ObserveOperationError(operation)
 
 			return nil, err
 		}
 
-		for i, field := range fields {
-			if !valueSets[field][values[i]] {
-				switch field {
-				case KeyNode:
-					results.Node = append(results.Node, values[i].(string))
-				case KeySlot:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Slot = append(results.Slot, uint64(values[i].(int64)))
-				case KeyEpoch:
-					//nolint:gosec // not worried about int64 overflow here
-					results.Epoch = append(results.Epoch, uint64(values[i].(int64)))
-				case KeyStateRoot:
-					results.StateRoot = append(results.StateRoot, values[i].(string))
-				case KeyNodeVersion:
-					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case KeyLocation:
-					results.Location = append(results.Location, values[i].(string))
-				case KeyNetwork:
-					results.Network = append(results.Network, values[i].(string))
-				case KeyBeaconImplementation:
-					results.BeaconImplementation = append(results.BeaconImplementation, values[i].(string))
-				}
-
-				valueSets[field][values[i]] = true
-			}
+		switch field {
+		case KeyNode:
+			results.Node = distinctStrings(values)
+		case KeySlot:
+			results.Slot = distinctUint64s(values)
+		case KeyEpoch:
+			results.Epoch = distinctUint64s(values)
+		case KeyStateRoot:
+			results.StateRoot = distinctStrings(values)
+		case KeyNodeVersion:
+			results.NodeVersion = distinctStrings(values)
+		case KeyLocation:
+			results.Location = distinctStrings(values)
+		case KeyNetwork:
+			results.Network = distinctStrings(values)
+		case KeyBeaconImplementation:
+			results.BeaconImplementation = distinctStrings(values)
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
 	}
 
 	return results, nil
@@ -348,35 +341,6 @@ func (i *Indexer) DeleteBeaconState(ctx context.Context, id string) error {
 		i.metrics.ObserveOperationError(operation)
 
 		return errors.New("beacon state not found")
-	}
-
-	return nil
-}
-
-func (i *Indexer) UpdateBeaconState(ctx context.Context, state *BeaconState) error {
-	operation := OperationUpdateBeaconState
-
-	i.metrics.ObserveOperation(operation)
-
-	query := i.db.WithContext(ctx)
-
-	result := query.Save(state)
-	if result.Error != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon state not found")
-	}
-
-	if result.RowsAffected != 1 {
-		i.metrics.ObserveOperationError(operation)
-
-		return errors.New("beacon state update affected more than one row")
 	}
 
 	return nil

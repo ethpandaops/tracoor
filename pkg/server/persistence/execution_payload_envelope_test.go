@@ -104,27 +104,6 @@ func TestListExecutionPayloadEnvelope(t *testing.T) {
 	assert.Equal(t, block.Node, blocks[0].Node)
 }
 
-func TestUpdateExecutionPayloadEnvelope(t *testing.T) {
-	indexer, mock, err := NewMockIndexer()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	block := generateRandomExecutionPayloadEnvelope()
-
-	err = indexer.InsertExecutionPayloadEnvelope(ctx, block)
-	assert.NoError(t, err)
-
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE").WithArgs(
-		block.ID, block.Node, block.Slot, block.Epoch, block.BlockRoot, block.FetchedAt,
-		block.BeaconImplementation, block.NodeVersion, block.Location, block.Network,
-	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	err = indexer.UpdateExecutionPayloadEnvelope(ctx, block)
-	assert.NoError(t, err)
-}
-
 //nolint:gocyclo // Test is long but manageable
 func TestExecutionPayloadEnvelopeFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {

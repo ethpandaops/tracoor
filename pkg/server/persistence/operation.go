@@ -9,43 +9,42 @@ const (
 	OperationDeleteBeaconState Operation = "delete_beacon_state_metadata"
 	OperationCountBeaconState  Operation = "count_beacon_state_metadata"
 	OperationListBeaconState   Operation = "list_beacon_state_metadata"
-	OperationUpdateBeaconState Operation = "update_beacon_state_metadata"
 
 	OperationInsertBeaconBlock Operation = "insert_beacon_block_metadata"
 	OperationDeleteBeaconBlock Operation = "delete_beacon_block_metadata"
 	OperationCountBeaconBlock  Operation = "count_beacon_block_metadata"
 	OperationListBeaconBlock   Operation = "list_beacon_block_metadata"
-	OperationUpdateBeaconBlock Operation = "update_beacon_block_metadata"
 
 	OperationInsertExecutionPayloadEnvelope Operation = "insert_execution_payload_envelope_metadata"
 	OperationDeleteExecutionPayloadEnvelope Operation = "delete_execution_payload_envelope_metadata"
 	OperationCountExecutionPayloadEnvelope  Operation = "count_execution_payload_envelope_metadata"
 	OperationListExecutionPayloadEnvelope   Operation = "list_execution_payload_envelope_metadata"
-	OperationUpdateExecutionPayloadEnvelope Operation = "update_execution_payload_envelope_metadata"
 
 	OperationInsertBeaconBadBlock Operation = "insert_beacon_bad_block_metadata"
 	OperationDeleteBeaconBadBlock Operation = "delete_beacon_bad_block_metadata"
 	OperationCountBeaconBadBlock  Operation = "count_beacon_bad_block_metadata"
 	OperationListBeaconBadBlock   Operation = "list_beacon_bad_block_metadata"
-	OperationUpdateBeaconBadBlock Operation = "update_beacon_bad_block_metadata"
 
 	OperationInsertBeaconBadBlob Operation = "insert_beacon_bad_blob_metadata"
 	OperationDeleteBeaconBadBlob Operation = "delete_beacon_bad_blob_metadata"
 	OperationCountBeaconBadBlob  Operation = "count_beacon_bad_blob_metadata"
 	OperationListBeaconBadBlob   Operation = "list_beacon_bad_blob_metadata"
-	OperationUpdateBeaconBadBlob Operation = "update_beacon_bad_blob_metadata"
 
 	OperationInsertExecutionBlockTrace Operation = "insert_execution_block_trace"
 	OperationDeleteExecutionBlockTrace Operation = "delete_execution_block_trace"
 	OperationCountExecutionBlockTrace  Operation = "count_execution_block_trace"
 	OperationListExecutionBlockTrace   Operation = "list_execution_block_trace"
-	OperationUpdateExecutionBlockTrace Operation = "update_execution_block_trace"
 
 	OperationInsertExecutionBadBlock Operation = "insert_execution_bad_block"
 	OperationDeleteExecutionBadBlock Operation = "delete_execution_bad_block"
 	OperationCountExecutionBadBlock  Operation = "count_execution_bad_block"
 	OperationListExecutionBadBlock   Operation = "list_execution_bad_block"
-	OperationUpdateExecutionBadBlock Operation = "update_execution_bad_block"
+
+	OperationGetBlob    Operation = "get_blob"
+	OperationInsertBlob Operation = "insert_blob"
+
+	OperationInsertPayloadDivergence Operation = "insert_payload_divergence"
+	OperationListPayloadDivergence   Operation = "list_payload_divergence"
 
 	OperationInsertPermanentBlock Operation = "insert_permanent_block"
 	OperationGetPermanentBlock    Operation = "get_permanent_block"

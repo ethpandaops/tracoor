@@ -106,27 +106,6 @@ func TestListBeaconBlock(t *testing.T) {
 	assert.Equal(t, block.Node, blocks[0].Node)
 }
 
-func TestUpdateBeaconBlock(t *testing.T) {
-	indexer, mock, err := NewMockIndexer()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	block := generateRandomBeaconBlock()
-
-	err = indexer.InsertBeaconBlock(ctx, block)
-	assert.NoError(t, err)
-
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE").WithArgs(
-		block.ID, block.Node, block.Slot, block.Epoch, block.BlockRoot, block.FetchedAt,
-		block.BeaconImplementation, block.NodeVersion, block.Location, block.Network,
-	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	err = indexer.UpdateBeaconBlock(ctx, block)
-	assert.NoError(t, err)
-}
-
 //nolint:gocyclo // Test is long but manageable
 func TestBeaconBlockFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {

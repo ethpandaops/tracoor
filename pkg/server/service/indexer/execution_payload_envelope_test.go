@@ -2,6 +2,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -26,6 +27,8 @@ func createRandomExecutionPayloadEnvelopeRequest() *pindexer.CreateExecutionPayl
 		NodeVersion:          wrapperspb.String(generateRandomString(8)),
 		Location:             wrapperspb.String(generateRandomString(10)),
 		Network:              wrapperspb.String(generateRandomString(5)),
+		ContentHash:          wrapperspb.String(generateRandomContentHash()),
+		DedupKey:             wrapperspb.String(generateRandomString(20)),
 	}
 }
 
@@ -45,7 +48,7 @@ func TestIndexerExecutionPayloadEnvelopeCount(t *testing.T) {
 	}()
 
 	t.Run("Counting", func(t *testing.T) {
-		_, err := index.CreateExecutionPayloadEnvelope(ctx, createRandomExecutionPayloadEnvelopeRequest())
+		_, err := createExecutionPayloadEnvelope(ctx, index, createRandomExecutionPayloadEnvelopeRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -81,15 +84,15 @@ func TestIndexerExecutionPayloadEnvelopeDownloading(t *testing.T) {
 
 		compressor := compression.NewCompressor()
 
-		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		compressedData, err := compressor.Compress(&data, compression.Default)
 		if err != nil {
 			t.Fatalf("failed to compress data: %v", err)
 		}
 
 		location, err := index.Store().SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{
-			Data:            &compressedData,
+			Data:            bytes.NewReader(compressedData),
 			Location:        "data.json",
-			ContentEncoding: compression.Gzip.ContentEncoding,
+			ContentEncoding: compression.Default.ContentEncoding,
 		})
 		if err != nil {
 			t.Fatalf("failed to save beacon state: %v", err)
@@ -98,7 +101,7 @@ func TestIndexerExecutionPayloadEnvelopeDownloading(t *testing.T) {
 		req := createRandomExecutionPayloadEnvelopeRequest()
 		req.Location = wrapperspb.String(location)
 
-		resp, err := index.CreateExecutionPayloadEnvelope(ctx, req)
+		resp, err := createExecutionPayloadEnvelope(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -161,14 +164,14 @@ func TestIndexerExecutionPayloadEnvelope(t *testing.T) {
 	}()
 
 	t.Run("Creating", func(t *testing.T) {
-		_, err := index.CreateExecutionPayloadEnvelope(ctx, createRandomExecutionPayloadEnvelopeRequest())
+		_, err := createExecutionPayloadEnvelope(ctx, index, createRandomExecutionPayloadEnvelopeRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
 	})
 
 	t.Run("Creating returns a valid ID", func(t *testing.T) {
-		rsp, err := index.CreateExecutionPayloadEnvelope(ctx, createRandomExecutionPayloadEnvelopeRequest())
+		rsp, err := createExecutionPayloadEnvelope(ctx, index, createRandomExecutionPayloadEnvelopeRequest())
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -181,7 +184,7 @@ func TestIndexerExecutionPayloadEnvelope(t *testing.T) {
 	t.Run("Handles duplicates", func(t *testing.T) {
 		req := createRandomExecutionPayloadEnvelopeRequest()
 
-		rsp, err := index.CreateExecutionPayloadEnvelope(ctx, req)
+		rsp, err := createExecutionPayloadEnvelope(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -190,16 +193,16 @@ func TestIndexerExecutionPayloadEnvelope(t *testing.T) {
 			t.Fatalf("expected ID to not be empty")
 		}
 
-		_, err = index.CreateExecutionPayloadEnvelope(ctx, req)
-		if err != nil && err.Error() != beaconStateExistsStr {
-			t.Fatal("expected error to be 'beacon state already exists'")
+		_, err = createExecutionPayloadEnvelope(ctx, index, req)
+		if err == nil {
+			t.Fatal("expected duplicate execution payload envelope to be rejected")
 		}
 	})
 
 	t.Run("Basic Listing", func(t *testing.T) {
 		req := createRandomExecutionPayloadEnvelopeRequest()
 
-		resp, err := index.CreateExecutionPayloadEnvelope(ctx, req)
+		resp, err := createExecutionPayloadEnvelope(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}
@@ -217,7 +220,7 @@ func TestIndexerExecutionPayloadEnvelope(t *testing.T) {
 	t.Run("Can list by filters", func(t *testing.T) {
 		req := createRandomExecutionPayloadEnvelopeRequest()
 
-		resp, err := index.CreateExecutionPayloadEnvelope(ctx, req)
+		resp, err := createExecutionPayloadEnvelope(ctx, index, req)
 		if err != nil {
 			t.Fatalf("failed to create beacon state: %v", err)
 		}

@@ -49,6 +49,10 @@ const (
 	Indexer_ListExecutionBadBlock_FullMethodName                    = "/indexer.Indexer/ListExecutionBadBlock"
 	Indexer_CountExecutionBadBlock_FullMethodName                   = "/indexer.Indexer/CountExecutionBadBlock"
 	Indexer_ListUniqueExecutionBadBlockValues_FullMethodName        = "/indexer.Indexer/ListUniqueExecutionBadBlockValues"
+	Indexer_GetBlob_FullMethodName                                  = "/indexer.Indexer/GetBlob"
+	Indexer_CreateBlob_FullMethodName                               = "/indexer.Indexer/CreateBlob"
+	Indexer_CreatePayloadDivergence_FullMethodName                  = "/indexer.Indexer/CreatePayloadDivergence"
+	Indexer_ListPayloadDivergence_FullMethodName                    = "/indexer.Indexer/ListPayloadDivergence"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -92,6 +96,12 @@ type IndexerClient interface {
 	ListExecutionBadBlock(ctx context.Context, in *ListExecutionBadBlockRequest, opts ...grpc.CallOption) (*ListExecutionBadBlockResponse, error)
 	CountExecutionBadBlock(ctx context.Context, in *CountExecutionBadBlockRequest, opts ...grpc.CallOption) (*CountExecutionBadBlockResponse, error)
 	ListUniqueExecutionBadBlockValues(ctx context.Context, in *ListUniqueExecutionBadBlockValuesRequest, opts ...grpc.CallOption) (*ListUniqueExecutionBadBlockValuesResponse, error)
+	// Blob
+	GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobResponse, error)
+	CreateBlob(ctx context.Context, in *CreateBlobRequest, opts ...grpc.CallOption) (*CreateBlobResponse, error)
+	// PayloadDivergence
+	CreatePayloadDivergence(ctx context.Context, in *CreatePayloadDivergenceRequest, opts ...grpc.CallOption) (*CreatePayloadDivergenceResponse, error)
+	ListPayloadDivergence(ctx context.Context, in *ListPayloadDivergenceRequest, opts ...grpc.CallOption) (*ListPayloadDivergenceResponse, error)
 }
 
 type indexerClient struct {
@@ -402,6 +412,46 @@ func (c *indexerClient) ListUniqueExecutionBadBlockValues(ctx context.Context, i
 	return out, nil
 }
 
+func (c *indexerClient) GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBlobResponse)
+	err := c.cc.Invoke(ctx, Indexer_GetBlob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) CreateBlob(ctx context.Context, in *CreateBlobRequest, opts ...grpc.CallOption) (*CreateBlobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateBlobResponse)
+	err := c.cc.Invoke(ctx, Indexer_CreateBlob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) CreatePayloadDivergence(ctx context.Context, in *CreatePayloadDivergenceRequest, opts ...grpc.CallOption) (*CreatePayloadDivergenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreatePayloadDivergenceResponse)
+	err := c.cc.Invoke(ctx, Indexer_CreatePayloadDivergence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) ListPayloadDivergence(ctx context.Context, in *ListPayloadDivergenceRequest, opts ...grpc.CallOption) (*ListPayloadDivergenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPayloadDivergenceResponse)
+	err := c.cc.Invoke(ctx, Indexer_ListPayloadDivergence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexerServer is the server API for Indexer service.
 // All implementations must embed UnimplementedIndexerServer
 // for forward compatibility.
@@ -443,6 +493,12 @@ type IndexerServer interface {
 	ListExecutionBadBlock(context.Context, *ListExecutionBadBlockRequest) (*ListExecutionBadBlockResponse, error)
 	CountExecutionBadBlock(context.Context, *CountExecutionBadBlockRequest) (*CountExecutionBadBlockResponse, error)
 	ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error)
+	// Blob
+	GetBlob(context.Context, *GetBlobRequest) (*GetBlobResponse, error)
+	CreateBlob(context.Context, *CreateBlobRequest) (*CreateBlobResponse, error)
+	// PayloadDivergence
+	CreatePayloadDivergence(context.Context, *CreatePayloadDivergenceRequest) (*CreatePayloadDivergenceResponse, error)
+	ListPayloadDivergence(context.Context, *ListPayloadDivergenceRequest) (*ListPayloadDivergenceResponse, error)
 	mustEmbedUnimplementedIndexerServer()
 }
 
@@ -542,6 +598,18 @@ func (UnimplementedIndexerServer) CountExecutionBadBlock(context.Context, *Count
 }
 func (UnimplementedIndexerServer) ListUniqueExecutionBadBlockValues(context.Context, *ListUniqueExecutionBadBlockValuesRequest) (*ListUniqueExecutionBadBlockValuesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUniqueExecutionBadBlockValues not implemented")
+}
+func (UnimplementedIndexerServer) GetBlob(context.Context, *GetBlobRequest) (*GetBlobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBlob not implemented")
+}
+func (UnimplementedIndexerServer) CreateBlob(context.Context, *CreateBlobRequest) (*CreateBlobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateBlob not implemented")
+}
+func (UnimplementedIndexerServer) CreatePayloadDivergence(context.Context, *CreatePayloadDivergenceRequest) (*CreatePayloadDivergenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePayloadDivergence not implemented")
+}
+func (UnimplementedIndexerServer) ListPayloadDivergence(context.Context, *ListPayloadDivergenceRequest) (*ListPayloadDivergenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPayloadDivergence not implemented")
 }
 func (UnimplementedIndexerServer) mustEmbedUnimplementedIndexerServer() {}
 func (UnimplementedIndexerServer) testEmbeddedByValue()                 {}
@@ -1104,6 +1172,78 @@ func _Indexer_ListUniqueExecutionBadBlockValues_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Indexer_GetBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).GetBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_GetBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).GetBlob(ctx, req.(*GetBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_CreateBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CreateBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CreateBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CreateBlob(ctx, req.(*CreateBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_CreatePayloadDivergence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePayloadDivergenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).CreatePayloadDivergence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_CreatePayloadDivergence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).CreatePayloadDivergence(ctx, req.(*CreatePayloadDivergenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_ListPayloadDivergence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPayloadDivergenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).ListPayloadDivergence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_ListPayloadDivergence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).ListPayloadDivergence(ctx, req.(*ListPayloadDivergenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Indexer_ServiceDesc is the grpc.ServiceDesc for Indexer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1230,6 +1370,22 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUniqueExecutionBadBlockValues",
 			Handler:    _Indexer_ListUniqueExecutionBadBlockValues_Handler,
+		},
+		{
+			MethodName: "GetBlob",
+			Handler:    _Indexer_GetBlob_Handler,
+		},
+		{
+			MethodName: "CreateBlob",
+			Handler:    _Indexer_CreateBlob_Handler,
+		},
+		{
+			MethodName: "CreatePayloadDivergence",
+			Handler:    _Indexer_CreatePayloadDivergence_Handler,
+		},
+		{
+			MethodName: "ListPayloadDivergence",
+			Handler:    _Indexer_ListPayloadDivergence_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

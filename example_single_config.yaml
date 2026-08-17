@@ -69,6 +69,18 @@ agents:
 shared:
   metricsAddr: ":9091"
   logging: "debug"
+  # How long each agent waits for in-flight fetches and uploads after a
+  # shutdown signal. Keep it below the orchestrator's termination grace period.
+  shutdownTimeoutSeconds: 10
+  # Deadline for one fetch attempt, per artifact kind, shared by every agent
+  # (an agent may still set its own). The defaults suit agents running near
+  # their nodes; over a WAN link beacon states need minutes, not seconds.
+  # fetchTimeouts:
+  #   beaconStateSeconds: 30
+  #   beaconBlockSeconds: 30
+  #   executionPayloadEnvelopeSeconds: 60
+  #   executionBlockTraceSeconds: 60
+  #   executionBadBlockSeconds: 60
   indexer:
     address: localhost:8081
   store:

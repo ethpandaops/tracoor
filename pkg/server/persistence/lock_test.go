@@ -2,21 +2,30 @@ package persistence
 
 import (
 	"context"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupTestDB(t *testing.T) *Indexer {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "lock.db")), &gorm.Config{})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+
+	// Serialise at the pool so concurrent writers contend on the conditional upsert rather
+	// than on SQLite's file lock.
+	sqlDB.SetMaxOpenConns(1)
 
 	err = db.AutoMigrate(&DistributedLock{})
 	require.NoError(t, err)
@@ -39,7 +48,6 @@ func TestAcquireLock(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Verify lock exists in DB
 		var lock DistributedLock
 
 		result := indexer.db.Where("key = ?", "test-key-1").First(&lock)
@@ -50,50 +58,40 @@ func TestAcquireLock(t *testing.T) {
 		assert.True(t, lock.ExpiresAt.After(time.Now()))
 	})
 
-	t.Run("acquire existing lock by same owner", func(t *testing.T) {
-		// First acquisition
+	t.Run("same owner extends the lock", func(t *testing.T) {
 		acquired, err := indexer.AcquireLock(ctx, "test-key-2", "owner-2", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Get the original expiry time
-		var lock1 DistributedLock
+		var before DistributedLock
 
-		result := indexer.db.Where("key = ?", "test-key-2").First(&lock1)
+		result := indexer.db.Where("key = ?", "test-key-2").First(&before)
 		require.NoError(t, result.Error)
 
-		originalExpiry := lock1.ExpiresAt
-
-		// Wait a bit to ensure the new expiry will be different
 		time.Sleep(10 * time.Millisecond)
 
-		// Second acquisition by same owner should extend the lock
 		acquired, err = indexer.AcquireLock(ctx, "test-key-2", "owner-2", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Verify lock was extended
-		var lock2 DistributedLock
+		var after DistributedLock
 
-		result = indexer.db.Where("key = ?", "test-key-2").First(&lock2)
+		result = indexer.db.Where("key = ?", "test-key-2").First(&after)
 		require.NoError(t, result.Error)
 
-		assert.Equal(t, "owner-2", lock2.Owner)
-		assert.True(t, lock2.ExpiresAt.After(originalExpiry))
+		assert.Equal(t, "owner-2", after.Owner)
+		assert.True(t, after.ExpiresAt.After(before.ExpiresAt))
 	})
 
-	t.Run("fail to acquire existing lock by different owner", func(t *testing.T) {
-		// First acquisition
+	t.Run("a held lock is not an error", func(t *testing.T) {
 		acquired, err := indexer.AcquireLock(ctx, "test-key-3", "owner-3", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Second acquisition by different owner should fail
 		acquired, err = indexer.AcquireLock(ctx, "test-key-3", "owner-4", 10*time.Second)
-		require.Error(t, err)
+		require.NoError(t, err)
 		assert.False(t, acquired)
 
-		// Verify lock still belongs to original owner
 		var lock DistributedLock
 
 		result := indexer.db.Where("key = ?", "test-key-3").First(&lock)
@@ -102,22 +100,18 @@ func TestAcquireLock(t *testing.T) {
 		assert.Equal(t, "owner-3", lock.Owner)
 	})
 
-	t.Run("acquire expired lock", func(t *testing.T) {
-		// Create an expired lock
-		expiredLock := &DistributedLock{
+	t.Run("expired lock is taken over", func(t *testing.T) {
+		result := indexer.db.Create(&DistributedLock{
 			Key:       "test-key-4",
 			Owner:     "owner-5",
 			ExpiresAt: time.Now().Add(-1 * time.Second),
-		}
-		result := indexer.db.Create(expiredLock)
+		})
 		require.NoError(t, result.Error)
 
-		// New owner should be able to acquire the expired lock
 		acquired, err := indexer.AcquireLock(ctx, "test-key-4", "owner-6", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Verify lock now belongs to new owner
 		var lock DistributedLock
 
 		result = indexer.db.Where("key = ?", "test-key-4").First(&lock)
@@ -133,47 +127,59 @@ func TestReleaseLock(t *testing.T) {
 	indexer := setupTestDB(t)
 
 	t.Run("release owned lock", func(t *testing.T) {
-		// First acquire the lock
 		acquired, err := indexer.AcquireLock(ctx, "test-key-5", "owner-7", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Release the lock
 		err = indexer.ReleaseLock(ctx, "test-key-5", "owner-7")
 		require.NoError(t, err)
 
-		// Verify lock no longer exists
 		var lock DistributedLock
 
 		result := indexer.db.Where("key = ?", "test-key-5").First(&lock)
-
-		assert.Error(t, result.Error)
-		assert.True(t, result.Error == gorm.ErrRecordNotFound)
+		require.ErrorIs(t, result.Error, gorm.ErrRecordNotFound)
 	})
 
 	t.Run("release non-existent lock", func(t *testing.T) {
-		// Release a lock that doesn't exist
 		err := indexer.ReleaseLock(ctx, "non-existent-key", "owner-8")
 		require.NoError(t, err)
 	})
 
 	t.Run("release lock owned by different owner", func(t *testing.T) {
-		// First acquire the lock
 		acquired, err := indexer.AcquireLock(ctx, "test-key-6", "owner-9", 10*time.Second)
 		require.NoError(t, err)
 		assert.True(t, acquired)
 
-		// Try to release the lock as a different owner
 		err = indexer.ReleaseLock(ctx, "test-key-6", "owner-10")
 		require.NoError(t, err)
 
-		// Verify lock still exists
 		var lock DistributedLock
 
 		result := indexer.db.Where("key = ?", "test-key-6").First(&lock)
-
 		require.NoError(t, result.Error)
 		assert.Equal(t, "owner-9", lock.Owner)
+	})
+
+	t.Run("released lock can be reacquired by anyone", func(t *testing.T) {
+		acquired, err := indexer.AcquireLock(ctx, "test-key-7", "owner-11", 10*time.Second)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+
+		acquired, err = indexer.AcquireLock(ctx, "test-key-7", "owner-12", 10*time.Second)
+		require.NoError(t, err)
+		assert.False(t, acquired)
+
+		require.NoError(t, indexer.ReleaseLock(ctx, "test-key-7", "owner-11"))
+
+		acquired, err = indexer.AcquireLock(ctx, "test-key-7", "owner-12", 10*time.Second)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+
+		var lock DistributedLock
+
+		result := indexer.db.Where("key = ?", "test-key-7").First(&lock)
+		require.NoError(t, result.Error)
+		assert.Equal(t, "owner-12", lock.Owner)
 	})
 }
 
@@ -181,47 +187,32 @@ func TestCleanupExpiredLocks(t *testing.T) {
 	ctx := context.Background()
 	indexer := setupTestDB(t)
 
-	// Create some expired locks
 	for i := range 5 {
-		expiredLock := &DistributedLock{
+		result := indexer.db.Create(&DistributedLock{
 			Key:       "expired-key-" + string(rune(i+'0')),
 			Owner:     "owner-expired",
 			ExpiresAt: time.Now().Add(-1 * time.Second),
-		}
-		result := indexer.db.Create(expiredLock)
+		})
 		require.NoError(t, result.Error)
 	}
 
-	// Create some valid locks
 	for i := range 3 {
-		validLock := &DistributedLock{
+		result := indexer.db.Create(&DistributedLock{
 			Key:       "valid-key-" + string(rune(i+'0')),
 			Owner:     "owner-valid",
 			ExpiresAt: time.Now().Add(10 * time.Second),
-		}
-		result := indexer.db.Create(validLock)
+		})
 		require.NoError(t, result.Error)
 	}
 
-	// Count total locks before cleanup
 	var countBefore int64
 
 	indexer.db.Model(&DistributedLock{}).Count(&countBefore)
 
 	assert.Equal(t, int64(8), countBefore)
 
-	// Run cleanup
-	err := indexer.cleanupExpiredLocks(ctx)
-	require.NoError(t, err)
+	require.NoError(t, indexer.cleanupExpiredLocks(ctx))
 
-	// Count remaining locks after cleanup
-	var countAfter int64
-
-	indexer.db.Model(&DistributedLock{}).Count(&countAfter)
-
-	assert.Equal(t, int64(3), countAfter)
-
-	// Verify only valid locks remain
 	var locks []DistributedLock
 
 	result := indexer.db.Find(&locks)
@@ -239,25 +230,52 @@ func TestConcurrentLockAcquisition(t *testing.T) {
 	ctx := context.Background()
 	indexer := setupTestDB(t)
 
-	// Test concurrent lock acquisition by different owners
-	t.Run("concurrent acquisition by different owners", func(t *testing.T) {
-		// First owner acquires the lock
-		acquired1, err := indexer.AcquireLock(ctx, "concurrent-key", "owner-11", 10*time.Second)
-		require.NoError(t, err)
-		assert.True(t, acquired1)
+	const contenders = 8
 
-		// Second owner tries to acquire the same lock
-		acquired2, err := indexer.AcquireLock(ctx, "concurrent-key", "owner-12", 10*time.Second)
-		require.Error(t, err)
-		assert.False(t, acquired2)
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		winners []string
+		start   = make(chan struct{})
+	)
 
-		// First owner releases the lock
-		err = indexer.ReleaseLock(ctx, "concurrent-key", "owner-11")
-		require.NoError(t, err)
+	for i := range contenders {
+		owner := "owner-" + string(rune(i+'a'))
 
-		// Now second owner should be able to acquire the lock
-		acquired3, err := indexer.AcquireLock(ctx, "concurrent-key", "owner-12", 10*time.Second)
-		require.NoError(t, err)
-		assert.True(t, acquired3)
-	})
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			acquired, err := indexer.AcquireLock(ctx, "contended-key", owner, 10*time.Second)
+			if err != nil {
+				mu.Lock()
+				defer mu.Unlock()
+
+				t.Errorf("unexpected error acquiring lock: %v", err)
+
+				return
+			}
+
+			if acquired {
+				mu.Lock()
+				defer mu.Unlock()
+
+				winners = append(winners, owner)
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	require.Len(t, winners, 1, "exactly one contender must win the lock")
+
+	var lock DistributedLock
+
+	result := indexer.db.Where("key = ?", "contended-key").First(&lock)
+	require.NoError(t, result.Error)
+	assert.Equal(t, winners[0], lock.Owner)
 }

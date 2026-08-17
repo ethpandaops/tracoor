@@ -94,15 +94,19 @@ export function useBeaconStatesCount(request: V1CountBeaconStateRequest, enabled
   });
 }
 
-export function useUniqueBeaconStateValues(fields: BeaconStateField[], enabled = true) {
+export function useUniqueBeaconStateValues(
+  fields: BeaconStateField[],
+  network?: string,
+  enabled = true,
+) {
   return useQuery<
     V1ListUniqueBeaconStateValuesResponse,
     unknown,
     V1ListUniqueBeaconStateValuesResponse,
-    [string, BeaconStateField[]]
+    [string, BeaconStateField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-beacon-state-values', fields],
-    queryFn: () => fetchListUniqueBeaconStateValues({ fields }),
+    queryKey: ['list-unique-beacon-state-values', fields, network],
+    queryFn: () => fetchListUniqueBeaconStateValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -126,15 +130,19 @@ export function useBeaconBlocksCount(request: V1CountBeaconBlockRequest, enabled
   });
 }
 
-export function useUniqueBeaconBlockValues(fields: BeaconBlockField[], enabled = true) {
+export function useUniqueBeaconBlockValues(
+  fields: BeaconBlockField[],
+  network?: string,
+  enabled = true,
+) {
   return useQuery<
     V1ListUniqueBeaconBlockValuesResponse,
     unknown,
     V1ListUniqueBeaconBlockValuesResponse,
-    [string, BeaconBlockField[]]
+    [string, BeaconBlockField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-beacon-block-values', fields],
-    queryFn: () => fetchListUniqueBeaconBlockValues({ fields }),
+    queryKey: ['list-unique-beacon-block-values', fields, network],
+    queryFn: () => fetchListUniqueBeaconBlockValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -163,15 +171,19 @@ export function useBeaconBadBlocksCount(request: V1CountBeaconBadBlockRequest, e
   });
 }
 
-export function useUniqueBeaconBadBlockValues(fields: BeaconBadBlockField[], enabled = true) {
+export function useUniqueBeaconBadBlockValues(
+  fields: BeaconBadBlockField[],
+  network?: string,
+  enabled = true,
+) {
   return useQuery<
     V1ListUniqueBeaconBadBlockValuesResponse,
     unknown,
     V1ListUniqueBeaconBadBlockValuesResponse,
-    [string, BeaconBadBlockField[]]
+    [string, BeaconBadBlockField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-beacon-bad-block-values', fields],
-    queryFn: () => fetchListUniqueBeaconBadBlockValues({ fields }),
+    queryKey: ['list-unique-beacon-bad-block-values', fields, network],
+    queryFn: () => fetchListUniqueBeaconBadBlockValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -195,15 +207,19 @@ export function useBeaconBadBlobsCount(request: V1CountBeaconBadBlobRequest, ena
   });
 }
 
-export function useUniqueBeaconBadBlobValues(fields: BeaconBadBlobField[], enabled = true) {
+export function useUniqueBeaconBadBlobValues(
+  fields: BeaconBadBlobField[],
+  network?: string,
+  enabled = true,
+) {
   return useQuery<
     V1ListUniqueBeaconBadBlobValuesResponse,
     unknown,
     V1ListUniqueBeaconBadBlobValuesResponse,
-    [string, BeaconBadBlobField[]]
+    [string, BeaconBadBlobField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-beacon-bad-blob-values', fields],
-    queryFn: () => fetchListUniqueBeaconBadBlobValues({ fields }),
+    queryKey: ['list-unique-beacon-bad-blob-values', fields, network],
+    queryFn: () => fetchListUniqueBeaconBadBlobValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -237,16 +253,17 @@ export function useExecutionBlockTracesCount(
 
 export function useUniqueExecutionBlockTraceValues(
   fields: ExecutionBlockTraceField[],
+  network?: string,
   enabled = true,
 ) {
   return useQuery<
     V1ListUniqueExecutionBlockTraceValuesResponse,
     unknown,
     V1ListUniqueExecutionBlockTraceValuesResponse,
-    [string, ExecutionBlockTraceField[]]
+    [string, ExecutionBlockTraceField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-execution-block-trace-values', fields],
-    queryFn: () => fetchListUniqueExecutionBlockTraceValues({ fields }),
+    queryKey: ['list-unique-execution-block-trace-values', fields, network],
+    queryFn: () => fetchListUniqueExecutionBlockTraceValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -278,15 +295,19 @@ export function useExecutionBadBlocksCount(
   });
 }
 
-export function useUniqueExecutionBadBlockValues(fields: ExecutionBadBlockField[], enabled = true) {
+export function useUniqueExecutionBadBlockValues(
+  fields: ExecutionBadBlockField[],
+  network?: string,
+  enabled = true,
+) {
   return useQuery<
     V1ListUniqueExecutionBadBlockValuesResponse,
     unknown,
     V1ListUniqueExecutionBadBlockValuesResponse,
-    [string, ExecutionBadBlockField[]]
+    [string, ExecutionBadBlockField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-execution-bad-block-values', fields],
-    queryFn: () => fetchListUniqueExecutionBadBlockValues({ fields }),
+    queryKey: ['list-unique-execution-bad-block-values', fields, network],
+    queryFn: () => fetchListUniqueExecutionBadBlockValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
@@ -323,16 +344,17 @@ export function useExecutionPayloadEnvelopesCount(
 
 export function useUniqueExecutionPayloadEnvelopeValues(
   fields: ExecutionPayloadEnvelopeField[],
+  network?: string,
   enabled = true,
 ) {
   return useQuery<
     V1ListUniqueExecutionPayloadEnvelopeValuesResponse,
     unknown,
     V1ListUniqueExecutionPayloadEnvelopeValuesResponse,
-    [string, ExecutionPayloadEnvelopeField[]]
+    [string, ExecutionPayloadEnvelopeField[], string | undefined]
   >({
-    queryKey: ['list-unqiue-execution-payload-envelope-values', fields],
-    queryFn: () => fetchListUniqueExecutionPayloadEnvelopeValues({ fields }),
+    queryKey: ['list-unique-execution-payload-envelope-values', fields, network],
+    queryFn: () => fetchListUniqueExecutionPayloadEnvelopeValues({ fields, network }),
     enabled,
     staleTime: 60_000,
   });
