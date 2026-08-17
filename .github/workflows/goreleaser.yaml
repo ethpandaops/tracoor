@@ -87,3 +87,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_SUFFIX: ${{ env.RELEASE_SUFFIX }}
+          # Pin the version to the tag that triggered this run. Without this,
+          # GoReleaser derives it from `git tag --points-at HEAD --sort=-version:refname`
+          # and takes the first result -- so a commit carrying tags from two release
+          # branches (e.g. cutting release/foo-8 from an already-tagged release/foo-7
+          # commit) gets released under whichever version sorts highest, clobbering
+          # the wrong release.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
