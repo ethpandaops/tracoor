@@ -19,6 +19,14 @@ message BeaconState {
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 14;
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when there is no ready blob to count against.
+  google.protobuf.UInt32Value agreement_count = 15;
 }
 
 message BeaconBlock {
@@ -33,6 +41,14 @@ message BeaconBlock {
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 14;
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when there is no ready blob to count against.
+  google.protobuf.UInt32Value agreement_count = 15;
 }
 
 message ExecutionPayloadEnvelope {
@@ -47,6 +63,14 @@ message ExecutionPayloadEnvelope {
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 14;
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when there is no ready blob to count against.
+  google.protobuf.UInt32Value agreement_count = 15;
 }
 
 message BeaconBadBlock {
@@ -61,6 +85,11 @@ message BeaconBadBlock {
   google.protobuf.StringValue network = 9;
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 14;
 }
 
 
@@ -77,6 +106,11 @@ message BeaconBadBlob {
   google.protobuf.StringValue beacon_implementation = 10;
   google.protobuf.UInt64Value index = 11;
   google.protobuf.StringValue content_encoding = 12;
+  google.protobuf.StringValue content_hash = 13;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 14;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 15;
 }
 
 message ExecutionBlockTrace {
@@ -90,6 +124,14 @@ message ExecutionBlockTrace {
   google.protobuf.StringValue execution_implementation = 8;
   google.protobuf.StringValue node_version = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 13;
+  // How many nodes' verified payloads share this content hash, this one
+  // included. Unset when there is no ready blob to count against.
+  google.protobuf.UInt32Value agreement_count = 14;
 }
 
 message ExecutionBadBlock {
@@ -104,6 +146,11 @@ message ExecutionBadBlock {
   google.protobuf.StringValue node_version = 9;
   google.protobuf.StringValue block_extra_data = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 14;
 }
 
 message Config {
@@ -209,6 +256,109 @@ service Indexer {
   rpc ListUniqueExecutionBadBlockValues(
       ListUniqueExecutionBadBlockValuesRequest)
       returns (ListUniqueExecutionBadBlockValuesResponse) {}
+  // Blob
+  rpc GetBlob(GetBlobRequest) returns (GetBlobResponse) {}
+  rpc CreateBlob(CreateBlobRequest) returns (CreateBlobResponse) {}
+  // PayloadDivergence
+  rpc CreatePayloadDivergence(CreatePayloadDivergenceRequest)
+      returns (CreatePayloadDivergenceResponse) {}
+  rpc ListPayloadDivergence(ListPayloadDivergenceRequest)
+      returns (ListPayloadDivergenceResponse) {}
+}
+
+// Blob is the deduplicated payload shared by every artifact row that observed
+// the same bytes for the same dedup key.
+message Blob {
+  google.protobuf.StringValue kind = 1;
+  google.protobuf.StringValue network = 2;
+  google.protobuf.StringValue dedup_key = 3;
+  google.protobuf.StringValue content_hash = 4;
+  google.protobuf.StringValue location = 5;
+  google.protobuf.StringValue content_encoding = 6;
+  google.protobuf.Int64Value raw_size = 7;
+  google.protobuf.Int64Value compressed_size = 8;
+  google.protobuf.Int64Value ref_count = 9;
+  // "ready" or "deleting". Only "ready" blobs may be linked.
+  google.protobuf.StringValue state = 10;
+  google.protobuf.Int64Value generation = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+message GetBlobRequest {
+  google.protobuf.StringValue kind = 1;
+  google.protobuf.StringValue network = 2;
+  google.protobuf.StringValue dedup_key = 3;
+}
+
+message GetBlobResponse { Blob blob = 1; }
+
+message CreateBlobRequest {
+  google.protobuf.StringValue kind = 1;
+  google.protobuf.StringValue network = 2;
+  google.protobuf.StringValue dedup_key = 3;
+  google.protobuf.StringValue content_hash = 4;
+  google.protobuf.StringValue location = 5;
+  google.protobuf.StringValue content_encoding = 6;
+  google.protobuf.Int64Value raw_size = 7;
+  google.protobuf.Int64Value compressed_size = 8;
+}
+
+message CreateBlobResponse {
+  // The row that won the insert: freshly created or already present. A caller
+  // that lost the race compares hashes against it.
+  Blob blob = 1;
+}
+
+// PayloadDivergence records that a node served bytes whose hash did not match
+// the canonical blob for the same dedup key.
+message PayloadDivergence {
+  google.protobuf.StringValue id = 1;
+  google.protobuf.Timestamp observed_at = 2;
+  google.protobuf.StringValue network = 3;
+  google.protobuf.StringValue kind = 4;
+  google.protobuf.StringValue node = 5;
+  google.protobuf.StringValue dedup_key = 6;
+  google.protobuf.StringValue expected_hash = 7;
+  google.protobuf.StringValue actual_hash = 8;
+  google.protobuf.UInt64Value slot = 9;
+  google.protobuf.StringValue identifier = 10;
+  // 1 = first observation, 2 = the single re-fetch.
+  google.protobuf.Int32Value attempt = 11;
+  google.protobuf.StringValue severity = 12;
+  // Location of the divergent copy, empty when it was not stored.
+  google.protobuf.StringValue location = 13;
+}
+
+message CreatePayloadDivergenceRequest {
+  google.protobuf.Timestamp observed_at = 1;
+  google.protobuf.StringValue network = 2;
+  google.protobuf.StringValue kind = 3;
+  google.protobuf.StringValue node = 4;
+  google.protobuf.StringValue dedup_key = 5;
+  google.protobuf.StringValue expected_hash = 6;
+  google.protobuf.StringValue actual_hash = 7;
+  google.protobuf.UInt64Value slot = 8;
+  google.protobuf.StringValue identifier = 9;
+  google.protobuf.Int32Value attempt = 10;
+  google.protobuf.StringValue severity = 11;
+  google.protobuf.StringValue location = 12;
+}
+
+message CreatePayloadDivergenceResponse {
+  google.protobuf.StringValue id = 1;
+}
+
+message ListPayloadDivergenceRequest {
+  string network = 1;
+  string kind = 2;
+  string dedup_key = 3;
+  google.protobuf.Timestamp before = 4;
+  google.protobuf.Timestamp after = 5;
+  PaginationCursor pagination = 6;
+}
+
+message ListPayloadDivergenceResponse {
+  repeated PayloadDivergence payload_divergences = 1;
 }
 
 message GetConfigRequest {}
@@ -235,6 +385,13 @@ message CreateBeaconStateRequest {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 13;
+  // Identifies the deduplicated payload these bytes belong to.
+  google.protobuf.StringValue dedup_key = 14;
 }
 
 message CreateBeaconStateResponse { google.protobuf.StringValue id = 1; }
@@ -250,6 +407,13 @@ message CreateBeaconBlockRequest {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 13;
+  // Identifies the deduplicated payload these bytes belong to.
+  google.protobuf.StringValue dedup_key = 14;
 }
 
 message CreateBeaconBlockResponse { google.protobuf.StringValue id = 1; }
@@ -265,6 +429,13 @@ message CreateExecutionPayloadEnvelopeRequest {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 13;
+  // Identifies the deduplicated payload these bytes belong to.
+  google.protobuf.StringValue dedup_key = 14;
 }
 
 message CreateExecutionPayloadEnvelopeResponse {
@@ -282,6 +453,9 @@ message CreateBeaconBadBlockRequest {
   google.protobuf.StringValue network = 8;
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
 }
 
 message CreateBeaconBadBlockResponse { google.protobuf.StringValue id = 1; }
@@ -298,6 +472,9 @@ message CreateBeaconBadBlobRequest {
   google.protobuf.StringValue beacon_implementation = 9;
   google.protobuf.UInt64Value index = 10;
   google.protobuf.StringValue content_encoding = 11;
+  google.protobuf.StringValue content_hash = 12;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 13;
 }
 
 message CreateBeaconBadBlobResponse { google.protobuf.StringValue id = 1; }
@@ -312,6 +489,13 @@ message CreateExecutionBlockTraceRequest {
   google.protobuf.StringValue execution_implementation = 7;
   google.protobuf.StringValue node_version = 8;
   google.protobuf.StringValue content_encoding = 9;
+  google.protobuf.StringValue content_hash = 10;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 11;
+  // Set when the hash was compared against an existing payload and matched.
+  google.protobuf.Timestamp content_matched_at = 12;
+  // Identifies the deduplicated payload these bytes belong to.
+  google.protobuf.StringValue dedup_key = 13;
 }
 
 message CreateExecutionBlockTraceResponse {
@@ -347,6 +531,8 @@ message CountExecutionBlockTraceRequest {
   google.protobuf.Timestamp after = 7;
   string execution_implementation = 8;
   string node_version = 9;
+  // A count must accept every filter the matching list accepts, or the two disagree.
+  string id = 10;
 }
 
 message CountExecutionBlockTraceResponse {
@@ -365,6 +551,8 @@ message ListUniqueExecutionBlockTraceValuesRequest {
     CLIENT_VERSION = 7;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueExecutionBlockTraceValuesResponse {
@@ -390,6 +578,8 @@ message ListUniqueBeaconStateValuesRequest {
     BEACON_IMPLEMENTATION = 7;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueBeaconStateValuesResponse {
@@ -449,6 +639,8 @@ message ListUniqueBeaconBlockValuesRequest {
     BEACON_IMPLEMENTATION = 7;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueBeaconBlockValuesResponse {
@@ -508,6 +700,8 @@ message ListUniqueBeaconBadBlockValuesRequest {
     BEACON_IMPLEMENTATION = 7;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueBeaconBadBlockValuesResponse {
@@ -533,6 +727,8 @@ message ListUniqueExecutionPayloadEnvelopeValuesRequest {
     BEACON_IMPLEMENTATION = 7;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueExecutionPayloadEnvelopeValuesResponse {
@@ -633,6 +829,8 @@ message ListUniqueBeaconBadBlobValuesRequest {
     INDEX = 8;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueBeaconBadBlobValuesResponse {
@@ -702,6 +900,9 @@ message CreateExecutionBadBlockRequest {
   google.protobuf.StringValue node_version = 8;
   google.protobuf.StringValue block_extra_data = 9;
   google.protobuf.StringValue content_encoding = 10;
+  google.protobuf.StringValue content_hash = 11;
+  // Set when these bytes were read and hashed from this node.
+  google.protobuf.Timestamp verified_at = 12;
 }
 
 message CreateExecutionBadBlockResponse { google.protobuf.StringValue id = 1; }
@@ -737,6 +938,8 @@ message CountExecutionBadBlockRequest {
   string execution_implementation = 8;
   string node_version = 9;
   string block_extra_data = 10;
+  // A count must accept every filter the matching list accepts, or the two disagree.
+  string id = 11;
 }
 
 message CountExecutionBadBlockResponse {
@@ -756,6 +959,8 @@ message ListUniqueExecutionBadBlockValuesRequest {
     BLOCK_EXTRA_DATA = 8;
   }
   repeated Field fields = 1;
+  // Empty means unscoped. Only the network dropdown itself may leave this empty.
+  string network = 2;
 }
 
 message ListUniqueExecutionBadBlockValuesResponse {

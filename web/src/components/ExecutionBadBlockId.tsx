@@ -5,6 +5,7 @@ import { useLocation } from 'wouter';
 
 import Alert from '@components/Alert';
 import CopyToClipboard from '@components/CopyToClipboard';
+import VerificationBadge from '@components/VerificationBadge';
 import useNetwork from '@contexts/network';
 import { useExecutionBadBlocks } from '@hooks/useQuery';
 
@@ -194,6 +195,28 @@ export default function ExecutionBadBlockId({ id }: { id: string }) {
                 <div className="h-5 w-16 bg-gray-600/35 rounded-xl animate-pulse"></div>
               ) : (
                 badBlock?.block_extra_data
+              )}
+            </dd>
+          </div>
+          <div className="py-4 sm:py-5 px-4 sm:grid sm:grid-cols-5 sm:gap-4 sm:px-6">
+            <dt className="text-sm font-medium text-gray-500">Content hash</dt>
+            <dd className="mt-1 text-sm text-sky-500 font-bold sm:mt-0 sm:col-span-4">
+              {isLoading ? (
+                <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <VerificationBadge
+                    contentHash={badBlock?.content_hash}
+                    verifiedAt={badBlock?.verified_at}
+                    contentMatchedAt={badBlock?.content_matched_at}
+                  />
+                  {badBlock?.content_hash && (
+                    <span className="flex font-mono">
+                      <span className="relative top-1">{badBlock.content_hash}</span>
+                      <CopyToClipboard text={badBlock.content_hash} className="ml-2" />
+                    </span>
+                  )}
+                </div>
               )}
             </dd>
           </div>

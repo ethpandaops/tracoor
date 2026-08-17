@@ -3,26 +3,40 @@ package persistence
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
 )
 
 type ExecutionBadBlock struct {
-	gorm.Model
 	ID                      string    `gorm:"primaryKey"`
-	Node                    string    `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	FetchedAt               time.Time `gorm:"index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:3;index:iidx_execution_bad_block_fetchedat,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:1"`
-	ExecutionImplementation string
-	NodeVersion             string `gorm:"not null;default:''"`
-	ContentEncoding         string `gorm:"not null;default:''"`
-	Location                string `gorm:"not null;default:''"`
-	Network                 string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:4;index:iidx_execution_bad_block_network,where:deleted_at IS NULL;index:iidx_execution_bad_block_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockHash               string `gorm:"not null;default:'';index;index:iidx_execution_bad_block_node_blockhash_fetchedat_network,where:deleted_at IS NULL,priority:2"`
-	BlockNumber             sql.NullInt64
-	BlockExtraData          sql.NullString
+	Node                    string    `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:3;index:ix_execution_bad_blocks_network_node_fetched_at,priority:2"`
+	FetchedAt               time.Time `gorm:"not null;index:ix_execution_bad_blocks_fetched_at;index:ix_execution_bad_blocks_network_node_fetched_at,priority:3;index:ix_execution_bad_blocks_network_fetched_at,priority:2"`
+	ExecutionImplementation string    `gorm:"not null;default:''"`
+	NodeVersion             string    `gorm:"not null;default:''"`
+	ContentEncoding         string    `gorm:"not null;default:''"`
+	Location                string    `gorm:"not null;default:''"`
+	ContentHash             string    `gorm:"not null;default:'';size:64"`
+	// VerifiedAt is set when these bytes were read and hashed from this node.
+	VerifiedAt *time.Time
+	// ContentMatchedAt is set when the hash was compared against an existing
+	// payload and matched. Bad blocks are never linked, so it stays null.
+	ContentMatchedAt *time.Time
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:1;index:ix_execution_bad_blocks_network_node_fetched_at,priority:1;index:ix_execution_bad_blocks_network_fetched_at,priority:1"`
+	BlockHash        string `gorm:"not null;default:'';uniqueIndex:ux_execution_bad_blocks_dedupe,priority:2"`
+	BlockNumber      sql.NullInt64
+	BlockExtraData   sql.NullString
+}
+
+// BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
+// the value itself carries, so a row written by a process in another zone would neither order
+// nor compare against the rest of the table.
+func (a *ExecutionBadBlock) BeforeSave(*gorm.DB) error {
+	a.FetchedAt = utcBound(a.FetchedAt)
+	a.VerifiedAt = utcBoundPtr(a.VerifiedAt)
+	a.ContentMatchedAt = utcBoundPtr(a.ContentMatchedAt)
+
+	return nil
 }
 
 type ExecutionBadBlockFilter struct {
@@ -83,24 +97,6 @@ func (f *ExecutionBadBlockFilter) AddBlockExtraData(data string) {
 	f.BlockExtraData = &data
 }
 
-func (f *ExecutionBadBlockFilter) Validate() error {
-	if f.ID == nil &&
-		f.Node == nil &&
-		f.Before == nil &&
-		f.After == nil &&
-		f.BlockHash == nil &&
-		f.BlockNumber == nil &&
-		f.ExecutionImplementation == nil &&
-		f.NodeVersion == nil &&
-		f.Location == nil &&
-		f.Network == nil &&
-		f.BlockExtraData == nil {
-		return errors.New("no filter specified")
-	}
-
-	return nil
-}
-
 func (f *ExecutionBadBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	if f.ID != nil {
 		query = query.Where("id = ?", f.ID)
@@ -111,11 +107,11 @@ func (f *ExecutionBadBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error)
 	}
 
 	if f.Before != nil {
-		query = query.Where("fetched_at <= ?", timestampFormatForDB(*f.Before))
+		query = query.Where("fetched_at <= ?", utcBound(*f.Before))
 	}
 
 	if f.After != nil {
-		query = query.Where("fetched_at >= ?", timestampFormatForDB(*f.After))
+		query = query.Where("fetched_at >= ?", utcBound(*f.After))
 	}
 
 	if f.BlockHash != nil {
@@ -213,7 +209,14 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, filter *ExecutionBa
 	if page != nil {
 		query = page.ApplyOffsetLimit(query)
 
-		query = page.ApplyOrderBy(query)
+		ordered, err := page.ApplyOrderBy(query)
+		if err != nil {
+			i.metrics.ObserveOperationError(operation)
+
+			return nil, err
+		}
+
+		query = ordered
 	}
 
 	query, err := filter.ApplyToQuery(query)
@@ -244,8 +247,25 @@ type DistinctExecutionBadBlockValueResults struct {
 	BlockExtraData          []string
 }
 
-//nolint:errcheck // casting fine here.
-func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []string) (*DistinctExecutionBadBlockValueResults, error) {
+// executionBadBlockDistinct declares how each requested field's distinct values are
+// resolved. Loose-scannable fields lead an index right after network: node via
+// ix_execution_bad_blocks_network_node_fetched_at(network, node, fetched_at), block_hash
+// via ux_execution_bad_blocks_dedupe(network, block_hash, node), and network leads both.
+var executionBadBlockDistinct = distinctTable{
+	name: "execution_bad_blocks",
+	fields: map[string]distinctStrategy{
+		KeyNode:                    distinctLooseScan,
+		KeyBlockHash:               distinctLooseScan,
+		KeyNetwork:                 distinctLooseScan,
+		KeyBlockNumber:             distinctFullScan,
+		KeyLocation:                distinctFullScan,
+		KeyExecutionImplementation: distinctFullScan,
+		KeyNodeVersion:             distinctFullScan,
+		KeyBlockExtraData:          distinctFullScan,
+	},
+}
+
+func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []string, network string) (*DistinctExecutionBadBlockValueResults, error) {
 	operation := OperationDistinctValues
 
 	i.metrics.ObserveOperation(operation)
@@ -260,67 +280,41 @@ func (i *Indexer) DistinctExecutionBadBlockValues(ctx context.Context, fields []
 		NodeVersion:             make([]string, 0),
 		BlockExtraData:          make([]string, 0),
 	}
-	query := i.db.WithContext(ctx).Model(&ExecutionBadBlock{}).Select(fields).Group(strings.Join(fields, ", ")).Limit(1000)
 
-	rows, err := query.Rows()
-	if err != nil {
-		i.metrics.ObserveOperationError(operation)
+	seen := make(map[string]bool, len(fields))
 
-		return nil, err
-	}
-	defer rows.Close()
-
-	valueSets := make(map[string]map[interface{}]bool)
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
-	}
-
-	var values []interface{}
-	for rows.Next() {
-		values = make([]interface{}, len(fields))
-		valuePtrs := make([]interface{}, len(fields))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
+		if seen[field] {
+			continue
 		}
 
-		err := rows.Scan(valuePtrs...)
+		seen[field] = true
+
+		values, err := i.distinctFieldValues(ctx, executionBadBlockDistinct, field, network)
 		if err != nil {
 			i.metrics.ObserveOperationError(operation)
 
 			return nil, err
 		}
 
-		for i, field := range fields {
-			if !valueSets[field][values[i]] {
-				switch field {
-				case KeyNode:
-					results.Node = append(results.Node, values[i].(string))
-				case KeyBlockHash:
-					results.BlockHash = append(results.BlockHash, values[i].(string))
-				case KeyBlockNumber:
-					results.BlockNumber = append(results.BlockNumber, values[i].(int64))
-				case KeyLocation:
-					results.Location = append(results.Location, values[i].(string))
-				case KeyNetwork:
-					results.Network = append(results.Network, values[i].(string))
-				case KeyExecutionImplementation:
-					results.ExecutionImplementation = append(results.ExecutionImplementation, values[i].(string))
-				case KeyNodeVersion:
-					results.NodeVersion = append(results.NodeVersion, values[i].(string))
-				case "block_extra_data":
-					results.BlockExtraData = append(results.BlockExtraData, values[i].(string))
-				}
-
-				valueSets[field][values[i]] = true
-			}
+		switch field {
+		case KeyNode:
+			results.Node = distinctStrings(values)
+		case KeyBlockHash:
+			results.BlockHash = distinctStrings(values)
+		case KeyBlockNumber:
+			results.BlockNumber = distinctInt64s(values)
+		case KeyLocation:
+			results.Location = distinctStrings(values)
+		case KeyNetwork:
+			results.Network = distinctStrings(values)
+		case KeyExecutionImplementation:
+			results.ExecutionImplementation = distinctStrings(values)
+		case KeyNodeVersion:
+			results.NodeVersion = distinctStrings(values)
+		case KeyBlockExtraData:
+			results.BlockExtraData = distinctStrings(values)
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		i.metrics.ObserveOperationError(operation)
-
-		return nil, err
 	}
 
 	return results, nil

@@ -15,6 +15,8 @@ const (
 	KeyLocation                = "location"
 	KeyFetchedAt               = "fetched_at"
 	KeyBeaconImplementation    = "beacon_implementation"
+	KeyIndex                   = "index"
+	KeyBlockExtraData          = "block_extra_data"
 )
 
 //nolint:tagliatelle // requires snake.

@@ -1,10 +1,10 @@
 package store
 
 import (
-	"context"
-	"testing"
-
 	"bytes"
+	"context"
+	"errors"
+	"testing"
 
 	"github.com/ethpandaops/tracoor/pkg/compression"
 )
@@ -51,6 +51,113 @@ func TestS3StoreOperations(t *testing.T) {
 	t.Run("Copy", func(t *testing.T) {
 		testCopy(ctx, t, store)
 	})
+
+	t.Run("AbortsOnAFailedRead", func(t *testing.T) {
+		testAbortsOnAFailedRead(ctx, t, store)
+	})
+
+	t.Run("DeleteMany", func(t *testing.T) {
+		testDeleteMany(ctx, t, store)
+	})
+}
+
+func testDeleteMany(ctx context.Context, t *testing.T, st Store) {
+	t.Helper()
+
+	locations := make([]string, 0, 4)
+	locations = append(locations, "delete_many/one.ssz", "delete_many/two.ssz", "delete_many/three.ssz")
+
+	for _, location := range locations {
+		if _, err := st.SaveBeaconState(ctx, &SaveParams{
+			Data:     bytes.NewReader([]byte("payload")),
+			Location: location,
+		}); err != nil {
+			t.Fatalf("Failed to save %s: %v", location, err)
+		}
+	}
+
+	// One location that was never written: bulk delete is idempotent, so it must not turn the
+	// batch into a failure.
+	if err := st.DeleteMany(ctx, append(locations, "delete_many/never-existed.ssz")); err != nil {
+		t.Fatalf("Failed to delete many: %v", err)
+	}
+
+	for _, location := range locations {
+		exists, err := st.Exists(ctx, location)
+		if err != nil {
+			t.Fatalf("Failed to check %s: %v", location, err)
+		}
+
+		if exists {
+			t.Fatalf("Expected %s to be deleted", location)
+		}
+	}
+
+	if err := st.DeleteMany(ctx, nil); err != nil {
+		t.Fatalf("Expected an empty delete to be a no-op, got: %v", err)
+	}
+}
+
+// failingReader serves size bytes and then fails, standing in for a payload
+// whose source dies part way through the upload.
+type failingReader struct {
+	remaining int
+	err       error
+}
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		return 0, r.err
+	}
+
+	if len(p) > r.remaining {
+		p = p[:r.remaining]
+	}
+
+	r.remaining -= len(p)
+
+	return len(p), nil
+}
+
+// testAbortsOnAFailedRead pins the property the streaming write path depends
+// on: a body that fails part way through must leave no object behind, whether
+// the failure lands before the first part is sent or after several already
+// have.
+func testAbortsOnAFailedRead(ctx context.Context, t *testing.T, store Store) {
+	t.Helper()
+
+	readErr := errors.New("source died")
+
+	for _, tt := range []struct {
+		name string
+		size int
+	}{
+		// Smaller than a part, so the failure arrives before anything is sent.
+		{name: "SinglePart", size: 1024},
+		// Larger than a part, so a multipart upload is already underway.
+		{name: "Multipart", size: int(uploadPartSize) + 1024},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			location := "beacon_state/aborted_" + tt.name + ".ssz"
+
+			_, err := store.SaveBeaconState(ctx, &SaveParams{
+				Data:     &failingReader{remaining: tt.size, err: readErr},
+				Location: location,
+			})
+			if err == nil {
+				t.Fatal("Expected a failed read to fail the save")
+			}
+
+			exists, err := store.Exists(ctx, location)
+			if err != nil {
+				t.Fatalf("Failed to check existence: %v", err)
+			}
+
+			if exists {
+				t.Fatal("Expected a failed read to leave no object behind")
+			}
+		})
+	}
 }
 
 func testBeaconState(ctx context.Context, t *testing.T, store Store) {
@@ -68,15 +175,15 @@ func testBeaconState(ctx context.Context, t *testing.T, store Store) {
 			t.Fatalf("Store is not healthy: %v", err)
 		}
 
-		compressedData, err := compressor.Compress(&data, compression.Gzip)
+		compressedData, err := compressor.Compress(&data, compression.Default)
 		if err != nil {
 			t.Fatalf("Failed to compress data: %v", err)
 		}
 
 		location, err = store.SaveBeaconState(ctx, &SaveParams{
-			Data:            &compressedData,
+			Data:            bytes.NewReader(compressedData),
 			Location:        location,
-			ContentEncoding: compression.Gzip.ContentEncoding,
+			ContentEncoding: compression.Default.ContentEncoding,
 		})
 		if err != nil {
 			t.Fatalf("Failed to save beacon state: %v", err)
@@ -129,7 +236,7 @@ func testBeaconBlock(ctx context.Context, t *testing.T, store Store) {
 		}
 
 		location, err = store.SaveBeaconBlock(ctx, &SaveParams{
-			Data:            &data,
+			Data:            bytes.NewReader(data),
 			Location:        location,
 			ContentEncoding: "",
 		})
@@ -184,7 +291,7 @@ func testExecutionPayloadEnvelope(ctx context.Context, t *testing.T, store Store
 		}
 
 		location, err = store.SaveExecutionPayloadEnvelope(ctx, &SaveParams{
-			Data:            &data,
+			Data:            bytes.NewReader(data),
 			Location:        location,
 			ContentEncoding: "",
 		})
@@ -239,7 +346,7 @@ func testBeaconBadBlock(ctx context.Context, t *testing.T, store Store) {
 		}
 
 		location, err = store.SaveBeaconBadBlock(ctx, &SaveParams{
-			Data:            &data,
+			Data:            bytes.NewReader(data),
 			Location:        location,
 			ContentEncoding: "",
 		})
@@ -294,7 +401,7 @@ func testExecutionBlockTrace(ctx context.Context, t *testing.T, store Store) {
 		}
 
 		location, err = store.SaveExecutionBlockTrace(ctx, &SaveParams{
-			Data:            &data,
+			Data:            bytes.NewReader(data),
 			Location:        location,
 			ContentEncoding: "",
 		})
@@ -349,7 +456,7 @@ func testExecutionBadBlock(ctx context.Context, t *testing.T, store Store) {
 		}
 
 		location, err = store.SaveExecutionBadBlock(ctx, &SaveParams{
-			Data:            &data,
+			Data:            bytes.NewReader(data),
 			Location:        location,
 			ContentEncoding: "",
 		})
@@ -403,7 +510,7 @@ func testCopy(ctx context.Context, t *testing.T, store Store) {
 		sourceData := []byte(`{"test": "data"}`)
 
 		_, err := store.SaveBeaconBlock(ctx, &SaveParams{
-			Data:            &sourceData,
+			Data:            bytes.NewReader(sourceData),
 			Location:        sourceLocation,
 			ContentEncoding: "",
 		})

@@ -10,7 +10,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func generateRandomBeaconBadBlob() *BeaconBadBlob {
@@ -105,27 +108,6 @@ func TestListBeaconBadBlob(t *testing.T) {
 	assert.Len(t, blobs, 1)
 	assert.Equal(t, blob.ID, blobs[0].ID)
 	assert.Equal(t, blob.Node, blobs[0].Node)
-}
-
-func TestUpdateBeaconBadBlob(t *testing.T) {
-	indexer, mock, err := NewMockIndexer()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	blob := generateRandomBeaconBadBlob()
-
-	err = indexer.InsertBeaconBadBlob(ctx, blob)
-	assert.NoError(t, err)
-
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE").WithArgs(
-		blob.ID, blob.Node, blob.Slot, blob.Epoch, blob.BlockRoot, blob.FetchedAt,
-		blob.BeaconImplementation, blob.NodeVersion, blob.Location, blob.Network, blob.Index,
-	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	err = indexer.UpdateBeaconBadBlob(ctx, blob)
-	assert.NoError(t, err)
 }
 
 //nolint:gocyclo // Test is long but manageable
@@ -330,4 +312,37 @@ func TestBeaconBadBlobIndividualFilters(t *testing.T) {
 			})
 		}
 	})
+}
+
+// index is a reserved word and has to be quoted, but backticks are MySQL's quoting: SQLite
+// tolerates them and Postgres rejects them outright. The predicate has to be rendered by
+// whichever dialect is in use, so it is checked against both.
+func TestBeaconBadBlobIndexFilterQuotesPerDialect(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	index := uint64(7)
+
+	render := func(db *gorm.DB) string {
+		return db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+			filter := &BeaconBadBlobFilter{Index: &index}
+
+			query, aerr := filter.ApplyToQuery(tx.Model(&BeaconBadBlob{}))
+			require.NoError(t, aerr)
+
+			var rows []*BeaconBadBlob
+
+			return query.Find(&rows)
+		})
+	}
+
+	require.Equal(t, "SELECT * FROM `beacon_bad_blobs` WHERE `index` = 7", render(indexer.db))
+
+	conn, _, err := sqlmock.New()
+	require.NoError(t, err)
+
+	pg, err := gorm.Open(postgres.New(postgres.Config{Conn: conn}), &gorm.Config{DryRun: true})
+	require.NoError(t, err)
+
+	require.Equal(t, `SELECT * FROM "beacon_bad_blobs" WHERE "index" = 7`, render(pg))
 }

@@ -2,6 +2,8 @@ package indexer
 
 import (
 	"context"
+	"math"
+	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
@@ -18,7 +20,9 @@ import (
 )
 
 const (
-	ServiceType                = "tracoor.indexer"
+	ServiceType      = "tracoor.indexer"
+	metricsNamespace = "tracoor_indexer"
+
 	KeyNode                    = "node"
 	KeyBlockRoot               = "block_root"
 	KeyBlockHash               = "block_hash"
@@ -36,6 +40,8 @@ const (
 	KeyID                      = "id"
 	KeyIndex                   = "index"
 	KeyLockKey                 = "lock_key"
+	KeyKind                    = "kind"
+	KeyDedupKey                = "dedup_key"
 
 	OrderFetchedAtDesc = "fetched_at DESC"
 	OrderFetchedAtAsc  = "fetched_at ASC"
@@ -55,6 +61,22 @@ type Indexer struct {
 	ethereumConfig *ethereum.Config
 
 	permanentStore *PermanentStore
+
+	metrics *Metrics
+
+	// reaper carries object deletes that the store refused, between retention passes.
+	reaper *objectReaper
+
+	// disagreements keeps the root-disagreement report to one per distinct observation.
+	disagreements *disagreementReporter
+
+	// blobs carries the collection failure counts that decide when a payload the collector
+	// cannot evaluate stops being retried.
+	blobs *blobQuarantine
+
+	// archiveBudget bounds how long one page of blocks may spend waiting on the permanent
+	// store before the rest of the page is left for the next cycle.
+	archiveBudget time.Duration
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
@@ -73,6 +95,11 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		config:         conf,
 		ethereumConfig: ethereumConfig,
 		permanentStore: permanentStore,
+		metrics:        NewMetrics(metricsNamespace),
+		reaper:         newObjectReaper(),
+		disagreements:  newDisagreementReporter(),
+		blobs:          newBlobQuarantine(),
+		archiveBudget:  permanentStoreArchiveBudget,
 	}
 
 	return i, nil
@@ -139,6 +166,71 @@ func (i *Indexer) GetConfig(ctx context.Context, req *indexer.GetConfigRequest) 
 	}, nil
 }
 
+// gateOnStore confirms the object is really there before an index entry claims it exists.
+//
+// The check is skipped for exactly one case: the write is taking a reference on a ready blob
+// stored at the same location. That blob row was written by an agent that had just uploaded
+// the object and it is a stronger, cheaper statement than a HEAD request, which every node
+// observing the same payload would otherwise repeat.
+func (i *Indexer) gateOnStore(ctx context.Context, p *persistence.InsertArtifactParams) error {
+	if p.DedupKey != "" && p.ContentHash != "" {
+		blob, err := i.db.GetBlob(ctx, p.Kind, p.Network, p.DedupKey)
+
+		switch {
+		case err == nil && blob.Location == p.Location:
+			return nil
+		case err != nil && !errors.Is(err, persistence.ErrBlobNotFound):
+			return status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	exists, err := i.store.Exists(ctx, p.Location)
+	if err != nil {
+		i.log.
+			WithError(err).
+			WithField(KeyLocation, p.Location).
+			WithField(KeyKind, p.Kind).
+			Error("Failed to index an artifact because the store could not be reached. Check that the agent and server are pointed at the same storage backend.")
+
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	if !exists {
+		return status.Error(codes.FailedPrecondition, "object not present in store")
+	}
+
+	return nil
+}
+
+// indexArtifact runs the write path shared by all seven kinds: gate on the store, insert
+// against the unique index, take a blob reference if the row is linking one. subject names the
+// kind in the errors the agent sees.
+func (i *Indexer) indexArtifact(ctx context.Context, p *persistence.InsertArtifactParams, subject string, logFields logrus.Fields) error {
+	if err := i.gateOnStore(ctx, p); err != nil {
+		return err
+	}
+
+	outcome, err := i.db.InsertArtifact(ctx, p)
+	if err != nil {
+		i.log.WithError(err).WithFields(logFields).Error("Failed to index " + subject)
+
+		return status.Error(codes.Internal, "failed to index "+subject)
+	}
+
+	switch outcome {
+	case persistence.ArtifactInsertDuplicate:
+		return status.Error(codes.AlreadyExists, subject+" already indexed")
+	case persistence.ArtifactInsertUnlinkable:
+		// Distinguishable on purpose: the agent's payload is not in the store any more, so it
+		// re-fetches and re-uploads rather than retrying the same write.
+		return status.Error(codes.FailedPrecondition, "blob not linkable")
+	case persistence.ArtifactInsertLinked, persistence.ArtifactInsertUnlinked:
+		return nil
+	}
+
+	return nil
+}
+
 func (i *Indexer) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -171,37 +263,6 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the state
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon state because the state could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the state is already indexed
-		filter := &persistence.BeaconStateFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddStateRoot(req.GetStateRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		states, err := i.db.ListBeaconState(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(states) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon state already indexed")
-		}
-	}
-
 	// Create the state
 	state := &indexer.BeaconState{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -215,6 +276,9 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := state.Validate(); err != nil {
@@ -234,10 +298,18 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconState(ctx, ProtoBeaconStateToDBBeaconState(state)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index state")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconStateToDBBeaconState(state),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyStateRoot, KeyNode},
+		Kind:            persistence.KindBeaconState,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index state")
+	if err := i.indexArtifact(ctx, params, "beacon state", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", state.GetId().GetValue()).Debug("Indexed beacon state")
@@ -245,6 +317,65 @@ func (i *Indexer) CreateBeaconState(ctx context.Context, req *indexer.CreateBeac
 	return &indexer.CreateBeaconStateResponse{
 		Id: state.GetId(),
 	}, nil
+}
+
+// agreementRef identifies one verified payload: the network it was observed on and the blob
+// location its row references. The location, not the content hash, is the key — a linked row
+// carries its blob's location, and blobs under different dedupe keys can share bytes (an empty
+// trace is identical JSON on every client build) without their counts being one number. Counts
+// are resolved per ref rather than per row so one blob query covers a whole page of rows that
+// mostly share payloads.
+type agreementRef struct {
+	network  string
+	location string
+}
+
+// verifiedRef builds the ref for a row, or a zero ref for one that carries no evidence — an
+// unverified row, one with no recorded hash, or one with no location has no agreement to
+// count.
+func verifiedRef(network, hash, location string, verifiedAt *time.Time) agreementRef {
+	if verifiedAt == nil || hash == "" || location == "" {
+		return agreementRef{}
+	}
+
+	return agreementRef{network: network, location: location}
+}
+
+// agreementCounts resolves how many rows share each referenced payload's bytes, from the
+// ready blobs' reference counts. A missing key means no ready blob backs that location and
+// the count is unknown. Failures degrade to what has been resolved so far: the count is
+// decoration on a list response, not data worth failing the request over.
+func (i *Indexer) agreementCounts(ctx context.Context, kind string, refs map[agreementRef]struct{}) map[agreementRef]uint32 {
+	byNetwork := make(map[string][]string)
+
+	for ref := range refs {
+		if ref == (agreementRef{}) {
+			continue
+		}
+
+		byNetwork[ref.network] = append(byNetwork[ref.network], ref.location)
+	}
+
+	out := make(map[agreementRef]uint32, len(refs))
+
+	for network, locations := range byNetwork {
+		counts, err := i.db.AgreementCountsByLocation(ctx, kind, network, locations)
+		if err != nil {
+			i.log.WithError(err).WithField("kind", kind).Warn("Failed to resolve payload agreement counts")
+
+			continue
+		}
+
+		for location, count := range counts {
+			if count < 0 || count > math.MaxUint32 {
+				continue
+			}
+
+			out[agreementRef{network: network, location: location}] = uint32(count)
+		}
+	}
+
+	return out
 }
 
 func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconStateRequest) (*indexer.ListBeaconStateResponse, error) {
@@ -301,7 +432,12 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconStates, err := i.db.ListBeaconState(ctx, filter, pagination)
@@ -309,9 +445,21 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 		return nil, err
 	}
 
+	refs := make(map[agreementRef]struct{}, len(beaconStates))
+	for _, state := range beaconStates {
+		refs[verifiedRef(state.Network, state.ContentHash, state.Location, state.VerifiedAt)] = struct{}{}
+	}
+
+	counts := i.agreementCounts(ctx, persistence.KindBeaconState, refs)
+
 	protoBeaconStates := make([]*indexer.BeaconState, len(beaconStates))
-	for i, state := range beaconStates {
-		protoBeaconStates[i] = DBBeaconStateToProtoBeaconState(state)
+	for idx, state := range beaconStates {
+		proto := DBBeaconStateToProtoBeaconState(state)
+		if count, ok := counts[verifiedRef(state.Network, state.ContentHash, state.Location, state.VerifiedAt)]; ok {
+			proto.AgreementCount = wrapperspb.UInt32(count)
+		}
+
+		protoBeaconStates[idx] = proto
 	}
 
 	return &indexer.ListBeaconStateResponse{
@@ -405,7 +553,7 @@ func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconStateValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconStateValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -429,37 +577,6 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the block
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon block because the block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the block is already indexed
-		filter := &persistence.BeaconBlockFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		blocks, err := i.db.ListBeaconBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(blocks) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
-		}
-	}
-
 	// Create the block
 	block := &indexer.BeaconBlock{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -473,6 +590,9 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := block.Validate(); err != nil {
@@ -492,10 +612,18 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBlock(ctx, ProtoBeaconBlockToDBBeaconBlock(block)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index block")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBlockToDBBeaconBlock(block),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindBeaconBlock,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index block")
+	if err := i.indexArtifact(ctx, params, "beacon block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed beacon block")
@@ -567,7 +695,12 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlocks, err := i.db.ListBeaconBlock(ctx, filter, pagination)
@@ -575,9 +708,21 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 		return nil, err
 	}
 
+	refs := make(map[agreementRef]struct{}, len(beaconBlocks))
+	for _, block := range beaconBlocks {
+		refs[verifiedRef(block.Network, block.ContentHash, block.Location, block.VerifiedAt)] = struct{}{}
+	}
+
+	counts := i.agreementCounts(ctx, persistence.KindBeaconBlock, refs)
+
 	protoBeaconBlocks := make([]*indexer.BeaconBlock, len(beaconBlocks))
-	for i, block := range beaconBlocks {
-		protoBeaconBlocks[i] = DBBeaconBlockToProtoBeaconBlock(block)
+	for idx, block := range beaconBlocks {
+		proto := DBBeaconBlockToProtoBeaconBlock(block)
+		if count, ok := counts[verifiedRef(block.Network, block.ContentHash, block.Location, block.VerifiedAt)]; ok {
+			proto.AgreementCount = wrapperspb.UInt32(count)
+		}
+
+		protoBeaconBlocks[idx] = proto
 	}
 
 	return &indexer.ListBeaconBlockResponse{
@@ -671,7 +816,7 @@ func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -695,37 +840,6 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the envelope
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index an execution payload envelope because it could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the envelope is already indexed
-		filter := &persistence.ExecutionPayloadEnvelopeFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		existing, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(existing) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "execution payload envelope already indexed")
-		}
-	}
-
 	// Create the envelope
 	envelope := &indexer.ExecutionPayloadEnvelope{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -739,6 +853,9 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
+		ContentMatchedAt:     req.GetContentMatchedAt(),
 	}
 
 	if err := envelope.Validate(); err != nil {
@@ -758,10 +875,18 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertExecutionPayloadEnvelope(ctx, ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(envelope)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index execution payload envelope")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionPayloadEnvelopeToDBExecutionPayloadEnvelope(envelope),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindExecutionPayloadEnvelope,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index execution payload envelope")
+	if err := i.indexArtifact(ctx, params, "execution payload envelope", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", envelope.GetId().GetValue()).Debug("Indexed execution payload envelope")
@@ -821,11 +946,16 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 	pagination := &persistence.PaginationCursor{
 		Limit:   1000,
 		Offset:  0,
-		OrderBy: "fetched_at DESC",
+		OrderBy: OrderFetchedAtDesc,
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	envelopes, err := i.db.ListExecutionPayloadEnvelope(ctx, filter, pagination)
@@ -833,9 +963,21 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 		return nil, err
 	}
 
+	refs := make(map[agreementRef]struct{}, len(envelopes))
+	for _, envelope := range envelopes {
+		refs[verifiedRef(envelope.Network, envelope.ContentHash, envelope.Location, envelope.VerifiedAt)] = struct{}{}
+	}
+
+	counts := i.agreementCounts(ctx, persistence.KindExecutionPayloadEnvelope, refs)
+
 	protoEnvelopes := make([]*indexer.ExecutionPayloadEnvelope, len(envelopes))
-	for i, envelope := range envelopes {
-		protoEnvelopes[i] = DBExecutionPayloadEnvelopeToProtoExecutionPayloadEnvelope(envelope)
+	for idx, envelope := range envelopes {
+		proto := DBExecutionPayloadEnvelopeToProtoExecutionPayloadEnvelope(envelope)
+		if count, ok := counts[verifiedRef(envelope.Network, envelope.ContentHash, envelope.Location, envelope.VerifiedAt)]; ok {
+			proto.AgreementCount = wrapperspb.UInt32(count)
+		}
+
+		protoEnvelopes[idx] = proto
 	}
 
 	return &indexer.ListExecutionPayloadEnvelopeResponse{
@@ -929,7 +1071,7 @@ func (i *Indexer) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, 
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionPayloadEnvelopeValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionPayloadEnvelopeValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -953,37 +1095,6 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the bad block
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon block because the bad block could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the bad block is already indexed
-		filter := &persistence.BeaconBadBlockFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		badBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(badBlocks) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon block already indexed")
-		}
-	}
-
 	// Create the bad block
 	badBlock := &indexer.BeaconBadBlock{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -997,6 +1108,8 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		Location:             req.GetLocation(),
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
 	}
 
 	if err := badBlock.Validate(); err != nil {
@@ -1016,10 +1129,18 @@ func (i *Indexer) CreateBeaconBadBlock(ctx context.Context, req *indexer.CreateB
 		KeyBeaconImplementation: req.GetBeaconImplementation().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBadBlock(ctx, ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad block")
+	// A bad block never joins the deduplicated set: its bytes are the evidence of a fault and
+	// are kept per node, so it carries no dedupe key and owns its object outright.
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBadBlockToDBBeaconBadBlock(badBlock),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyNode},
+		Kind:            persistence.KindBeaconBadBlock,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index bad block")
+	if err := i.indexArtifact(ctx, params, "beacon bad block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", badBlock.GetId().GetValue()).Debug("Indexed beacon block")
@@ -1083,7 +1204,12 @@ func (i *Indexer) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeaco
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlocks, err := i.db.ListBeaconBadBlock(ctx, filter, pagination)
@@ -1187,7 +1313,7 @@ func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *index
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBadBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBadBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1211,38 +1337,6 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Check the store for the bad blob
-	exists, err := i.store.Exists(ctx, req.GetLocation().GetValue())
-	if err != nil {
-		i.log.
-			WithError(err).
-			WithField(KeyLocation, req.GetLocation().GetValue()).
-			WithField(KeyNode, req.GetNode().GetValue()).
-			Error("Failed to index a beacon blob because the bad blob could not be found in the store. Check that the agent and server are pointed at the same storage backend.")
-
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if exists {
-		// Check if the bad blob is already indexed
-		filter := &persistence.BeaconBadBlobFilter{}
-
-		filter.AddNetwork(req.GetNetwork().GetValue())
-		filter.AddSlot(req.GetSlot().GetValue())
-		filter.AddBlockRoot(req.GetBlockRoot().GetValue())
-		filter.AddIndex(req.GetIndex().GetValue())
-		filter.AddNode(req.GetNode().GetValue())
-
-		badBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, &persistence.PaginationCursor{Limit: 1, Offset: 0})
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		if len(badBlobs) > 0 {
-			return nil, status.Error(codes.AlreadyExists, "beacon blob already indexed")
-		}
-	}
-
 	// Create the bad blob
 	badBlob := &indexer.BeaconBadBlob{
 		Id:                   wrapperspb.String(uuid.New().String()),
@@ -1257,6 +1351,8 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		FetchedAt:            req.GetFetchedAt(),
 		BeaconImplementation: req.GetBeaconImplementation(),
 		Index:                req.GetIndex(),
+		ContentHash:          req.GetContentHash(),
+		VerifiedAt:           req.GetVerifiedAt(),
 	}
 
 	if err := badBlob.Validate(); err != nil {
@@ -1277,10 +1373,16 @@ func (i *Indexer) CreateBeaconBadBlob(ctx context.Context, req *indexer.CreateBe
 		KeyIndex:                req.GetIndex().GetValue(),
 	}
 
-	if err := i.db.InsertBeaconBadBlob(ctx, ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob)); err != nil {
-		i.log.WithError(err).WithFields(logFields).Error("Failed to index bad blob")
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoBeaconBadBlobToDBBeaconBadBlob(badBlob),
+		ConflictColumns: []string{KeyNetwork, KeySlot, KeyBlockRoot, KeyIndex, KeyNode},
+		Kind:            persistence.KindBeaconBadBlob,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
 
-		return nil, status.Error(codes.Internal, "failed to index bad blob")
+	if err := i.indexArtifact(ctx, params, "beacon bad blob", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", badBlob.GetId().GetValue()).Debug("Indexed beacon blob")
@@ -1348,7 +1450,12 @@ func (i *Indexer) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeacon
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	beaconBlobs, err := i.db.ListBeaconBadBlob(ctx, filter, pagination)
@@ -1458,7 +1565,7 @@ func (i *Indexer) ListUniqueBeaconBadBlobValues(ctx context.Context, req *indexe
 		}
 	}
 
-	distinctValues, err := i.db.DistinctBeaconBadBlobValues(ctx, fields)
+	distinctValues, err := i.db.DistinctBeaconBadBlobValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1494,14 +1601,13 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		Network:                 req.GetNetwork(),
 		ExecutionImplementation: req.GetExecutionImplementation(),
 		NodeVersion:             req.GetNodeVersion(),
+		ContentHash:             req.GetContentHash(),
+		VerifiedAt:              req.GetVerifiedAt(),
+		ContentMatchedAt:        req.GetContentMatchedAt(),
 	}
 
 	if err := trace.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if err := i.db.InsertExecutionBlockTrace(ctx, ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace)); err != nil {
-		return nil, status.Error(codes.Internal, "failed to insert execution block trace")
 	}
 
 	logFields := logrus.Fields{
@@ -1510,6 +1616,20 @@ func (i *Indexer) CreateExecutionBlockTrace(ctx context.Context, req *indexer.Cr
 		KeyNodeVersion: req.GetNodeVersion().GetValue(),
 		KeyLocation:    req.GetLocation().GetValue(),
 		KeyFetchedAt:   req.GetFetchedAt().AsTime(),
+	}
+
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionBlockTraceToDBExecutionBlockTrace(trace),
+		ConflictColumns: []string{KeyNetwork, KeyBlockHash, KeyNode},
+		Kind:            persistence.KindExecutionBlockTrace,
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
+
+	if err := i.indexArtifact(ctx, params, "execution block trace", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", trace.GetId().GetValue()).Debug("Indexed execution block trace")
@@ -1569,7 +1689,12 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	executionBlockTraces, err := i.db.ListExecutionBlockTrace(ctx, filter, pagination)
@@ -1577,9 +1702,21 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 		return nil, err
 	}
 
+	refs := make(map[agreementRef]struct{}, len(executionBlockTraces))
+	for _, trace := range executionBlockTraces {
+		refs[verifiedRef(trace.Network, trace.ContentHash, trace.Location, trace.VerifiedAt)] = struct{}{}
+	}
+
+	counts := i.agreementCounts(ctx, persistence.KindExecutionBlockTrace, refs)
+
 	protoExecutionBlockTraces := make([]*indexer.ExecutionBlockTrace, len(executionBlockTraces))
-	for i, trace := range executionBlockTraces {
-		protoExecutionBlockTraces[i] = DBExecutionBlockTraceToProtoExecutionBlockTrace(trace)
+	for idx, trace := range executionBlockTraces {
+		proto := DBExecutionBlockTraceToProtoExecutionBlockTrace(trace)
+		if count, ok := counts[verifiedRef(trace.Network, trace.ContentHash, trace.Location, trace.VerifiedAt)]; ok {
+			proto.AgreementCount = wrapperspb.UInt32(count)
+		}
+
+		protoExecutionBlockTraces[idx] = proto
 	}
 
 	return &indexer.ListExecutionBlockTraceResponse{
@@ -1589,6 +1726,10 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 
 func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.CountExecutionBlockTraceRequest) (*indexer.CountExecutionBlockTraceResponse, error) {
 	filter := &persistence.ExecutionBlockTraceFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
 
 	if req.Node != "" {
 		filter.AddNode(req.Node)
@@ -1663,7 +1804,7 @@ func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionBlockTraceValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionBlockTraceValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1699,14 +1840,12 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 		Network:                 req.GetNetwork(),
 		ExecutionImplementation: req.GetExecutionImplementation(),
 		NodeVersion:             req.GetNodeVersion(),
+		ContentHash:             req.GetContentHash(),
+		VerifiedAt:              req.GetVerifiedAt(),
 	}
 
 	if err := block.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if err := i.db.InsertExecutionBadBlock(ctx, ProtoExecutionBadBlockToDBExecutionBadBlock(block)); err != nil {
-		return nil, status.Error(codes.Internal, "failed to insert execution bad block")
 	}
 
 	logFields := logrus.Fields{
@@ -1716,6 +1855,18 @@ func (i *Indexer) CreateExecutionBadBlock(ctx context.Context, req *indexer.Crea
 		KeyContentEncoding: req.GetContentEncoding().GetValue(),
 		KeyLocation:        req.GetLocation().GetValue(),
 		KeyFetchedAt:       req.GetFetchedAt().AsTime(),
+	}
+
+	params := &persistence.InsertArtifactParams{
+		Row:             ProtoExecutionBadBlockToDBExecutionBadBlock(block),
+		ConflictColumns: []string{KeyNetwork, KeyBlockHash, KeyNode},
+		Kind:            persistence.KindExecutionBadBlock,
+		Network:         req.GetNetwork().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+	}
+
+	if err := i.indexArtifact(ctx, params, "execution bad block", logFields); err != nil {
+		return nil, err
 	}
 
 	i.log.WithFields(logFields).WithField("id", block.GetId().GetValue()).Debug("Indexed execution bad block")
@@ -1779,7 +1930,12 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 	}
 
 	if req.Pagination != nil {
-		pagination = ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.Pagination)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
 	}
 
 	executionBadBlocks, err := i.db.ListExecutionBadBlock(ctx, filter, pagination)
@@ -1799,6 +1955,10 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 
 func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.CountExecutionBadBlockRequest) (*indexer.CountExecutionBadBlockResponse, error) {
 	filter := &persistence.ExecutionBadBlockFilter{}
+
+	if req.Id != "" {
+		filter.AddID(req.Id)
+	}
 
 	if req.Node != "" {
 		filter.AddNode(req.Node)
@@ -1879,7 +2039,7 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 		}
 	}
 
-	distinctValues, err := i.db.DistinctExecutionBadBlockValues(ctx, fields)
+	distinctValues, err := i.db.DistinctExecutionBadBlockValues(ctx, fields, req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -1896,4 +2056,167 @@ func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *in
 	}
 
 	return response, nil
+}
+
+func (i *Indexer) GetBlob(ctx context.Context, req *indexer.GetBlobRequest) (*indexer.GetBlobResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	blob, err := i.db.GetBlob(ctx, req.GetKind().GetValue(), req.GetNetwork().GetValue(), req.GetDedupKey().GetValue())
+	if err != nil {
+		if errors.Is(err, persistence.ErrBlobNotFound) {
+			return nil, status.Error(codes.NotFound, "blob not found")
+		}
+
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &indexer.GetBlobResponse{
+		Blob: DBBlobToProtoBlob(blob),
+	}, nil
+}
+
+func (i *Indexer) CreateBlob(ctx context.Context, req *indexer.CreateBlobRequest) (*indexer.CreateBlobResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	blob := &persistence.Blob{
+		Kind:            req.GetKind().GetValue(),
+		Network:         req.GetNetwork().GetValue(),
+		DedupKey:        req.GetDedupKey().GetValue(),
+		ContentHash:     req.GetContentHash().GetValue(),
+		Location:        req.GetLocation().GetValue(),
+		ContentEncoding: req.GetContentEncoding().GetValue(),
+		RawSize:         req.GetRawSize().GetValue(),
+		CompressedSize:  req.GetCompressedSize().GetValue(),
+		State:           persistence.BlobStateReady,
+		CreatedAt:       time.Now().UTC(),
+	}
+
+	// The winner is whichever row is in the table afterwards: a concurrent creator with
+	// different bytes must be visible to the loser so it can compare hashes.
+	winner, err := i.db.InsertBlob(ctx, blob)
+	if err != nil {
+		i.log.WithError(err).WithFields(logrus.Fields{
+			KeyKind:     blob.Kind,
+			KeyNetwork:  blob.Network,
+			KeyDedupKey: blob.DedupKey,
+		}).Error("Failed to create blob")
+
+		return nil, status.Error(codes.Internal, "failed to create blob")
+	}
+
+	return &indexer.CreateBlobResponse{
+		Blob: DBBlobToProtoBlob(winner),
+	}, nil
+}
+
+func (i *Indexer) CreatePayloadDivergence(ctx context.Context, req *indexer.CreatePayloadDivergenceRequest) (*indexer.CreatePayloadDivergenceResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	divergence := &indexer.PayloadDivergence{
+		Id:           wrapperspb.String(uuid.New().String()),
+		ObservedAt:   req.GetObservedAt(),
+		Network:      req.GetNetwork(),
+		Kind:         req.GetKind(),
+		Node:         req.GetNode(),
+		DedupKey:     req.GetDedupKey(),
+		ExpectedHash: req.GetExpectedHash(),
+		ActualHash:   req.GetActualHash(),
+		Slot:         req.GetSlot(),
+		Identifier:   req.GetIdentifier(),
+		Attempt:      req.GetAttempt(),
+		Severity:     req.GetSeverity(),
+		Location:     req.GetLocation(),
+	}
+
+	row := ProtoPayloadDivergenceToDBPayloadDivergence(divergence)
+	if req.GetObservedAt() == nil {
+		row.ObservedAt = time.Now().UTC()
+	}
+
+	// Attempt 1 is the first observation; an unset attempt means exactly that.
+	if req.GetAttempt() == nil {
+		row.Attempt = 1
+	}
+
+	if err := i.db.InsertPayloadDivergence(ctx, row); err != nil {
+		i.log.WithError(err).WithFields(logrus.Fields{
+			KeyKind:     row.Kind,
+			KeyNetwork:  row.Network,
+			KeyDedupKey: row.DedupKey,
+			KeyNode:     row.Node,
+		}).Error("Failed to record payload divergence")
+
+		return nil, status.Error(codes.Internal, "failed to record payload divergence")
+	}
+
+	i.log.WithFields(logrus.Fields{
+		KeyKind:     row.Kind,
+		KeyNetwork:  row.Network,
+		KeyDedupKey: row.DedupKey,
+		KeyNode:     row.Node,
+		"expected":  row.ExpectedHash,
+		"actual":    row.ActualHash,
+	}).Warn("Payload divergence recorded")
+
+	return &indexer.CreatePayloadDivergenceResponse{
+		Id: divergence.GetId(),
+	}, nil
+}
+
+func (i *Indexer) ListPayloadDivergence(ctx context.Context, req *indexer.ListPayloadDivergenceRequest) (*indexer.ListPayloadDivergenceResponse, error) {
+	filter := &persistence.PayloadDivergenceFilter{}
+
+	if req.GetNetwork() != "" {
+		filter.AddNetwork(req.GetNetwork())
+	}
+
+	if req.GetKind() != "" {
+		filter.AddKind(req.GetKind())
+	}
+
+	if req.GetDedupKey() != "" {
+		filter.AddDedupKey(req.GetDedupKey())
+	}
+
+	if req.GetBefore() != nil {
+		filter.AddBefore(req.GetBefore().AsTime())
+	}
+
+	if req.GetAfter() != nil {
+		filter.AddAfter(req.GetAfter().AsTime())
+	}
+
+	pagination := &persistence.PaginationCursor{
+		Limit:  persistence.DefaultPageLimit,
+		Offset: 0,
+	}
+
+	if req.GetPagination() != nil {
+		p, err := ProtoPaginationCursorToDBPaginationCursor(req.GetPagination())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		pagination = p
+	}
+
+	divergences, err := i.db.ListPayloadDivergence(ctx, filter, pagination)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	protoDivergences := make([]*indexer.PayloadDivergence, len(divergences))
+	for idx, divergence := range divergences {
+		protoDivergences[idx] = DBPayloadDivergenceToProtoPayloadDivergence(divergence)
+	}
+
+	return &indexer.ListPayloadDivergenceResponse{
+		PayloadDivergences: protoDivergences,
+	}, nil
 }

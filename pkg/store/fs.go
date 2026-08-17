@@ -1,9 +1,11 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,14 +73,56 @@ func (s *FSStore) ensureDir(path string) error {
 	return nil
 }
 
-func (s *FSStore) saveFile(data *[]byte, path string) error {
+// saveFile streams data into a temporary file alongside path and renames it
+// into place once the whole body has been written. Publishing is therefore
+// atomic: a reader that fails part way through leaves the temporary file to be
+// removed and nothing at path, so no other process can observe a truncated
+// object as a complete one.
+func (s *FSStore) saveFile(data io.Reader, path string) error {
+	if data == nil {
+		return errors.New("data is nil")
+	}
+
 	if err := s.ensureDir(path); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(path, *data, 0o600); err != nil {
-		return err
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
+
+	tmpPath := tmp.Name()
+
+	// Every exit short of a completed rename has to take the temporary file
+	// with it, or a failed save leaves litter beside the real object.
+	renamed := false
+
+	defer func() {
+		if renamed {
+			return
+		}
+
+		_ = tmp.Close()
+
+		if rerr := os.Remove(tmpPath); rerr != nil && !os.IsNotExist(rerr) {
+			s.log.WithError(rerr).WithField("path", tmpPath).Warn("Failed to remove temporary file")
+		}
+	}()
+
+	if _, err := io.Copy(tmp, data); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("failed to publish %s: %w", path, err)
+	}
+
+	renamed = true
 
 	return nil
 }
@@ -296,6 +340,45 @@ func (s *FSStore) DeleteExecutionBadBlock(ctx context.Context, location string) 
 	return s.removeFile(filepath.Join(s.basePath, filepath.Join(parts...)))
 }
 
+// DeleteMany removes objects in bulk. There is no batch primitive on a filesystem, so this is
+// a loop that keeps going past individual failures and reports the ones that did not go, in
+// the same shape as the object-store implementation.
+func (s *FSStore) DeleteMany(ctx context.Context, locations []string) error {
+	var (
+		failed   []string
+		firstErr error
+	)
+
+	for idx, location := range locations {
+		if err := ctx.Err(); err != nil {
+			// Everything not yet attempted is still there; say so rather than claiming success.
+			failed = append(failed, locations[idx:]...)
+
+			return &DeleteManyError{Failed: failed, Err: err}
+		}
+
+		parts := strings.Split(location, "/")
+
+		if err := s.removeFile(filepath.Join(s.basePath, filepath.Join(parts...))); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+
+			failed = append(failed, location)
+
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+
+	if len(failed) > 0 {
+		return &DeleteManyError{Failed: failed, Err: firstErr}
+	}
+
+	return nil
+}
+
 func (s *FSStore) PathPrefix() string {
 	return s.basePath
 }
@@ -317,9 +400,8 @@ func (s *FSStore) StorageHandshakeTokenExists(ctx context.Context, node string) 
 
 func (s *FSStore) SaveStorageHandshakeToken(ctx context.Context, node, data string) error {
 	location := s.constructLocation(s.basePath, "handshake_tokens", node)
-	dataBytes := []byte(data)
 
-	if err := s.saveFile(&dataBytes, location); err != nil {
+	if err := s.saveFile(bytes.NewReader([]byte(data)), location); err != nil {
 		return err
 	}
 
@@ -345,18 +427,20 @@ func (s *FSStore) Copy(ctx context.Context, params *CopyParams) error {
 	source := filepath.Join(s.basePath, params.Source)
 	destination := filepath.Join(s.basePath, params.Destination)
 
-	if err := s.ensureDir(destination); err != nil {
-		return err
-	}
-
-	// Read the source file
-	data, err := os.ReadFile(source)
+	from, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	// Write to the destination file
-	if err := os.WriteFile(destination, data, 0o600); err != nil { //nolint:gosec // path is constructed from validated basePath
+	defer func() {
+		if cerr := from.Close(); cerr != nil {
+			s.log.WithError(cerr).WithField("path", source).Warn("Failed to close source file")
+		}
+	}()
+
+	// Streamed and published by rename, for the same reason a save is: a payload can be tens
+	// of megabytes, and a reader must never find a half-written object at the destination.
+	if err := s.saveFile(from, destination); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

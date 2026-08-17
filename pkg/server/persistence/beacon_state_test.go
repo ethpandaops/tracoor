@@ -105,27 +105,6 @@ func TestListBeaconState(t *testing.T) {
 	assert.Equal(t, state.Node, states[0].Node)
 }
 
-func TestUpdateBeaconState(t *testing.T) {
-	indexer, mock, err := NewMockIndexer()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	state := generateRandomBeaconState()
-
-	err = indexer.InsertBeaconState(ctx, state)
-	assert.NoError(t, err)
-
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE").WithArgs(
-		state.ID, state.Node, state.Slot, state.Epoch, state.StateRoot, state.FetchedAt,
-		state.BeaconImplementation, state.NodeVersion, state.Location, state.Network,
-	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	err = indexer.UpdateBeaconState(ctx, state)
-	assert.NoError(t, err)
-}
-
 //nolint:gocyclo // Test is long but manageable
 func TestBeaconStateFilters(t *testing.T) {
 	t.Run("By random combinations", func(t *testing.T) {

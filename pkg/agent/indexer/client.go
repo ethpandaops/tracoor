@@ -142,6 +142,33 @@ func (c *Client) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeaconB
 	return c.pb.ListBeaconBadBlob(ctx, req, grpc.UseCompressor(gzip.Name))
 }
 
+// GetBlob looks up the deduplicated payload for a dedup key. A NotFound status
+// means nobody has stored these bytes yet.
+func (c *Client) GetBlob(ctx context.Context, req *indexer.GetBlobRequest) (*indexer.GetBlobResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.GetBlob(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
+// CreateBlob claims a dedup key for a payload. The response carries the row
+// that won, which is this one only when nobody else got there first.
+func (c *Client) CreateBlob(ctx context.Context, req *indexer.CreateBlobRequest) (*indexer.CreateBlobResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreateBlob(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
+// CreatePayloadDivergence records that a node served bytes whose hash did not
+// match the payload already stored under the same dedup key.
+func (c *Client) CreatePayloadDivergence(ctx context.Context, req *indexer.CreatePayloadDivergenceRequest) (*indexer.CreatePayloadDivergenceResponse, error) {
+	md := metadata.New(c.config.Headers)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return c.pb.CreatePayloadDivergence(ctx, req, grpc.UseCompressor(gzip.Name))
+}
+
 func (c *Client) GetStorageHandshakeToken(ctx context.Context, req *indexer.GetStorageHandshakeTokenRequest) (*indexer.GetStorageHandshakeTokenResponse, error) {
 	md := metadata.New(c.config.Headers)
 	ctx = metadata.NewOutgoingContext(ctx, md)

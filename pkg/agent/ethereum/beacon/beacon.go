@@ -27,9 +27,15 @@ type Node struct {
 }
 
 func NewNode(ctx context.Context, log logrus.FieldLogger, name, overrideNetworkName string, config *Config) *Node {
+	// The node's metrics stay on for the raw response counters they carry:
+	// raw_response_leaks_total counts bodies that only the cleanup safety net
+	// closed, and a leaked body holds a transport slot for the life of the
+	// process, degrading every later fetch against that node. The library owns
+	// those counters and only feeds them when its metrics are enabled, so
+	// turning them off costs the one signal that makes a missing Close visible.
 	opts := *bn.
 		DefaultOptions().
-		DisablePrometheusMetrics()
+		EnablePrometheusMetrics()
 
 	if config.BeaconSubscriptions != nil {
 		opts.BeaconSubscription = bn.BeaconSubscriptionOptions{
@@ -81,45 +87,71 @@ func (b *Node) GetVersionImmuneBlock(ctx context.Context, blockID string) (*Vers
 	return block, nil
 }
 
-// FetchRawExecutionPayloadEnvelope fetches the raw signed execution payload
-// envelope for the given block id (gloas onwards).
-func (b *Node) FetchRawExecutionPayloadEnvelope(ctx context.Context, blockID, contentType string) ([]byte, error) {
-	return b.beacon.FetchRawExecutionPayloadEnvelope(ctx, blockID, contentType)
-}
-
 func (b *Node) Start(ctx context.Context) error {
 	s := gocron.NewScheduler(time.Local)
 
-	errs := make(chan error, 1)
+	var (
+		// errs carries the first problem that makes this node unusable. It is
+		// buffered and sent to once, so reporting a failure never blocks the
+		// goroutine that noticed it.
+		errs     = make(chan error, 1)
+		failed   = make(chan struct{})
+		failOnce sync.Once
+	)
+
+	fail := func(err error) {
+		failOnce.Do(func() {
+			errs <- err
+
+			close(failed)
+		})
+	}
 
 	go func() {
-		wg := sync.WaitGroup{}
-
 		for _, service := range b.services {
-			wg.Add(1)
+			ready := make(chan struct{})
+
+			var readyOnce sync.Once
 
 			service.OnReady(ctx, func(ctx context.Context) error {
 				b.log.WithField("service", service.Name()).Info("Service is ready")
 
-				wg.Done()
+				readyOnce.Do(func() { close(ready) })
 
 				return nil
+			})
+
+			service.OnFailure(func(_ context.Context, err error) {
+				fail(fmt.Errorf("service %s failed: %w", service.Name(), err))
 			})
 
 			b.log.WithField("service", service.Name()).Info("Starting service")
 
 			if err := service.Start(ctx); err != nil {
-				errs <- fmt.Errorf("failed to start service: %w", err)
+				fail(fmt.Errorf("failed to start service: %w", err))
+
+				return
 			}
 
-			wg.Wait()
+			// A service that gave up will never report ready, so the wait ends
+			// on its failure as well as on shutdown. Parking here forever would
+			// leave the node neither started nor stopped.
+			select {
+			case <-ready:
+			case <-failed:
+				return
+			case <-ctx.Done():
+				return
+			}
 		}
 
 		b.log.Info("All services are ready")
 
 		for _, callback := range b.onReadyCallbacks {
 			if err := callback(ctx); err != nil {
-				errs <- fmt.Errorf("failed to run on ready callback: %w", err)
+				fail(fmt.Errorf("failed to run on ready callback: %w", err))
+
+				return
 			}
 		}
 	}()

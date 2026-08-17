@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -20,8 +22,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// uploadPartSize and uploadConcurrency bound how much of a stream is held in
+// memory while it is being uploaded. The uploader buffers at most one part per
+// worker plus one, so the pair is the real per-upload memory ceiling: the point
+// of streaming is lost if the uploader buffers the payload on our behalf.
+const (
+	uploadPartSize    = manager.MinUploadPartSize
+	uploadConcurrency = 4
+)
+
+const (
+	// s3DeleteBatchSize is the hard limit DeleteObjects imposes on keys per request.
+	s3DeleteBatchSize = 1000
+	// s3NoSuchKeyCode is the per-key error code for an object that is already gone.
+	s3NoSuchKeyCode = "NoSuchKey"
+)
+
 type S3Store struct {
 	s3Client *s3.Client
+
+	// uploader streams bodies of unknown length. PutObject cannot: it needs a
+	// known content length, which a pipe does not have.
+	uploader *manager.Uploader
 
 	config *S3StoreConfig
 
@@ -66,13 +88,84 @@ func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig,
 
 	metrics := GetBasicMetricsInstance(namespace, string(S3StoreType), opts.MetricsEnabled)
 
+	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
+		u.PartSize = uploadPartSize
+		u.Concurrency = uploadConcurrency
+		// A streamed body cannot be hashed before it is sent, so the payload
+		// signature is skipped exactly as it was on the buffered path.
+		u.ClientOptions = append(
+			u.ClientOptions,
+			s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware),
+		)
+	})
+
 	return &S3Store{
 		s3Client:     s3Client,
+		uploader:     uploader,
 		config:       config,
 		log:          log,
 		opts:         opts,
 		basicMetrics: metrics,
 	}, nil
+}
+
+// countingReader records how many bytes were read out of a stream, so an upload
+// of unknown length can still report its size once it has finished.
+type countingReader struct {
+	reader io.Reader
+	read   int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.reader.Read(p)
+	c.read += int64(n)
+
+	return n, err
+}
+
+// putStream uploads params.Data to params.Location.
+//
+// A read failure part way through the body surfaces from Upload and the
+// multipart upload is aborted rather than completed, so a truncated payload is
+// never published under a location the index will later point at.
+func (s *S3Store) putStream(ctx context.Context, params *SaveParams, dataType DataType, failure string) (string, error) {
+	if params == nil || params.Data == nil {
+		return "", errors.New("data is nil")
+	}
+
+	counter := &countingReader{reader: params.Data}
+
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(params.Location),
+		Body:   counter,
+	}
+
+	if params.ContentEncoding != "" {
+		input.ContentEncoding = aws.String(params.ContentEncoding)
+	}
+
+	if _, err := s.uploader.Upload(ctx, input); err != nil {
+		var apiErr smithy.APIError
+
+		if errors.As(err, &apiErr) {
+			switch apiErr.(type) {
+			case *s3types.NoSuchBucket:
+				return "", errors.New("bucket does not exist: " + apiErr.Error())
+			case *s3types.NotFound:
+				return "", ErrNotFound
+			default:
+				return "", errors.New(failure + ": " + apiErr.Error())
+			}
+		}
+
+		return "", fmt.Errorf("%s: %w", failure, err)
+	}
+
+	s.basicMetrics.ObserveItemAdded(string(dataType))
+	s.basicMetrics.ObserveItemAddedBytes(string(dataType), int(counter.read))
+
+	return params.Location, nil
 }
 
 func (s *S3Store) PathPrefix() string {
@@ -211,36 +304,7 @@ func (s *S3Store) Exists(ctx context.Context, location string) (bool, error) {
 }
 
 func (s *S3Store) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save beacon state: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BeaconStateDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconStateDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BeaconStateDataType, "failed to save beacon state")
 }
 
 func (s *S3Store) getPresignedURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -347,40 +411,7 @@ func (s *S3Store) DeleteBeaconState(ctx context.Context, location string) error 
 }
 
 func (s *S3Store) SaveBeaconBlock(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BeaconBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBlockDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BeaconBlockDataType, "failed to save beacon block")
 }
 
 func (s *S3Store) GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -433,40 +464,7 @@ func (s *S3Store) DeleteBeaconBlock(ctx context.Context, location string) error 
 }
 
 func (s *S3Store) SaveExecutionPayloadEnvelope(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(ExecutionPayloadEnvelopeDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(ExecutionPayloadEnvelopeDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, ExecutionPayloadEnvelopeDataType, "failed to save execution payload envelope")
 }
 
 func (s *S3Store) GetExecutionPayloadEnvelopeURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -519,40 +517,7 @@ func (s *S3Store) DeleteExecutionPayloadEnvelope(ctx context.Context, location s
 }
 
 func (s *S3Store) SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BeaconBadBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlockDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BeaconBadBlockDataType, "failed to save beacon bad block")
 }
 
 func (s *S3Store) GetBeaconBadBlockURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -605,40 +570,7 @@ func (s *S3Store) DeleteBeaconBadBlock(ctx context.Context, location string) err
 }
 
 func (s *S3Store) SaveBeaconBadBlob(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save frame: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BeaconBadBlobDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BeaconBadBlobDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BeaconBadBlobDataType, "failed to save beacon bad blob")
 }
 
 func (s *S3Store) GetBeaconBadBlobURL(ctx context.Context, params *GetURLParams) (string, error) {
@@ -691,40 +623,7 @@ func (s *S3Store) DeleteBeaconBadBlob(ctx context.Context, location string) erro
 }
 
 func (s *S3Store) SaveExecutionBlockTrace(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save execution block trace: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BlockTraceDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BlockTraceDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BlockTraceDataType, "failed to save execution block trace")
 }
 
 func (s *S3Store) GetExecutionBlockTrace(ctx context.Context, location string) (*[]byte, error) {
@@ -777,40 +676,7 @@ func (s *S3Store) DeleteExecutionBlockTrace(ctx context.Context, location string
 }
 
 func (s *S3Store) SaveExecutionBadBlock(ctx context.Context, params *SaveParams) (string, error) {
-	if params.Data == nil {
-		return "", errors.New("data is nil")
-	}
-
-	input := &s3.PutObjectInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(params.Location),
-		Body:   bytes.NewBuffer(*params.Data),
-	}
-
-	if params.ContentEncoding != "" {
-		input.ContentEncoding = aws.String(params.ContentEncoding)
-	}
-
-	_, err := s.s3Client.PutObject(ctx, input, s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware))
-	if err != nil {
-		var apiErr smithy.APIError
-
-		if errors.As(err, &apiErr) {
-			switch apiErr.(type) {
-			case *s3types.NoSuchBucket:
-				return "", errors.New("bucket does not exist: " + apiErr.Error())
-			case *s3types.NotFound:
-				return "", ErrNotFound
-			default:
-				return "", errors.New("failed to save execution block trace: " + apiErr.Error())
-			}
-		}
-	}
-
-	s.basicMetrics.ObserveItemAdded(string(BadBlockDataType))
-	s.basicMetrics.ObserveItemAddedBytes(string(BadBlockDataType), len(*params.Data))
-
-	return params.Location, err
+	return s.putStream(ctx, params, BadBlockDataType, "failed to save execution bad block")
 }
 
 func (s *S3Store) GetExecutionBadBlock(ctx context.Context, location string) (*[]byte, error) {
@@ -938,6 +804,82 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 
 	// If not an API error, return the original error
 	return fmt.Errorf("failed to copy object: %w", err)
+}
+
+// DeleteMany removes objects in bulk. Keys are sent in DeleteObjects batches; a batch that
+// fails wholesale and individual per-key errors both surface as failed locations rather than
+// aborting the remaining batches, because retention deletes a mixed bag of objects and one
+// poisoned key must not keep the rest alive forever.
+func (s *S3Store) DeleteMany(ctx context.Context, locations []string) error {
+	if len(locations) == 0 {
+		return nil
+	}
+
+	var (
+		failed   []string
+		firstErr error
+	)
+
+	for start := 0; start < len(locations); start += s3DeleteBatchSize {
+		end := start + s3DeleteBatchSize
+		if end > len(locations) {
+			end = len(locations)
+		}
+
+		chunk := locations[start:end]
+
+		objects := make([]s3types.ObjectIdentifier, 0, len(chunk))
+		for _, location := range chunk {
+			objects = append(objects, s3types.ObjectIdentifier{Key: aws.String(location)})
+		}
+
+		out, err := s.s3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.config.BucketName),
+			Delete: &s3types.Delete{
+				Objects: objects,
+				// Quiet still reports errors, it only drops the per-key success entries.
+				Quiet: aws.Bool(true),
+			},
+		})
+		if err != nil {
+			failed = append(failed, chunk...)
+
+			if firstErr == nil {
+				firstErr = err
+			}
+
+			continue
+		}
+
+		removed := len(chunk)
+
+		for _, e := range out.Errors {
+			key := aws.ToString(e.Key)
+
+			// A key that is already gone is the outcome we wanted.
+			if aws.ToString(e.Code) == s3NoSuchKeyCode {
+				continue
+			}
+
+			removed--
+
+			failed = append(failed, key)
+
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %s", key, aws.ToString(e.Message))
+			}
+		}
+
+		for i := 0; i < removed; i++ {
+			s.basicMetrics.ObserveItemRemoved(string(UnknownDataType))
+		}
+	}
+
+	if len(failed) > 0 {
+		return &DeleteManyError{Failed: failed, Err: firstErr}
+	}
+
+	return nil
 }
 
 func (s *S3Store) PreferURLs() bool {
