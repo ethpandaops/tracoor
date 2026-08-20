@@ -212,6 +212,10 @@ func (s *S3Store) GetRaw(ctx context.Context, location string) (*bytes.Buffer, e
 	return &buff, nil
 }
 
+func (s *S3Store) SaveRaw(ctx context.Context, params *SaveParams) (string, error) {
+	return s.putStream(ctx, params, RawDataType, "failed to save raw object")
+}
+
 func (s *S3Store) StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error) {
 	key := fmt.Sprintf("handshake/%s", node)
 

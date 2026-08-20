@@ -4,7 +4,6 @@ server:
   pprofAddr: ":6060"
   gatewayAddr: ":7007"
   preStopSleepSeconds: 1
-  ntpServer: time.google.com
 
   persistence:
     dsn: "file:/tmp/tracoor1.db?parseTime=True"

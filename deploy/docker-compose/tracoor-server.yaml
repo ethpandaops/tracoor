@@ -3,7 +3,6 @@ addr: ":8081"
 metricsAddr: ":9091"
 pprofAddr: ":6060"
 preStopSleepSeconds: 1
-ntpServer: time.google.com
 
 persistence:
   dsn: "postgres://user:password@postgres:5432/tracoor?sslmode=disable"
@@ -15,7 +14,7 @@ services:
       beaconStates: 30m
       beaconBlocks: 30m
       executionPayloadEnvelopes: 30m
-      executionBlockTrace: 30m
+      executionBlockTraces: 30m
 
 store:
   type: s3

@@ -3,7 +3,6 @@ server:
   gatewayAddr: ":7007"
   pprofAddr: ":6060"
   preStopSleepSeconds: 1
-  ntpServer: time.google.com
 
   persistence:
     dsn: "file:/tmp/tracoor.db"
@@ -16,6 +15,22 @@ server:
         executionBlockTraces: 30m
         beaconBlocks: 30m
         executionPayloadEnvelopes: 30m
+    # Copy interesting (pre-state, block) pairs out of the retention buffer into a
+    # separate, append-only corpus that outlives the network. Opt-in, and never
+    # deletes anything. See example_server_config.yaml for every available option.
+    # NOTE: beaconStates/beaconBlocks retention must exceed
+    # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start
+    # - the 30m above is not enough for the 12s/32 network below.
+    # promotion:
+    #   enabled: true
+    #   lagEpochs: 2
+    #   checkInterval: 30s
+    #   slotsPerEpoch: 32
+    #   secondsPerSlot: 12s
+    #   store:              # the corpus; must NOT be the buffer store below
+    #     type: fs
+    #     config:
+    #       base_path: "/tmp/tracoor-corpus"
   # Use the following to configure Tracoor for a custom network
   # ethereum:
   #   config:
@@ -87,6 +102,3 @@ shared:
     type: fs
     config:
       base_path: "/tmp/tracoor"
-
-
-ethpandaops/tracoor:0.0.20-debian
