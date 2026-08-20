@@ -144,6 +144,17 @@ func (s *FSStore) removeFile(path string) error {
 	return os.Remove(path)
 }
 
+func (s *FSStore) SaveRaw(ctx context.Context, params *SaveParams) (string, error) {
+	parts := strings.Split(params.Location, "/")
+
+	path := filepath.Join(s.basePath, filepath.Join(parts...))
+	if err := s.saveFile(params.Data, path); err != nil {
+		return "", err
+	}
+
+	return params.Location, nil
+}
+
 func (s *FSStore) SaveBeaconState(ctx context.Context, params *SaveParams) (string, error) {
 	parts := strings.Split(params.Location, "/")
 

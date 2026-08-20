@@ -14,8 +14,11 @@ type BeaconBlock struct {
 	// We have to use int64 here as SQLite doesn't support uint64. This sucks
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
-	Slot                 int64     `gorm:"not null;default:0;uniqueIndex:ux_beacon_blocks_dedupe,priority:2"`
-	Epoch                int64     `gorm:"not null;default:0"`
+	Slot int64 `gorm:"not null;default:0;uniqueIndex:ux_beacon_blocks_dedupe,priority:2"`
+	// The promotion service walks the index one (network, epoch) at a time,
+	// so this pair is indexed; an unindexed epoch turns each of those
+	// listings into a full table scan.
+	Epoch                int64     `gorm:"not null;default:0;index:ix_beacon_blocks_network_epoch,priority:2"`
 	BlockRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:3"`
 	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_blocks_fetched_at;index:ix_beacon_blocks_network_node_fetched_at,priority:3;index:ix_beacon_blocks_network_fetched_at,priority:2"`
 	BeaconImplementation string    `gorm:"not null;default:''"`
@@ -28,7 +31,7 @@ type BeaconBlock struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:1;index:ix_beacon_blocks_network_node_fetched_at,priority:1;index:ix_beacon_blocks_network_fetched_at,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_blocks_dedupe,priority:1;index:ix_beacon_blocks_network_node_fetched_at,priority:1;index:ix_beacon_blocks_network_fetched_at,priority:1;index:ix_beacon_blocks_network_epoch,priority:1"`
 }
 
 // BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone

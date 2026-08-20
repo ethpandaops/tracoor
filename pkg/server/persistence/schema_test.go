@@ -8,7 +8,8 @@ import (
 )
 
 // expectedIndexes is the full index set each artifact table is allowed to carry: the dedupe
-// unique index plus the three fetched_at orderings the list, filter and retention queries use.
+// unique index, the three fetched_at orderings the list, filter and retention queries use, and
+// on beacon_blocks the (network, epoch) pair the promotion service walks.
 var expectedIndexes = map[string][]string{
 	"beacon_states": {
 		"ux_beacon_states_dedupe",
@@ -21,6 +22,7 @@ var expectedIndexes = map[string][]string{
 		"ix_beacon_blocks_network_node_fetched_at",
 		"ix_beacon_blocks_network_fetched_at",
 		"ix_beacon_blocks_fetched_at",
+		"ix_beacon_blocks_network_epoch",
 	},
 	"execution_payload_envelopes": {
 		"ux_execution_payload_envelopes_dedupe",

@@ -46,6 +46,9 @@ type Store interface {
 	// quarantine them without re-deleting the rest.
 	DeleteMany(ctx context.Context, locations []string) error
 
+	// SaveRaw saves arbitrary bytes to the store at the given location
+	SaveRaw(ctx context.Context, params *SaveParams) (string, error)
+
 	// StorageHandshakeTokenExists checks if a storage handshake token exists in the store
 	StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error)
 	// SaveStorageHandshakeToken saves a storage handshake token to the store

@@ -3,7 +3,6 @@ addr: ":8081"
 metricsAddr: ":9091"
 pprofAddr: ":6060"
 preStopSleepSeconds: 1
-ntpServer: time.google.com
 
 persistence:
   dsn: "postgres://user:password@postgres:5432/tracoor?sslmode=disable"
@@ -17,8 +16,54 @@ services:
       executionPayloadEnvelopes: 30m
       beaconBadBlocks: 30m
       beaconBadBlobs: 30m
-      executionBlockTrace: 30m
+      executionBlockTraces: 30m
       executionBadBlocks: 30m
+      # The record of a node serving the wrong bytes outlives the payload it
+      # describes, so this one is deliberately long.
+      payloadDivergences: 4344h
+    # Minimum age of a zero-reference payload before the collector may remove it.
+    # It must exceed the longest fetch-plus-upload plus the agents' payload-lookup
+    # cache TTL, so an agent mid-hash cannot link to a payload being deleted.
+    blobGcGracePeriod: 10m
+  # Promote "interesting" (pre-state, block) pairs from the retention buffer
+  # into a separate, append-only corpus bucket. Opt-in.
+  # NOTE: beaconStates/beaconBlocks retention must exceed
+  # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start.
+  # promotion:
+  #   enabled: true
+  #   lagEpochs: 2
+  #   checkInterval: 30s
+  #   slotsPerEpoch: 32
+  #   secondsPerSlot: 12s
+  #   rateCapPerHour: 30       # common tier: gap/participation/baseline floods
+  #   rareCapPerHour: 120      # rare tier: slashings/exits/etc never compete with floods
+  #   reorgCapPerHour: 1000    # reorg tier: generous, but still a ceiling
+  #   # A cap of 0 promotes nothing in that tier; to drop a class of captures,
+  #   # disable its trigger instead.
+  #   baselineEveryNEpochs: 8
+  #   gapTrigger: 2
+  #   syncParticipationFloor: 0.95
+  #   triggers:              # per-trigger toggles, all default true
+  #     slashing: true
+  #     voluntaryExit: true
+  #     blsToExecutionChange: true
+  #     deposit: true
+  #     executionRequest: true
+  #     gap: true
+  #     reorg: true
+  #     lowParticipation: true
+  #     forkBoundary: true
+  #     undecodableFork: true
+  #     baseline: true
+  #   store:                 # the corpus bucket; must NOT be the buffer bucket above.
+  #                          # Use credentials without delete: PutObject/GetObject/ListBucket.
+  #     type: s3
+  #     config:
+  #       region: "us-east-1"
+  #       endpoint: http://minio:9000
+  #       bucket_name: interesting-states
+  #       access_key: xxx
+  #       access_secret: xxx
   # Use the following to configure Tracoor for a custom network
   # ethereum:
   #   config:

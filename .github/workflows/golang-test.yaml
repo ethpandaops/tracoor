@@ -14,6 +14,14 @@ jobs:
 
     runs-on: ubuntu-24.04
 
+    # Nothing here needs cgo - the sqlite driver is pure Go - and every artifact build
+    # (Dockerfile, goreleaser) already pins this. With cgo on, ethkit and go-ethereum each
+    # compile their own copy of libsecp256k1 and the test binaries fail to link with
+    # "multiple definition of secp256k1_*". Older binutils tolerate it; newer ones do not,
+    # so the runner image is the only thing standing between this job and a red build.
+    env:
+      CGO_ENABLED: 0
+
     steps:
       - name: checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
