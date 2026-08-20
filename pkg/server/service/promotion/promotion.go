@@ -506,6 +506,11 @@ type epochPass struct {
 	// pass: deterministic evidence for canonical-branch resolution.
 	children map[string]bool
 
+	// parents memoises out-of-pass parent resolutions, including negative
+	// ones: same-slot branches at an epoch's first slot all reference the
+	// same parent root, and each miss costs a query plus an object load.
+	parents map[string]parentInfo
+
 	// lookahead caches the parent roots referenced by the next epoch's
 	// earliest blocks, resolved at most once per pass.
 	lookahead       map[string]bool
@@ -540,6 +545,7 @@ func (p *Promoter) processEpoch(ctx context.Context, network string, epoch, head
 		bySlot:           make(map[uint64][]*candidate),
 		byRoot:           make(map[string]*candidate),
 		children:         make(map[string]bool),
+		parents:          make(map[string]parentInfo),
 		firstIndexedSlot: firstIndexedSlot(rows),
 	}
 
@@ -733,6 +739,17 @@ func (p *Promoter) resolveParent(ctx context.Context, pass *epochPass, parentRoo
 		return info
 	}
 
+	if info, ok := pass.parents[parentRoot]; ok {
+		return info
+	}
+
+	info := p.fetchParent(ctx, pass, parentRoot)
+	pass.parents[parentRoot] = info
+
+	return info
+}
+
+func (p *Promoter) fetchParent(ctx context.Context, pass *epochPass, parentRoot string) parentInfo {
 	rows, err := p.db.ListBeaconBlock(ctx, &persistence.BeaconBlockFilter{Network: &pass.network, BlockRoot: &parentRoot}, &persistence.PaginationCursor{Limit: 10, OrderBy: orderSlotAsc})
 	if err != nil || len(rows) == 0 || rows[0].Slot < 0 {
 		return parentInfo{}

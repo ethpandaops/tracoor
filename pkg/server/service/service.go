@@ -57,19 +57,16 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 
 	services = append(services, ap)
 
-	// Promotion (opt-in)
-	if err := defaults.Set(&cfg.Promotion); err != nil {
-		return nil, err
-	}
-
+	// Promotion (opt-in). Unlike its siblings there is deliberately no
+	// defaults.Set here: the config loaders apply defaults before
+	// unmarshalling, and re-applying them to the unmarshalled struct would
+	// overwrite explicitly configured zero values - and a cap of 0 is
+	// documented to promote nothing in its tier.
 	if cfg.Promotion.Enabled {
 		// Refuse to start when the buffer cannot outlive the processing
 		// lag: the promotion service reads lagged slots from a buffer the
 		// retention reaper empties on its own schedule.
-		retention := cfg.Indexer.Retention.BeaconStates.Duration
-		if cfg.Indexer.Retention.BeaconBlocks.Duration < retention {
-			retention = cfg.Indexer.Retention.BeaconBlocks.Duration
-		}
+		retention := min(cfg.Indexer.Retention.BeaconStates.Duration, cfg.Indexer.Retention.BeaconBlocks.Duration)
 
 		if err := cfg.Promotion.ValidateRetention(retention); err != nil {
 			return nil, err

@@ -7,6 +7,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -34,6 +35,30 @@ func TestConfigDefaults(t *testing.T) {
 
 	// Disabled promotion never blocks startup.
 	require.NoError(t, conf.Validate())
+}
+
+// An explicit zero is a meaningful value - a cap of 0 promotes nothing in
+// its tier, baselineEveryNEpochs 0 disables the baseline - so the loaders'
+// defaults-then-unmarshal order must preserve it. Nothing downstream may
+// re-apply defaults to the unmarshalled struct: creasty/defaults cannot
+// tell an explicit zero from an absent key and would overwrite it.
+func TestExplicitZerosSurviveLoading(t *testing.T) {
+	doc := `
+enabled: true
+rateCapPerHour: 0
+baselineEveryNEpochs: 0
+`
+
+	conf := &Config{}
+	require.NoError(t, defaults.Set(conf))
+	require.NoError(t, yaml.Unmarshal([]byte(doc), conf))
+
+	assert.Zero(t, conf.RateCapPerHour)
+	assert.Zero(t, conf.BaselineEveryNEpochs)
+
+	// Fields the document omits still take their defaults.
+	assert.Equal(t, uint64(120), conf.RareCapPerHour)
+	assert.Equal(t, uint64(1000), conf.ReorgCapPerHour)
 }
 
 // The service refuses to run when the buffer cannot outlive the processing

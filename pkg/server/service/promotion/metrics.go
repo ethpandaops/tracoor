@@ -37,19 +37,28 @@ const (
 	ResetReasonIdentityChange   = "identity_change"
 )
 
+// metricsInstances is one Metrics per namespace, so the collectors are
+// registered at most once per namespace and multiple service instances
+// (restarts, tests) are safe.
 var (
-	metricsInstance *Metrics
-	metricsOnce     sync.Once
+	metricsInstances = map[string]*Metrics{}
+	metricsMu        sync.Mutex
 )
 
-// GetMetricsInstance returns the process-wide promotion metrics, registering
-// them at most once so multiple service instances (restarts, tests) are safe.
+// GetMetricsInstance returns the promotion metrics for a namespace, creating
+// and registering them on first use.
 func GetMetricsInstance(namespace string) *Metrics {
-	metricsOnce.Do(func() {
-		metricsInstance = newMetrics(namespace)
-	})
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
 
-	return metricsInstance
+	if instance, ok := metricsInstances[namespace]; ok {
+		return instance
+	}
+
+	instance := newMetrics(namespace)
+	metricsInstances[namespace] = instance
+
+	return instance
 }
 
 func newMetrics(namespace string) *Metrics {
