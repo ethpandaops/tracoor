@@ -14,10 +14,14 @@ import (
 	"time"
 
 	"github.com/OffchainLabs/go-bitfield"
-	"github.com/attestantio/go-eth2-client/spec/altair"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/creasty/defaults"
+	"github.com/ethpandaops/go-eth2-client/spec/altair"
+	"github.com/ethpandaops/go-eth2-client/spec/deneb"
+	"github.com/ethpandaops/go-eth2-client/spec/electra"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/google/uuid"
+	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -442,4 +446,156 @@ func (e *env) readCorpusObject(path string) []byte {
 	require.NoError(e.t, err)
 
 	return data
+}
+
+// testGloasBlock builds a valid gloas SignedBeaconBlock and returns its raw
+// SSZ. Gloas is the fork the glamsterdam devnets run, and the fork whose body
+// no longer carries an execution payload - a block shaped like this must not
+// fall through the decode ladder as undecodable.
+func testGloasBlock(t *testing.T, slot uint64, parentRoot, stateRoot phase0.Root, mutate func(body *gloas.BeaconBlockBody)) []byte {
+	t.Helper()
+
+	bits := bitfield.NewBitvector512()
+	for i := range bits.Len() {
+		bits.SetBitAt(i, true)
+	}
+
+	block := &gloas.SignedBeaconBlock{
+		Message: &gloas.BeaconBlock{
+			Slot:          phase0.Slot(slot),
+			ProposerIndex: 1,
+			ParentRoot:    parentRoot,
+			StateRoot:     stateRoot,
+			Body: &gloas.BeaconBlockBody{
+				ETH1Data:      &phase0.ETH1Data{BlockHash: make([]byte, 32)},
+				SyncAggregate: &altair.SyncAggregate{SyncCommitteeBits: bits},
+				SignedExecutionPayloadBid: &gloas.SignedExecutionPayloadBid{
+					Message: &gloas.ExecutionPayloadBid{Slot: phase0.Slot(slot)},
+				},
+				ParentExecutionRequests: &gloas.ExecutionRequests{},
+			},
+		},
+	}
+
+	if mutate != nil {
+		mutate(block.Message.Body)
+	}
+
+	raw, err := block.MarshalSSZ()
+	require.NoError(t, err)
+
+	return raw
+}
+
+// testElectraBlock builds a valid electra SignedBeaconBlock and returns its raw
+// SSZ. Electra is the fork immediately below gloas in the decode ladder, and
+// the one a gloas-shaped decode could plausibly be confused with.
+func testElectraBlock(t *testing.T, slot uint64, parentRoot, stateRoot phase0.Root) []byte {
+	t.Helper()
+
+	bits := bitfield.NewBitvector512()
+	for i := range bits.Len() {
+		bits.SetBitAt(i, true)
+	}
+
+	block := &electra.SignedBeaconBlock{
+		Message: &electra.BeaconBlock{
+			Slot:          phase0.Slot(slot),
+			ProposerIndex: 1,
+			ParentRoot:    parentRoot,
+			StateRoot:     stateRoot,
+			Body: &electra.BeaconBlockBody{
+				ETH1Data:      &phase0.ETH1Data{BlockHash: make([]byte, 32)},
+				SyncAggregate: &altair.SyncAggregate{SyncCommitteeBits: bits},
+				ExecutionPayload: &deneb.ExecutionPayload{
+					BaseFeePerGas: uint256.NewInt(0),
+					ExtraData:     []byte{},
+				},
+				ExecutionRequests: &electra.ExecutionRequests{},
+			},
+		},
+	}
+
+	raw, err := block.MarshalSSZ()
+	require.NoError(t, err)
+
+	return raw
+}
+
+// seedEnvelope seeds an execution payload envelope for a block root, the way
+// the capture pipeline would have on a gloas network.
+func (e *env) seedEnvelope(node string, slot uint64, root phase0.Root, raw []byte, fetchedAt time.Time) {
+	e.t.Helper()
+
+	location := e.seedEnvelopeRow(node, slot, root, fetchedAt)
+	compressed := encoded(e.t, raw, e.encoding)
+
+	_, err := e.buffer.SaveExecutionPayloadEnvelope(e.t.Context(), &store.SaveParams{Data: bytes.NewReader(compressed), Location: location, ContentEncoding: e.encoding.ContentEncoding})
+	require.NoError(e.t, err)
+}
+
+// seedEnvelopeRow indexes an execution payload envelope without writing its
+// object - the shape a storage outage or a reaper race leaves behind - and
+// returns the location the row points at.
+func (e *env) seedEnvelopeRow(node string, slot uint64, root phase0.Root, fetchedAt time.Time) string {
+	e.t.Helper()
+
+	rootHex := root.String()
+	location := fmt.Sprintf("execution_payload_envelopes/%s/%d/%s/%s", testNetwork, slot, node, rootHex)
+
+	require.NoError(e.t, e.db.InsertExecutionPayloadEnvelope(e.t.Context(), &persistence.ExecutionPayloadEnvelope{
+		ID:                   uuid.New().String(),
+		Node:                 node,
+		Slot:                 int64(slot),
+		Epoch:                int64(slot / 32),
+		BlockRoot:            rootHex,
+		FetchedAt:            fetchedAt,
+		ContentEncoding:      e.encoding.ContentEncoding,
+		Location:             location,
+		Network:              testNetwork,
+		BeaconImplementation: testMeta,
+		NodeVersion:          testMeta,
+	}))
+
+	return location
+}
+
+// testEnvelope stands in for a SignedExecutionPayloadEnvelope. The promoter
+// never decodes one - it copies bytes and records their hash - so opaque
+// filler exercises the real path.
+func testEnvelope(slot uint64) []byte {
+	buf := make([]byte, 96)
+	binary.LittleEndian.PutUint64(buf[0:8], slot)
+
+	for i := 8; i < len(buf); i++ {
+		buf[i] = 0x77
+	}
+
+	return buf
+}
+
+// seedGloasChain is seedChain in the fork the glamsterdam devnets actually run: gloas block
+// bytes, a matching post-state per slot, and the execution payload envelope that gloas
+// moves the payload into. mutate shapes each block's body.
+func (e *env) seedGloasChain(gvr phase0.Root, mutate func(body *gloas.BeaconBlockBody), slots ...uint64) map[uint64][]byte {
+	e.t.Helper()
+
+	raws := make(map[uint64][]byte, len(slots))
+	now := time.Now()
+
+	for i, slot := range slots {
+		parent := blockRootFor(slot - 1)
+		if i > 0 {
+			parent = blockRootFor(slots[i-1])
+		}
+
+		raw := testGloasBlock(e.t, slot, parent, stateRootFor(slot), mutate)
+		raws[slot] = raw
+
+		e.seedBlock(testNode, slot, slot/32, blockRootFor(slot), raw, now)
+		e.seedState(testNode, slot, stateRootFor(slot), testState(gvr, slot), now)
+		e.seedEnvelope(testNode, slot, blockRootFor(slot), testEnvelope(slot), now)
+	}
+
+	return raws
 }

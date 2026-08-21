@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	//nolint:gosec // only exposed if pprofAddr config is set
@@ -84,6 +85,11 @@ type agent struct {
 	// pending collapses duplicate work: a reorg re-derives the same slots for
 	// every artifact kind, and the queues block on send.
 	pending *pendingItems
+
+	// noGloasForkOnce keeps the "this network schedules no gloas fork" notice
+	// to one line: the check runs once per slot, and the answer never changes
+	// for the life of a network.
+	noGloasForkOnce sync.Once
 
 	// workers tracks every background loop the agent owns so a shutdown can
 	// wait for them instead of abandoning them mid-fetch.

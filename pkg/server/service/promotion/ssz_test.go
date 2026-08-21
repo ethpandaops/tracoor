@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,4 +89,48 @@ func TestDecodeBlockUndecodableFork(t *testing.T) {
 
 	_, err = decodeBlock(raw)
 	assert.ErrorIs(t, err, errUndecodableFork)
+}
+
+// TestDecodeBlockGloas is the regression guard for glamsterdam: a gloas block
+// carries no execution payload in its body, so it round-trips under no
+// pre-gloas fork and would otherwise be labelled undecodable_fork - starving
+// every content trigger on a live devnet.
+func TestDecodeBlockGloas(t *testing.T) {
+	parent := fillRoot(0x0a)
+	state := fillRoot(0x0b)
+	raw := testGloasBlock(t, 4242, parent, state, nil)
+
+	peek, err := peekBlock(raw)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(4242), peek.Slot)
+	assert.Equal(t, parent, peek.ParentRoot)
+	assert.Equal(t, state, peek.StateRoot)
+
+	decoded, err := decodeBlock(raw)
+	require.NoError(t, err)
+	assert.Equal(t, spec.DataVersionGloas, decoded.Version)
+
+	slot, err := decoded.Slot()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(4242), uint64(slot))
+}
+
+// TestDecodeBlockLadderOrdering pins the ladder: gloas now sits at the top, so
+// the older fork shapes below it must still report themselves.
+func TestDecodeBlockLadderOrdering(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  []byte
+		want spec.DataVersion
+	}{
+		{"gloas", testGloasBlock(t, 7, fillRoot(0x0a), fillRoot(0x0b), nil), spec.DataVersionGloas},
+		{"electra", testElectraBlock(t, 7, fillRoot(0x0a), fillRoot(0x0b)), spec.DataVersionElectra},
+		{"altair", testBlock(t, 7, fillRoot(0x0a), fillRoot(0x0b), nil), spec.DataVersionAltair},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			decoded, err := decodeBlock(test.raw)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, decoded.Version)
+		})
+	}
 }

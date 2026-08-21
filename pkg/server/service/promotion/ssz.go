@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/altair"
-	"github.com/attestantio/go-eth2-client/spec/bellatrix"
-	"github.com/attestantio/go-eth2-client/spec/capella"
-	"github.com/attestantio/go-eth2-client/spec/deneb"
-	"github.com/attestantio/go-eth2-client/spec/electra"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/altair"
+	"github.com/ethpandaops/go-eth2-client/spec/bellatrix"
+	"github.com/ethpandaops/go-eth2-client/spec/capella"
+	"github.com/ethpandaops/go-eth2-client/spec/deneb"
+	"github.com/ethpandaops/go-eth2-client/spec/electra"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
 // Fork-stable byte offsets into raw SSZ. They allow extraction without typed
@@ -110,9 +111,13 @@ func roundTrips(b sszBlock, raw []byte) bool {
 // decodeBlock attempts a typed decode of raw SignedBeaconBlock SSZ, trying
 // forks newest first. A fork too new for the pinned go-eth2-client returns
 // errUndecodableFork - which is itself a trigger, never a hard failure.
-// Structurally identical forks report the older name (e.g. fulu blocks decode
-// as electra); triggers evaluate identically either way.
+// Structurally identical forks report the older name (heze blocks decode as
+// gloas, fulu blocks as electra); triggers evaluate identically either way.
 func decodeBlock(raw []byte) (*spec.VersionedSignedBeaconBlock, error) {
+	if b := new(gloas.SignedBeaconBlock); roundTrips(b, raw) {
+		return &spec.VersionedSignedBeaconBlock{Version: spec.DataVersionGloas, Gloas: b}, nil
+	}
+
 	if b := new(electra.SignedBeaconBlock); roundTrips(b, raw) {
 		return &spec.VersionedSignedBeaconBlock{Version: spec.DataVersionElectra, Electra: b}, nil
 	}

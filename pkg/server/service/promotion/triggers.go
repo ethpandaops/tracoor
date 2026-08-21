@@ -1,6 +1,9 @@
 package promotion
 
-import "github.com/attestantio/go-eth2-client/spec"
+import (
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+)
 
 // Trigger names recorded in manifests. Selection may be sloppy-generous;
 // these labels may not be, so a trigger is only ever recorded when its
@@ -54,12 +57,8 @@ func (p *Promoter) decodedTriggers(block *spec.VersionedSignedBeaconBlock) []str
 		}
 	}
 
-	if triggerEnabled(cfg.ExecutionRequest) {
-		if requests, err := block.ExecutionRequests(); err == nil && requests != nil {
-			if len(requests.Deposits)+len(requests.Withdrawals)+len(requests.Consolidations) > 0 {
-				triggers = append(triggers, TriggerExecutionRequest)
-			}
-		}
+	if triggerEnabled(cfg.ExecutionRequest) && hasExecutionRequests(block) {
+		triggers = append(triggers, TriggerExecutionRequest)
 	}
 
 	if triggerEnabled(cfg.LowParticipation) {
@@ -74,4 +73,54 @@ func (p *Promoter) decodedTriggers(block *spec.VersionedSignedBeaconBlock) []str
 	}
 
 	return triggers
+}
+
+// hasExecutionRequests reports whether this block processes execution-layer
+// triggered requests. Gloas (EIP-7732) moves the payload out of the block, so
+// the requests a gloas block processes are its parent payload's and the
+// versioned accessor declines them - read them off the body instead. EIP-8282
+// builder requests count too: they are the same kind of rare, state-moving
+// event the trigger exists to catch.
+func hasExecutionRequests(block *spec.VersionedSignedBeaconBlock) bool {
+	if body := gloasBody(block); body != nil {
+		r := body.ParentExecutionRequests
+		if r == nil {
+			return false
+		}
+
+		return len(r.Deposits)+len(r.Withdrawals)+len(r.Consolidations)+
+			len(r.BuilderDeposits)+len(r.BuilderExits) > 0
+	}
+
+	requests, err := block.ExecutionRequests()
+	if err != nil || requests == nil {
+		return false
+	}
+
+	deposits, _ := requests.Deposits()
+	withdrawals, _ := requests.Withdrawals()
+	consolidations, _ := requests.Consolidations()
+
+	return len(deposits)+len(withdrawals)+len(consolidations) > 0
+}
+
+// gloasBody returns the block body for the gloas-shaped forks, or nil when the
+// block is an earlier fork. Heze reuses the gloas containers.
+func gloasBody(block *spec.VersionedSignedBeaconBlock) *gloas.BeaconBlockBody {
+	var b *gloas.SignedBeaconBlock
+
+	switch block.Version {
+	case spec.DataVersionGloas:
+		b = block.Gloas
+	case spec.DataVersionHeze:
+		b = block.Heze
+	default:
+		return nil
+	}
+
+	if b == nil || b.Message == nil {
+		return nil
+	}
+
+	return b.Message.Body
 }

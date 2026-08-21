@@ -256,12 +256,15 @@ func (i *Indexer) purgeSpecs() []purgeSpec {
 			kind:      persistence.KindBeaconBlock,
 			retention: i.config.Retention.BeaconBlocks.Duration,
 			list:      i.db.ListExpiringBeaconBlocks,
-			prepare:   i.archiveBlocksBeforePurge,
+			prepare:   i.archiveBeforePurge(persistence.KindBeaconBlock),
 		},
 		{
 			kind:      persistence.KindExecutionPayloadEnvelope,
 			retention: i.config.Retention.ExecutionPayloadEnvelopes.Duration,
 			list:      i.db.ListExpiringExecutionPayloadEnvelopes,
+			// From gloas on the execution payload is not in the block. Archiving the
+			// block alone keeps a slot that cannot be replayed or re-executed.
+			prepare: i.archiveBeforePurge(persistence.KindExecutionPayloadEnvelope),
 		},
 		{
 			kind:      persistence.KindBeaconBadBlock,
@@ -648,8 +651,14 @@ func (i *Indexer) deleteObjects(ctx context.Context, locations []string) {
 // archived (its source object is gone for good) cannot pin the head of the queue and starve
 // every block behind it. Only an exhausted budget stops the pass: it is shared, so later
 // pages would fare no better.
-func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, bool, error) {
-	if !i.permanentStore.IsEnabled() {
+func (i *Indexer) archiveBeforePurge(kind string) func(context.Context, []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, bool, error) {
+	return func(ctx context.Context, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, bool, error) {
+		return i.archiveRowsBeforePurge(ctx, kind, rows)
+	}
+}
+
+func (i *Indexer) archiveRowsBeforePurge(ctx context.Context, kind string, rows []*persistence.ExpiringArtifact) ([]*persistence.ExpiringArtifact, bool, error) {
+	if !i.permanentStore.IsEnabledFor(kind) {
 		return rows, false, nil
 	}
 
@@ -668,7 +677,7 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 			return archived, true, nil
 		}
 
-		divergent, err := i.rowDivergesFromBlob(ctx, row)
+		divergent, err := i.rowDivergesFromBlob(ctx, kind, row)
 		if err != nil {
 			return nil, false, err
 		}
@@ -684,6 +693,7 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 		}
 
 		block := PermanentStoreBlock{
+			Kind:      kind,
 			Location:  row.Location,
 			BlockRoot: row.Identifier,
 			Network:   row.Network,
@@ -730,14 +740,14 @@ func (i *Indexer) archiveBlocksBeforePurge(ctx context.Context, rows []*persiste
 // face value. A hashed row whose blob is already gone is archived as-is: when only divergent
 // copies were ever captured, keeping those bytes beats losing the block entirely — at the
 // cost that the archive cannot tell such a copy apart from a clean one.
-func (i *Indexer) rowDivergesFromBlob(ctx context.Context, row *persistence.ExpiringArtifact) (bool, error) {
+func (i *Indexer) rowDivergesFromBlob(ctx context.Context, kind string, row *persistence.ExpiringArtifact) (bool, error) {
 	if row.ContentHash == "" {
 		return false, nil
 	}
 
-	dedupKey := persistence.DedupKeyFor(persistence.KindBeaconBlock, row)
+	dedupKey := persistence.DedupKeyFor(kind, row)
 
-	blob, err := i.db.GetBlob(ctx, persistence.KindBeaconBlock, row.Network, dedupKey)
+	blob, err := i.db.GetBlob(ctx, kind, row.Network, dedupKey)
 	if err != nil {
 		if errors.Is(err, persistence.ErrBlobNotFound) {
 			return false, nil

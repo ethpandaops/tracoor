@@ -635,7 +635,7 @@ func TestArchivingBeforePurgeIsBoundedPerPage(t *testing.T) {
 
 	start := time.Now()
 
-	archived, stop, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, stop, err := index.archiveRowsBeforePurge(ctx, persistence.KindBeaconBlock, rows)
 	require.NoError(t, err)
 
 	require.Less(t, time.Since(start), 5*time.Second, "the page has one budget, not one per row")
@@ -669,7 +669,7 @@ func TestArchiveBlocksBeforePurgeHoldsBackFailedArchives(t *testing.T) {
 		{ID: "archivable", Location: goodLocation, Network: network, Slot: 2, Identifier: "root-good"},
 	}
 
-	archived, stop, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, stop, err := index.archiveRowsBeforePurge(ctx, persistence.KindBeaconBlock, rows)
 	require.NoError(t, err)
 
 	require.Len(t, archived, 1, "the row whose copy failed is held back")
@@ -722,7 +722,7 @@ func TestArchiveBlocksBeforePurgeHoldsBackDivergentRows(t *testing.T) {
 		{ID: "no-blob", Location: orphanLocation, ContentHash: generateRandomContentHash(), Network: network, Slot: 101, Identifier: "root-orphan"},
 	}
 
-	archived, _, err := index.archiveBlocksBeforePurge(ctx, rows)
+	archived, _, err := index.archiveRowsBeforePurge(ctx, persistence.KindBeaconBlock, rows)
 	require.NoError(t, err)
 
 	ids := make([]string, 0, len(archived))

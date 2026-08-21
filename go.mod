@@ -5,7 +5,6 @@ go 1.26.1
 require (
 	github.com/0xsequence/ethkit v1.38.1
 	github.com/OffchainLabs/go-bitfield v0.0.0-20251031151322-f427d04d8506
-	github.com/attestantio/go-eth2-client v0.29.0
 	github.com/aws/aws-sdk-go-v2 v1.25.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.1
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.11
@@ -15,13 +14,14 @@ require (
 	github.com/creasty/defaults v1.7.0
 	github.com/ethpandaops/beacon v0.69.1-0.20260817014823-77db92c99c0d
 	github.com/ethpandaops/ethwallclock v0.3.0
-	github.com/ethpandaops/go-eth2-client v0.1.7-0.20260712074542-bca0dce49005
+	github.com/ethpandaops/go-eth2-client v0.1.7-0.20260821071915-8411fb110139
 	github.com/glebarez/sqlite v1.10.0
 	github.com/go-co-op/gocron v1.27.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/holiman/uint256 v1.3.2
 	github.com/klauspost/compress v1.18.0
 	github.com/lib/pq v1.10.9
 	github.com/pkg/errors v0.9.1
@@ -55,7 +55,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
-	github.com/casbin/govaluate v1.10.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9 // indirect
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
@@ -88,7 +87,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/goware/breaker v0.2.0 // indirect
 	github.com/goware/superr v0.0.2 // indirect
-	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/huandu/go-clone v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -112,8 +110,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
-	github.com/pk910/dynamic-ssz v1.3.2 // indirect
-	github.com/pk910/hashtree-bindings v0.2.2 // indirect
+	github.com/pk910/dynamic-ssz v1.3.3-0.20260812091520-ef568569f9c1 // indirect
+	github.com/pk910/hashtree-bindings v0.2.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

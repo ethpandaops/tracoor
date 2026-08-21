@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethpandaops/beacon/pkg/beacon/api"
+	"github.com/ethpandaops/beacon/pkg/beacon/state"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/compression"
@@ -378,9 +380,7 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 
 	epoch := uint64(slot) / uint64(spec.SlotsPerEpoch)
 
-	gloas, err := spec.ForkEpochs.GetByName("gloas")
-	if err != nil || uint64(gloas.Epoch) > epoch {
-		// The network has no gloas fork scheduled, or the slot pre-dates it.
+	if !s.envelopeForkActive(spec, epoch) {
 		return nil
 	}
 
@@ -917,4 +917,40 @@ func (s *agent) fetchAndIndexBeaconBadBlobs(ctx context.Context, path string) er
 	}
 
 	return nil
+}
+
+// envelopeForks are the forks that carry execution payload envelopes, oldest
+// first. Gloas introduces them; every later fork inherits them.
+var envelopeForks = []string{"gloas", "heze"}
+
+// envelopeForkActive reports whether the slot's epoch is at or past the fork
+// that introduces execution payload envelopes. Gloas introduces them and every
+// later fork inherits them, so a network that starts at a later fork - and
+// therefore never publishes GLOAS_FORK_EPOCH - still has envelopes.
+//
+// A spec that names none of them is a real possibility worth one log line: the
+// only other symptom is an envelope table that stays empty forever.
+func (s *agent) envelopeForkActive(spec *state.Spec, epoch uint64) bool {
+	for _, name := range envelopeForks {
+		fork, err := spec.ForkEpochs.GetByName(name)
+		if err != nil {
+			continue
+		}
+
+		if uint64(fork.Epoch) <= epoch {
+			return true
+		}
+
+		// The fork is scheduled but still ahead of us. Later forks in the list
+		// are later still, so there is nothing to find.
+		return false
+	}
+
+	s.noGloasForkOnce.Do(func() {
+		s.log.WithField("forks", strings.Join(envelopeForks, ",")).Warn(
+			"Node spec schedules no execution-payload-envelope fork; envelope capture is disabled for this network",
+		)
+	})
+
+	return false
 }

@@ -630,6 +630,7 @@ func (i *Indexer) CreateBeaconBlock(ctx context.Context, req *indexer.CreateBeac
 
 	// Queue the block for permanent storage
 	i.permanentStore.QueueBlock(PermanentStoreBlock{
+		Kind:      persistence.KindBeaconBlock,
 		Location:  req.GetLocation().GetValue(),
 		BlockRoot: req.GetBlockRoot().GetValue(),
 		Network:   req.GetNetwork().GetValue(),
@@ -890,6 +891,17 @@ func (i *Indexer) CreateExecutionPayloadEnvelope(ctx context.Context, req *index
 	}
 
 	i.log.WithFields(logFields).WithField("id", envelope.GetId().GetValue()).Debug("Indexed execution payload envelope")
+
+	// Queue the envelope for permanent storage. From gloas on it carries the execution
+	// payload the block no longer does, so archiving one without the other keeps a slot
+	// that cannot be re-executed.
+	i.permanentStore.QueueBlock(PermanentStoreBlock{
+		Kind:      persistence.KindExecutionPayloadEnvelope,
+		Location:  req.GetLocation().GetValue(),
+		BlockRoot: req.GetBlockRoot().GetValue(),
+		Network:   req.GetNetwork().GetValue(),
+		Slot:      phase0.Slot(req.GetSlot().GetValue()),
+	})
 
 	return &indexer.CreateExecutionPayloadEnvelopeResponse{
 		Id: envelope.GetId(),

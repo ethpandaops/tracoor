@@ -56,9 +56,8 @@ func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	nodeID := uuid.New().String()
 
 	permanentStore, err := NewPermanentStore(log, mockStore, indexer, nodeID, &PermanentStoreConfig{
-		Blocks: BlockConfig{
-			Enabled: true,
-		},
+		Blocks:                    BlockConfig{Enabled: true},
+		ExecutionPayloadEnvelopes: BlockConfig{Enabled: true},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, permanentStore)
@@ -678,4 +677,92 @@ func TestQueueBlockAlwaysClosesProcessedChan(t *testing.T) {
 		permanentStore.QueueBlock(block)
 		requireClosed(t, block)
 	})
+}
+
+// From gloas on, a slot is two artifacts that share one block root: the beacon block and
+// the execution payload envelope carrying the payload the block no longer holds. They must
+// archive as two distinct objects and two distinct rows - if either collapses into the
+// other, one of them is purged having never been archived.
+func TestPermanentStoreArchivesBlockAndEnvelopeSharingABlockRoot(t *testing.T) {
+	ctx := context.Background()
+	permanentStore, mockStore, cleanup := setupPermanentStore(t)
+
+	defer cleanup()
+
+	const sharedRoot = "0xdeadbeef"
+
+	blockData := []byte("gloas beacon block")
+	envelopeData := []byte("signed execution payload envelope")
+
+	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{Location: "blocks/gloas.ssz", Data: bytes.NewReader(blockData)})
+	require.NoError(t, err)
+
+	_, err = mockStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{Location: "envelopes/gloas.ssz", Data: bytes.NewReader(envelopeData)})
+	require.NoError(t, err)
+
+	items := []PermanentStoreBlock{
+		{Kind: persistence.KindBeaconBlock, Location: "blocks/gloas.ssz", BlockRoot: sharedRoot, Network: testNetwork, Slot: 777},
+		{Kind: persistence.KindExecutionPayloadEnvelope, Location: "envelopes/gloas.ssz", BlockRoot: sharedRoot, Network: testNetwork, Slot: 777},
+	}
+
+	for i := range items {
+		items[i].ProcessedChan = make(chan PermanentStoreResult, 1)
+
+		permanentStore.QueueBlock(items[i])
+
+		select {
+		case result := <-items[i].ProcessedChan:
+			require.True(t, result.Archived, "%s should report itself archived", items[i].Kind)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s processing timed out", items[i].Kind)
+		}
+	}
+
+	blockLoc := permanentStore.GetPermanentLocation(items[0])
+	envelopeLoc := permanentStore.GetPermanentLocation(items[1])
+
+	assert.NotEqual(t, blockLoc, envelopeLoc, "a block and its envelope must not resolve to one object")
+
+	got, err := mockStore.GetBeaconBlock(ctx, blockLoc)
+	require.NoError(t, err)
+	assert.Equal(t, blockData, *got)
+
+	got, err = mockStore.GetExecutionPayloadEnvelope(ctx, envelopeLoc)
+	require.NoError(t, err)
+	assert.Equal(t, envelopeData, *got, "the envelope must not have been overwritten by the block")
+
+	// Two rows, one per kind, both under the shared root.
+	filter := &persistence.PermanentBlockFilter{}
+	filter.AddBlockRoot(sharedRoot)
+	filter.AddNetwork(testNetwork)
+
+	rows, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "the block and the envelope are each recorded")
+
+	kinds := []string{rows[0].Kind, rows[1].Kind}
+	assert.ElementsMatch(t, []string{persistence.KindBeaconBlock, persistence.KindExecutionPayloadEnvelope}, kinds)
+}
+
+// A kind that is switched off is not archived, and its rows are handed back to the purge
+// unchanged rather than held for an archive that will never happen.
+func TestPermanentStoreRespectsPerKindEnablement(t *testing.T) {
+	indexer := setupMockIndexer(t)
+
+	log := logrus.New()
+
+	permanentStore, err := NewPermanentStore(log, nil, indexer, uuid.New().String(), &PermanentStoreConfig{
+		Blocks:                    BlockConfig{Enabled: true},
+		ExecutionPayloadEnvelopes: BlockConfig{Enabled: false},
+	})
+	require.NoError(t, err)
+
+	assert.True(t, permanentStore.IsEnabledFor(persistence.KindBeaconBlock))
+	assert.False(t, permanentStore.IsEnabledFor(persistence.KindExecutionPayloadEnvelope))
+	assert.True(t, permanentStore.IsEnabled(), "one enabled kind is enough to run the store")
+
+	off, err := NewPermanentStore(log, nil, indexer, uuid.New().String(), &PermanentStoreConfig{})
+	require.NoError(t, err)
+
+	assert.False(t, off.IsEnabled(), "nothing enabled means nothing to archive")
 }

@@ -25,9 +25,18 @@ services:
     # It must exceed the longest fetch-plus-upload plus the agents' payload-lookup
     # cache TTL, so an agent mid-hash cannot link to a payload being deleted.
     blobGcGracePeriod: 10m
+    # Keep at least one copy of an artifact for ever, copied to permanent/<network>/ before
+    # the retention reaper removes the buffered one. Opt-in, per kind. From gloas on a
+    # beacon block no longer carries its execution payload, so archiving blocks without
+    # envelopes keeps slots that cannot be re-executed.
+    # permanentStore:
+    #   blocks:
+    #     enabled: true
+    #   executionPayloadEnvelopes:
+    #     enabled: true
   # Promote "interesting" (pre-state, block) pairs from the retention buffer
   # into a separate, append-only corpus bucket. Opt-in.
-  # NOTE: beaconStates/beaconBlocks retention must exceed
+  # NOTE: beaconStates/beaconBlocks/executionPayloadEnvelopes retention must exceed
   # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start.
   # promotion:
   #   enabled: true

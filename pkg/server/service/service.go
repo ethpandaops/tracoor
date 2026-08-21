@@ -66,7 +66,13 @@ func CreateGRPCServices(ctx context.Context, log logrus.FieldLogger, cfg *Config
 		// Refuse to start when the buffer cannot outlive the processing
 		// lag: the promotion service reads lagged slots from a buffer the
 		// retention reaper empties on its own schedule.
-		retention := min(cfg.Indexer.Retention.BeaconStates.Duration, cfg.Indexer.Retention.BeaconBlocks.Duration)
+		// Envelopes count from gloas on: the promoter reads them out of the
+		// same buffer, and a capture missing its payload cannot replay.
+		retention := min(
+			cfg.Indexer.Retention.BeaconStates.Duration,
+			cfg.Indexer.Retention.BeaconBlocks.Duration,
+			cfg.Indexer.Retention.ExecutionPayloadEnvelopes.Duration,
+		)
 
 		if err := cfg.Promotion.ValidateRetention(retention); err != nil {
 			return nil, err

@@ -24,6 +24,7 @@ type Manifest struct {
 	Fork       ManifestFork      `json:"fork"`
 	Block      ManifestBlock     `json:"block"`
 	Prestate   *ManifestPrestate `json:"prestate,omitempty"`
+	Envelope   *ManifestEnvelope `json:"envelope,omitempty"`
 	Promotion  ManifestPromotion `json:"promotion"`
 	Context    ManifestContext   `json:"context"`
 }
@@ -71,6 +72,21 @@ type ManifestPrestate struct {
 	// missing from the buffer.
 	ExpectedStateRoot string `json:"expected_state_root,omitempty"`
 	SourceNode        string `json:"source_node"`
+}
+
+// ManifestEnvelope records the block's execution payload envelope. Gloas
+// (EIP-7732) moves the execution payload out of the beacon block, so from that
+// fork on a (pre-state, block) pair alone does not replay a slot - the
+// envelope is the third artifact a consumer needs. Omitted, never substituted,
+// for pre-gloas blocks and for a gloas payload that was never revealed.
+//
+//nolint:tagliatelle // see Manifest.
+type ManifestEnvelope struct {
+	Slot uint64 `json:"slot"`
+	// SHA256 is computed over exactly the raw (decompressed) bytes written.
+	SHA256     string `json:"sha256"`
+	Size       int    `json:"size"`
+	SourceNode string `json:"source_node"`
 }
 
 //nolint:tagliatelle // see Manifest.

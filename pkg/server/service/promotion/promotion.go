@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -40,8 +40,9 @@ const (
 
 	namespace = "tracoor_server_promotion"
 
-	orderSlotAsc  = "slot ASC"
-	orderSlotDesc = "slot DESC"
+	orderSlotAsc      = "slot ASC"
+	orderFetchedAtAsc = "fetched_at ASC"
+	orderSlotDesc     = "slot DESC"
 
 	// epochRowLimit bounds a single epoch listing; 32-ish slots times a
 	// handful of nodes sits far below it. Hitting it is reported, never
@@ -1105,6 +1106,19 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 
 	p.metrics.ObserveCorpusBytes(pass.network, "block", len(cand.raw))
 
+	envelopeRaw, envelope, envErr := p.resolveEnvelope(ctx, pass.network, cand)
+	if envErr != nil {
+		return envErr
+	}
+
+	if envelopeRaw != nil {
+		if _, err := p.corpus.SaveRaw(ctx, &store.SaveParams{Data: bytes.NewReader(envelopeRaw), Location: capturePath(network, forkName, id, captureEnvelopeName)}); err != nil {
+			return errors.Wrap(err, "failed to write execution payload envelope")
+		}
+
+		p.metrics.ObserveCorpusBytes(pass.network, "envelope", len(envelopeRaw))
+	}
+
 	manifest := &Manifest{
 		Schema:     manifestSchema,
 		Tool:       tracoor.Full(),
@@ -1126,6 +1140,7 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 			Size:       len(cand.raw),
 		},
 		Prestate: prestate,
+		Envelope: envelope,
 		Promotion: ManifestPromotion{
 			Triggers: triggers,
 			Decoded:  cand.decoded != nil,
@@ -1170,9 +1185,78 @@ func (p *Promoter) promote(ctx context.Context, pass *epochPass, cand *candidate
 		"triggers":      triggers,
 		"branch":        branch,
 		"pair_verified": manifest.Promotion.PairVerified,
+		"envelope":      envelope != nil,
 	}).Info("Promoted capture to corpus")
 
 	return nil
+}
+
+// resolveEnvelope locates the block's execution payload envelope in the
+// buffer. Gloas (EIP-7732) moves the execution payload out of the beacon
+// block, so from that fork on a (pre-state, block) pair no longer replays a
+// slot - the envelope is the third artifact. Any node's copy will do: they are
+// deduplicated by content upstream.
+//
+// Absence is ordinary and silent: pre-gloas blocks have no envelope, and a
+// gloas payload the builder never revealed leaves the slot without one. The
+// capture is still worth promoting either way. A transient failure is neither:
+// the corpus is append-only, so promoting past a listing or read error would
+// turn a hiccup into a permanent gap - it fails the promotion instead, and the
+// epoch is retried next tick. Only copies that are provably corrupt - present
+// but undecompressable - are given up on, since retrying cannot mend bytes.
+func (p *Promoter) resolveEnvelope(ctx context.Context, network string, cand *candidate) ([]byte, *ManifestEnvelope, error) {
+	rows, err := p.db.ListExecutionPayloadEnvelope(ctx,
+		&persistence.ExecutionPayloadEnvelopeFilter{Network: &network, BlockRoot: &cand.root},
+		&persistence.PaginationCursor{Limit: 10, OrderBy: orderFetchedAtAsc},
+	)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to list execution payload envelopes")
+	}
+
+	var readErr error
+
+	for _, row := range rows {
+		data, gerr := p.buffer.GetExecutionPayloadEnvelope(ctx, row.Location)
+		if gerr != nil || data == nil {
+			if gerr == nil {
+				gerr = errors.Errorf("no data at %s", row.Location)
+			}
+
+			readErr = gerr
+
+			continue
+		}
+
+		raw, derr := p.decompress(*data, row.ContentEncoding)
+		if derr != nil {
+			p.log.WithError(derr).WithField("location", row.Location).Warn("Failed to decompress execution payload envelope")
+
+			continue
+		}
+
+		return raw, &ManifestEnvelope{
+			Slot:       cand.slot,
+			SHA256:     sha256Hex(raw),
+			Size:       len(raw),
+			SourceNode: row.Node,
+		}, nil
+	}
+
+	if readErr != nil {
+		return nil, nil, errors.Wrap(readErr, "failed to read execution payload envelope from buffer")
+	}
+
+	if len(rows) > 0 {
+		// Every indexed copy exists but is corrupt; a retry cannot mend bytes,
+		// so the capture promotes without its envelope rather than never.
+		p.log.WithFields(logrus.Fields{
+			labelNetwork:   network,
+			labelSlot:      cand.slot,
+			labelBlockRoot: cand.root,
+		}).Warn("Every buffered copy of the execution payload envelope is unreadable; promoting the capture without it")
+	}
+
+	return nil, nil, nil
 }
 
 // resolvePrestate locates and verifies the parent's post-state in the buffer.

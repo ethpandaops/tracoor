@@ -67,7 +67,7 @@ var expectedIndexes = map[string][]string{
 		"ix_distributed_locks_expires_at",
 	},
 	"permanent_blocks": {
-		"ux_permanent_blocks_block_root_network",
+		"ux_permanent_blocks_kind_block_root_network",
 	},
 }
 

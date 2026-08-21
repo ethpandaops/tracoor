@@ -200,6 +200,18 @@ func (i *Indexer) Start(ctx context.Context) error {
 		return perrors.Wrap(err, "failed to auto migrate permanent block")
 	}
 
+	// AutoMigrate adds the kind-aware unique index but never drops the one it replaces.
+	// Left in place, (block_root, network) still forbids a gloas block and its execution
+	// payload envelope - same root - from both being recorded, so the second one could
+	// never be archived.
+	if i.db.Migrator().HasIndex(&PermanentBlock{}, legacyPermanentBlockIndex) {
+		if err = i.db.Migrator().DropIndex(&PermanentBlock{}, legacyPermanentBlockIndex); err != nil {
+			return perrors.Wrap(err, "failed to drop superseded permanent block index")
+		}
+
+		i.log.WithField("index", legacyPermanentBlockIndex).Info("Dropped superseded permanent block index")
+	}
+
 	return nil
 }
 

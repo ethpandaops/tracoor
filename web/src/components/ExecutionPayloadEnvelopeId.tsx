@@ -1,4 +1,4 @@
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { useFormContext } from 'react-hook-form';
 import TimeAgo from 'react-timeago';
 import { useLocation } from 'wouter';
@@ -26,6 +26,13 @@ export default function ExecutionPayloadEnvelopeId({ id }: { id: string }) {
   const handleSearch = (key: string, value: unknown) => {
     setValue(key, value);
     setLocation('/execution_payload_envelope');
+  };
+
+  // The envelope carries the payload its beacon block no longer does, so there has to be a
+  // way across: without it the two halves of a gloas slot are unreachable from each other.
+  const handleBlockSearch = (blockRoot: string) => {
+    setValue('beaconBlockBlockRoot', blockRoot);
+    setLocation('/beacon_block');
   };
 
   let errorMessage = undefined;
@@ -241,7 +248,18 @@ export default function ExecutionPayloadEnvelopeId({ id }: { id: string }) {
               )}
             </dd>
           </div>
-          <div className="py-4 sm:py-5 px-4 sm:px-6 flex justify-center sm:bg-gray-100 sm:dark:bg-gray-900">
+          <div className="py-4 sm:py-5 px-4 sm:px-6 flex flex-wrap justify-center gap-x-6 gap-y-2 sm:bg-gray-100 sm:dark:bg-gray-900">
+            {envelope?.block_root && (
+              <dt className="text-md text-gray-500 font-bold">
+                <button
+                  type="button"
+                  onClick={() => handleBlockSearch(envelope.block_root)}
+                  className="text-amber-500 hover:text-amber-600 px-2 flex"
+                >
+                  Beacon block <ArrowTopRightOnSquareIcon className="w-6 h-6 ml-2" />
+                </button>
+              </dt>
+            )}
             <dt className="text-md text-gray-500 font-bold">
               <a
                 href={`/download/execution_payload_envelope/${id}`}

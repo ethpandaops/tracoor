@@ -204,6 +204,11 @@ func rawConfigMap(conf store.Config) (map[string]any, error) {
 // processing lag: the service reads slots lagEpochs behind head from a buffer
 // the retention reaper empties, so retention must exceed the lag plus at
 // least one epoch of processing margin or promotion silently loses data.
+//
+// Every artifact the promoter reads is bound by the same rule. From gloas on
+// that includes execution payload envelopes: an envelope reaped before its
+// block is promoted leaves a capture that cannot replay the slot, and the
+// corpus is append-only, so the gap is permanent.
 func (c *Config) ValidateRetention(retention time.Duration) error {
 	if !c.Enabled {
 		return nil
@@ -214,7 +219,7 @@ func (c *Config) ValidateRetention(retention time.Duration) error {
 	required := time.Duration(c.LagEpochs+1) * epoch //nolint:gosec // bounded by config validation
 	if retention < required {
 		return fmt.Errorf(
-			"promotion: beacon state/block retention %s is below lag %d epochs + 1 epoch margin (%s); increase retention or reduce lagEpochs",
+			"promotion: beacon state/block/execution payload envelope retention %s is below lag %d epochs + 1 epoch margin (%s); increase retention or reduce lagEpochs",
 			retention, c.LagEpochs, required,
 		)
 	}

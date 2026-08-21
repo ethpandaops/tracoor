@@ -56,8 +56,6 @@ github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRF
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137/go.mod h1:OMCwj8VM1Kc9e19TLln2VL61YJF0x1XFtfdL4JdbSyE=
-github.com/attestantio/go-eth2-client v0.29.0 h1:nOVPR6boXuGn5yg94pVOKcaoiO9yyjaYbM1vzwPF4n4=
-github.com/attestantio/go-eth2-client v0.29.0/go.mod h1:yhVnKAzIsFhtawbq6k/rA/Dy4vsPpu2Z2cGdQVrIjd0=
 github.com/aws/aws-sdk-go-v2 v1.25.0 h1:sv7+1JVJxOu/dD/sz/csHX7jFqmP001TIY7aytBWDSQ=
 github.com/aws/aws-sdk-go-v2 v1.25.0/go.mod h1:G104G1Aho5WqF+SR3mDIobTABQzpYV0WxMsKxlMggOA=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.4 h1:OCs21ST2LrepDfD3lwlQiOqIGp6JiEUqG84GzTDoyJs=
@@ -110,8 +108,6 @@ github.com/btcsuite/btcd/btcutil v1.1.6 h1:zFL2+c3Lb9gEgqKNzowKUPQNb8jV7v5Oaodi/
 github.com/btcsuite/btcd/btcutil v1.1.6/go.mod h1:9dFymx8HpuLqBnsPELrImQeTQfKBQqzqGbbV3jK55aE=
 github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 h1:59Kx4K6lzOW5w6nFlA0v5+lk/6sjybR934QNHSJZPTQ=
 github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0/go.mod h1:7SFka0XMvUgj3hfZtydOrQY2mwhPclbT2snogU7SQQc=
-github.com/casbin/govaluate v1.10.0 h1:ffGw51/hYH3w3rZcxO/KcaUIDOLP84w7nsidMVgaDG0=
-github.com/casbin/govaluate v1.10.0/go.mod h1:G/UnbIjZk/0uMNaLwZZmFQrR72tYRZWQkO70si/iR7A=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
@@ -187,8 +183,8 @@ github.com/ethpandaops/beacon v0.69.1-0.20260817014823-77db92c99c0d h1:ONuDcC5xx
 github.com/ethpandaops/beacon v0.69.1-0.20260817014823-77db92c99c0d/go.mod h1:Bg1gTi65Y34ImJPAl9v3KFvQLPFQrn0D1A7ANs8uORY=
 github.com/ethpandaops/ethwallclock v0.3.0 h1:xF5fwtBf+bHFHZKBnwiPFEuelW3sMM7SD3ZNFq1lJY4=
 github.com/ethpandaops/ethwallclock v0.3.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/go-eth2-client v0.1.7-0.20260712074542-bca0dce49005 h1:hN4nugJUYn/O1Or4cW8jBYJBgCCrIGeMU2bXbpKWInU=
-github.com/ethpandaops/go-eth2-client v0.1.7-0.20260712074542-bca0dce49005/go.mod h1:97Oq3omOQSGPPYgrbsOIIw2Pc4T5Ph21f8ZRyHJQBHU=
+github.com/ethpandaops/go-eth2-client v0.1.7-0.20260821071915-8411fb110139 h1:fIqOt3N4K59+M6M0yvfFWJbNkZTzhjLxUJtXVJn/VMA=
+github.com/ethpandaops/go-eth2-client v0.1.7-0.20260821071915-8411fb110139/go.mod h1:MXQukU/345puJmB2EikoaeQIFizk3zbekPxwYyxG/t8=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
@@ -419,10 +415,10 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.0 h1:8SG7/vwALn54lVB/0yZ/MMwhFrPYtpEHQb2IpWsCzug=
 github.com/opencontainers/image-spec v1.1.0/go.mod h1:W4s4sFTMaBeK1BQLXbG4AdM2szdn85PY75RI83NrTrM=
-github.com/pk910/dynamic-ssz v1.3.2 h1:65UR/O+ss+U2Dn86Rdl7LwehHo3u2ElutduS/pcuUXE=
-github.com/pk910/dynamic-ssz v1.3.2/go.mod h1:lqmnou2bjr2UWQ3C/L3082TGW0SFl/SwT7ionwM0+FU=
-github.com/pk910/hashtree-bindings v0.2.2 h1:gkczxxekBW2NeMK9N3OLj7Jepe7zPmJGVwr8LyofGsA=
-github.com/pk910/hashtree-bindings v0.2.2/go.mod h1:zrWt88783JmhBfcgni6kkIMYRdXTZi/FL//OyI5T/l4=
+github.com/pk910/dynamic-ssz v1.3.3-0.20260812091520-ef568569f9c1 h1:s9bqZutzC2JSpKMOIjFEGqpaCAOPtX4BqLEPLbrv7Wg=
+github.com/pk910/dynamic-ssz v1.3.3-0.20260812091520-ef568569f9c1/go.mod h1:5qeouU7Xd1RPblfOr5QBHQyZlNmQJ6WJK9xK+p/5Iwo=
+github.com/pk910/hashtree-bindings v0.2.5 h1:zwONqRIgw40yGEOnGXBORvQVYaXtdZE3bS1ZJohc2/s=
+github.com/pk910/hashtree-bindings v0.2.5/go.mod h1:zrWt88783JmhBfcgni6kkIMYRdXTZi/FL//OyI5T/l4=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

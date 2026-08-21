@@ -14,7 +14,13 @@ import CopyToClipboard from '@components/CopyToClipboard';
 import LCLISetup from '@components/LCLISetup';
 import Loading from '@components/Loading';
 import useNetwork from '@contexts/network';
-import { useBeaconBlocks, useBeaconBadBlocks, useBeaconStates, useConfig } from '@hooks/useQuery';
+import {
+  useBeaconBlocks,
+  useBeaconBadBlocks,
+  useBeaconStates,
+  useConfig,
+  useExecutionPayloadEnvelopes,
+} from '@hooks/useQuery';
 import { isCustomNetwork } from '@utils/config';
 
 export default function LCLIStateTransition() {
@@ -73,6 +79,22 @@ export default function LCLIStateTransition() {
     Boolean(beaconBlockSelectorId),
   );
 
+  const block = blockData?.[0];
+
+  // From gloas on, the execution payload is not in the block: it rides in a separate
+  // SignedExecutionPayloadEnvelope. Offer it alongside so the slot's artifacts are not
+  // split across two pages.
+  const { data: envelopeData } = useExecutionPayloadEnvelopes(
+    {
+      network: network ? network : undefined,
+      block_root: block?.block_root,
+      pagination: {
+        limit: 1,
+      },
+    },
+    Boolean(block?.block_root),
+  );
+
   function generateStateFileNamePrefix(state: BeaconState) {
     return `beacon_state-${state.node}-${state.slot}-${state.state_root}`;
   }
@@ -86,11 +108,12 @@ export default function LCLIStateTransition() {
   }
 
   const state = stateData?.[0];
-  const block = blockData?.[0];
   const badBlock = badBlockData?.[0];
+  const envelope = envelopeData?.[0];
   let stateFileName = '';
   let blockFileName = '';
   let blockType = 'beacon_block';
+  let envelopeFileName = '';
   if (state) {
     stateFileName = generateStateFileNamePrefix(state);
   }
@@ -101,18 +124,33 @@ export default function LCLIStateTransition() {
     blockFileName = generateBadBlockFileNamePrefix(badBlock);
     blockType = 'beacon_bad_block';
   }
+  if (envelope) {
+    envelopeFileName = `execution_payload_envelope-${envelope.node}-${envelope.slot}-${envelope.block_root}`;
+  }
 
   const cmd = useMemo(() => {
     if (state && (block || badBlock)) {
       return `# Download the state and block
 # Note: requires wget
 wget -O ${stateFileName}.ssz -q ${window.location.origin}/download/beacon_state/${state.id}
-wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}
+wget -O ${blockFileName}.ssz -q ${window.location.origin}/download/${blockType}/${block?.id ?? badBlock?.id}${
+        envelope
+          ? `
+wget -O ${envelopeFileName}.ssz -q ${window.location.origin}/download/execution_payload_envelope/${envelope.id}`
+          : ''
+      }
 
 # Transition the state${
         config && isCustomNetwork(config)
           ? `
 # Note: requires the network config in the local directory "${network}", read the setup instructions above`
+          : ''
+      }${
+        envelope
+          ? `
+# Note: this slot has an execution payload envelope, downloaded above. transition-blocks
+# takes a pre-state and a block only, so the payload it carries is NOT executed here and
+# the post-state below covers the consensus-side transition alone.`
           : ''
       }
 cargo run --release -- transition-blocks \\
@@ -122,7 +160,7 @@ cargo run --release -- transition-blocks \\
   --post-state-output-path ${stateFileName}-post.ssz`;
     }
     return '';
-  }, [stateData, blockData, badBlockData]);
+  }, [stateData, blockData, badBlockData, envelopeData]);
 
   let otherComp = undefined;
 

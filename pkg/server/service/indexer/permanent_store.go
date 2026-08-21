@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -22,8 +23,12 @@ type PermanentStoreResult struct {
 	Archived bool
 }
 
-// PermanentStoreBlock contains the minimal information needed to identify a block.
+// PermanentStoreBlock contains the minimal information needed to identify an archivable
+// artifact. Kind distinguishes the two artifacts that share a block root from gloas on -
+// the beacon block and its execution payload envelope - and an empty Kind means
+// persistence.KindBeaconBlock, which is what every caller meant before envelopes existed.
 type PermanentStoreBlock struct {
+	Kind      string
 	Location  string
 	BlockRoot string
 	Network   string
@@ -42,13 +47,16 @@ type PermanentStore struct {
 	db      *persistence.Indexer
 	queue   chan PermanentStoreBlock
 	cache   *lru.Cache[string, bool]
-	enabled bool
+	enabled map[string]bool
 	stopped bool
 	nodeID  string
 }
 
 type PermanentStoreConfig struct {
 	Blocks BlockConfig `yaml:"blocks"`
+	// ExecutionPayloadEnvelopes is its own switch, but archiving gloas blocks without it
+	// keeps only half of each slot: the payload lives in the envelope from that fork on.
+	ExecutionPayloadEnvelopes BlockConfig `yaml:"executionPayloadEnvelopes"`
 }
 
 type BlockConfig struct {
@@ -63,12 +71,15 @@ func NewPermanentStore(log logrus.FieldLogger, st store.Store, db *persistence.I
 	}
 
 	return &PermanentStore{
-		log:     log.WithField("component", "permanent_store"),
-		store:   st,
-		db:      db,
-		queue:   make(chan PermanentStoreBlock, 5000),
-		cache:   cache,
-		enabled: conf.Blocks.Enabled,
+		log:   log.WithField("component", "permanent_store"),
+		store: st,
+		db:    db,
+		queue: make(chan PermanentStoreBlock, 5000),
+		cache: cache,
+		enabled: map[string]bool{
+			persistence.KindBeaconBlock:              conf.Blocks.Enabled,
+			persistence.KindExecutionPayloadEnvelope: conf.ExecutionPayloadEnvelopes.Enabled,
+		},
 		nodeID:  nodeID,
 		stopped: false,
 	}, nil
@@ -115,16 +126,28 @@ func (p *PermanentStore) Stop(ctx context.Context) error {
 	return nil
 }
 
+// IsEnabledFor reports whether this kind of artifact is archived.
+func (p *PermanentStore) IsEnabledFor(kind string) bool {
+	return p.enabled[kind]
+}
+
+// IsEnabled reports whether the permanent store archives anything at all.
 func (p *PermanentStore) IsEnabled() bool {
-	return p.enabled
+	for _, on := range p.enabled {
+		if on {
+			return true
+		}
+	}
+
+	return false
 }
 
 // QueueBlock adds a block to the queue for processing. Every path that does not hand the block
 // to a worker signals ProcessedChan itself — with a not-archived result — so a caller waiting
 // on it is never stranded and never mistakes a dropped block for an archived one.
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
-	// Check if the permanent store is enabled
-	if !p.IsEnabled() {
+	// Check if the permanent store is enabled for this kind of artifact
+	if !p.IsEnabledFor(block.kind()) {
 		signalProcessed(block, false)
 
 		return
@@ -202,8 +225,10 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 // processBlock processes a single block.
 func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreBlock) error {
-	// Create a cache key for this block
-	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
+	// Create a cache key for this artifact. The kind is in the key because a gloas block
+	// and its envelope share a block root: without it, archiving one would mark the other
+	// as already done and the object would be purged unarchived.
+	cacheKey := fmt.Sprintf("%s:%s:%s", block.kind(), block.Network, block.BlockRoot)
 
 	// The result is delivered on the way out. archived flips to true only once the block is
 	// known to be in the permanent store, so a waiter never releases a row on a lost lock or
@@ -299,11 +324,12 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 	}
 
 	// Check if block is already recorded in database before checking the store
-	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
-	if err != nil {
+	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.kind(), block.BlockRoot, block.Network)
+	if err != nil && !errors.Is(err, persistence.ErrPermanentBlockNotFound) {
 		p.log.WithError(err).WithFields(logrus.Fields{
 			KeyBlockRoot: block.BlockRoot,
 			KeyNetwork:   block.Network,
+			KeyKind:      block.kind(),
 		}).Error("Failed to check if block is already recorded in database")
 	} else if permanentBlock != nil {
 		p.log.WithFields(logrus.Fields{
@@ -393,15 +419,33 @@ func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block Permane
 	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
 		//nolint:gosec // At the mercy of the database
 		Slot:      int64(block.Slot),
+		Kind:      block.kind(),
 		BlockRoot: block.BlockRoot,
 		Network:   block.Network,
 	})
 }
 
-// GetPermanentLocation returns the permanent location for a block.
+// GetPermanentLocation returns the permanent location for an artifact. Beacon blocks keep
+// the layout they have always had, so archives written before envelopes existed still
+// resolve; every other kind gets its own subdirectory, which is also what keeps a block and
+// its envelope - same root, same extension - from being the same object.
 func (p *PermanentStore) GetPermanentLocation(block PermanentStoreBlock) string {
 	// Extract the file extension from the source location
 	extension := filepath.Ext(block.Location)
 
-	return filepath.Join("permanent", block.Network, block.BlockRoot+extension)
+	if block.kind() == persistence.KindBeaconBlock {
+		return filepath.Join("permanent", block.Network, block.BlockRoot+extension)
+	}
+
+	return filepath.Join("permanent", block.Network, block.kind(), block.BlockRoot+extension)
+}
+
+// kind is the artifact's kind, defaulting to a beacon block: every caller that predates
+// envelopes queues blocks and sets no kind.
+func (b PermanentStoreBlock) kind() string {
+	if b.Kind == "" {
+		return persistence.KindBeaconBlock
+	}
+
+	return b.Kind
 }

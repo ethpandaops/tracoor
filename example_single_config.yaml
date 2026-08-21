@@ -18,7 +18,7 @@ server:
     # Copy interesting (pre-state, block) pairs out of the retention buffer into a
     # separate, append-only corpus that outlives the network. Opt-in, and never
     # deletes anything. See example_server_config.yaml for every available option.
-    # NOTE: beaconStates/beaconBlocks retention must exceed
+    # NOTE: beaconStates/beaconBlocks/executionPayloadEnvelopes retention must exceed
     # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start
     # - the 30m above is not enough for the 12s/32 network below.
     # promotion:

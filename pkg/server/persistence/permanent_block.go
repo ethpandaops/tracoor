@@ -9,28 +9,47 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// PermanentBlock represents a permanently stored block in the database.
-// This provides a mapping between slot, block_root, and network for
-// blocks that have been copied to permanent storage.
+// legacyPermanentBlockIndex is the pre-kind unique index on (block_root, network),
+// superseded by ux_permanent_blocks_kind_block_root_network and dropped at migration.
+const legacyPermanentBlockIndex = "ux_permanent_blocks_block_root_network"
+
+// ErrPermanentBlockNotFound is returned when no row records the artifact. It is an
+// ordinary answer on the archive path - almost every artifact is new - so callers must
+// be able to tell it apart from a database failure.
+var ErrPermanentBlockNotFound = errors.New("permanent block not found")
+
+// PermanentBlock represents a permanently stored artifact in the database.
+// This provides a mapping between kind, slot, block_root, and network for
+// artifacts that have been copied to permanent storage.
 //
 // It has no retention on purpose: it is the index of what was kept for ever, so a row that
 // expired would leave a permanent object nothing points at.
 //
-// The only production lookup is by (block_root, network), so that pair carries the one
-// index, and unique makes it the integrity guarantee the get-before-insert flow in the
+// Kind is part of the identity, not decoration. Gloas splits a slot across two artifacts -
+// the block and its execution payload envelope - which share a block root, so without kind
+// the second one to arrive would collide with the first and never be archived.
+//
+// The only production lookup is by (kind, block_root, network), so that triple carries the
+// one index, and unique makes it the integrity guarantee the get-before-insert flow in the
 // permanent store otherwise only approximates.
 type PermanentBlock struct {
 	ID uint `gorm:"primaryKey"`
 	// We have to use int64 here as SQLite doesn't support uint64
 	Slot      int64  `gorm:"not null;default:0"`
-	BlockRoot string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_block_root_network,priority:1"`
-	Network   string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_block_root_network,priority:2"`
+	Kind      string `gorm:"not null;default:'beacon_block';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:1"`
+	BlockRoot string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:2"`
+	Network   string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:3"`
 }
 
 type PermanentBlockFilter struct {
 	Slot      *int64
+	Kind      *string
 	BlockRoot *string
 	Network   *string
+}
+
+func (f *PermanentBlockFilter) AddKind(kind string) {
+	f.Kind = &kind
 }
 
 func (f *PermanentBlockFilter) AddSlot(slot int64) {
@@ -48,6 +67,10 @@ func (f *PermanentBlockFilter) AddNetwork(network string) {
 func (f *PermanentBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	if f.Slot != nil {
 		query = query.Where("slot = ?", f.Slot)
+	}
+
+	if f.Kind != nil {
+		query = query.Where("kind = ?", f.Kind)
 	}
 
 	if f.BlockRoot != nil {
@@ -71,7 +94,7 @@ func (i *Indexer) InsertPermanentBlock(ctx context.Context, block *PermanentBloc
 	query := i.db.WithContext(ctx)
 
 	result := query.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "block_root"}, {Name: "network"}},
+		Columns:   []clause.Column{{Name: "kind"}, {Name: "block_root"}, {Name: "network"}},
 		DoNothing: true,
 	}).Create(block)
 	if result.Error != nil {
@@ -151,8 +174,10 @@ func (i *Indexer) CountPermanentBlock(ctx context.Context, filter *PermanentBloc
 	return count, nil
 }
 
-// GetPermanentBlockByBlockRoot retrieves a permanent block by block root and network.
-func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, network string) (*PermanentBlock, error) {
+// GetPermanentBlockByBlockRoot retrieves a permanent artifact by kind, block root and
+// network. A row that is not there returns ErrPermanentBlockNotFound, which is the normal
+// answer and not a database error.
+func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, kind, blockRoot, network string) (*PermanentBlock, error) {
 	operation := OperationGetPermanentBlock
 	i.metrics.ObserveOperation(operation)
 
@@ -160,10 +185,10 @@ func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, n
 
 	var permanentBlock PermanentBlock
 
-	result := query.Where("block_root = ? AND network = ?", blockRoot, network).First(&permanentBlock)
+	result := query.Where("kind = ? AND block_root = ? AND network = ?", kind, blockRoot, network).First(&permanentBlock)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, errors.New("permanent block not found")
+			return nil, ErrPermanentBlockNotFound
 		}
 
 		i.metrics.ObserveOperationError(operation)

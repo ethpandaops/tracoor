@@ -10,12 +10,14 @@ import (
 //
 //	v1/states/<sha256-of-raw-ssz>.ssz                        uncompressed, content-addressed, deduplicated
 //	v1/captures/<network>/<fork>/<capture_id>/input.ssz      the SignedBeaconBlock, raw
+//	v1/captures/<network>/<fork>/<capture_id>/envelope.ssz   the SignedExecutionPayloadEnvelope, raw (gloas+, when revealed)
 //	v1/captures/<network>/<fork>/<capture_id>/manifest.json
 const (
 	corpusStatePrefix   = "v1/states"
 	corpusCapturePrefix = "v1/captures"
 
 	captureBlockName    = "input.ssz"
+	captureEnvelopeName = "envelope.ssz"
 	captureManifestName = "manifest.json"
 
 	captureRootChars = 12

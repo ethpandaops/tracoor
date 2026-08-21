@@ -1,6 +1,7 @@
 package promotion
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -8,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/ethpandaops/tracoor/pkg/store"
 )
 
 // Pairing across skipped slots: the pre-state is the post-state of the
@@ -767,4 +770,220 @@ func TestDecompressHonoursDeclaredEncoding(t *testing.T) {
 		_, err := e.promoter.decompress(raw, "br")
 		require.Error(t, err)
 	})
+}
+
+// From gloas on, the execution payload lives outside the block. A capture
+// without its envelope cannot replay the slot, and the corpus is append-only,
+// so the envelope has to land in the same commit as the block.
+func TestPromotesExecutionPayloadEnvelope(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	envelope := testEnvelope(163)
+	e.seedEnvelope(testNode, 163, blockRootFor(163), envelope, time.Now())
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+
+	m := e.readManifest(manifests[0])
+
+	require.NotNil(t, m.Envelope)
+	assert.Equal(t, uint64(163), m.Envelope.Slot)
+	assert.Equal(t, sha256Hex(envelope), m.Envelope.SHA256)
+	assert.Equal(t, len(envelope), m.Envelope.Size)
+	assert.Equal(t, testNode, m.Envelope.SourceNode)
+
+	envelopePath := strings.TrimSuffix(manifests[0], captureManifestName) + captureEnvelopeName
+	assert.Equal(t, envelope, e.readCorpusObject(envelopePath))
+}
+
+// A pre-gloas block has no envelope, and a gloas payload the builder never
+// revealed leaves the slot without one. Both are ordinary absence: the capture
+// still promotes, and the manifest omits the field rather than claiming an
+// envelope that does not exist.
+func TestPromotesWithoutEnvelopeWhenNoneExists(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+
+	m := e.readManifest(manifests[0])
+	assert.Nil(t, m.Envelope)
+
+	for path := range e.corpusFiles() {
+		assert.NotContains(t, path, captureEnvelopeName)
+	}
+}
+
+// An envelope the index knows about but the buffer cannot deliver is a
+// transient failure, not absence: the corpus is append-only, so promoting past
+// it would turn a storage hiccup into a permanent gap. The capture is held
+// back and the next tick, with the object readable again, promotes it whole.
+func TestEnvelopeReadFailureHoldsBackPromotion(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	// The row exists; the object it points at does not.
+	location := e.seedEnvelopeRow(testNode, 163, blockRootFor(163), time.Now())
+
+	e.promoter.tick(t.Context())
+
+	require.Empty(t, e.findManifests(), "a capture whose envelope cannot be read is not promoted")
+
+	// The outage ends: the object is where the row said it was.
+	envelope := testEnvelope(163)
+	compressed := encoded(t, envelope, e.encoding)
+
+	_, err := e.buffer.SaveExecutionPayloadEnvelope(t.Context(), &store.SaveParams{Data: bytes.NewReader(compressed), Location: location, ContentEncoding: e.encoding.ContentEncoding})
+	require.NoError(t, err)
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+
+	m := e.readManifest(manifests[0])
+	require.NotNil(t, m.Envelope)
+	assert.Equal(t, sha256Hex(envelope), m.Envelope.SHA256)
+}
+
+// A copy that exists but does not decompress is corrupt, and retrying cannot
+// mend bytes: holding the capture back would trade a missing envelope for a
+// missing capture. It promotes without one.
+func TestCorruptEnvelopeDoesNotBlockPromotion(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	// The row declares the buffer's encoding; the bytes are not it.
+	location := e.seedEnvelopeRow(testNode, 163, blockRootFor(163), time.Now())
+
+	_, err := e.buffer.SaveExecutionPayloadEnvelope(t.Context(), &store.SaveParams{Data: bytes.NewReader([]byte("not compressed at all")), Location: location, ContentEncoding: e.encoding.ContentEncoding})
+	require.NoError(t, err)
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1, "the capture still promotes")
+	assert.Nil(t, e.readManifest(manifests[0]).Envelope, "the manifest does not claim an envelope it could not read")
+}
+
+// The envelope belongs to a block root, not a slot: on a reorg both branches
+// have a block at the same slot and only one of them owns a given envelope.
+func TestEnvelopeIsKeyedByBlockRootNotSlot(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	e.seedChain(gvr, 160, 163)
+	e.seedHeadAnchor(224)
+
+	// An envelope filed under a different block root at the same slot.
+	e.seedEnvelope(testNode, 163, fillRoot(0xee), testEnvelope(163), time.Now())
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+
+	assert.Nil(t, e.readManifest(manifests[0]).Envelope)
+}
+
+// The end-to-end shape of a glamsterdam capture: a gloas chain in, a decoded, paired,
+// envelope-bearing capture out, filed under the fork's own name. Every other promoter test
+// seeds altair, so this is the one that would have caught a decode ladder that cannot read
+// the fork the devnets run.
+func TestPromotesGloasChain(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	raws := e.seedGloasChain(gvr, func(body *gloas.BeaconBlockBody) {
+		// EIP-8282 builder requests ride in the parent's execution requests on gloas.
+		body.ParentExecutionRequests.BuilderDeposits = []*gloas.BuilderDepositRequest{{}}
+	}, 160, 163)
+	e.seedHeadAnchor(224)
+
+	e.promoter.tick(t.Context())
+
+	// Both slots carry the builder request, so both are interesting; the child is the one
+	// with a parent to pair against.
+	manifests := e.findManifests()
+	require.Len(t, manifests, 2)
+
+	var capture string
+
+	for _, path := range manifests {
+		assert.Contains(t, path, "/gloas/", "the capture is filed under the fork it is")
+
+		if strings.Contains(path, captureID(163, blockRootFor(163).String())) {
+			capture = path
+		}
+	}
+
+	require.NotEmpty(t, capture, "the slot 163 capture should exist")
+
+	m := e.readManifest(capture)
+
+	assert.Equal(t, "gloas", m.Fork.Name)
+	assert.True(t, m.Promotion.Decoded, "a gloas block is decodable, not an unknown fork")
+	assert.True(t, m.Promotion.PairVerified)
+	assert.NotContains(t, m.Promotion.Triggers, TriggerUndecodableFork)
+	assert.Contains(t, m.Promotion.Triggers, TriggerExecutionRequest)
+
+	// All three artifacts of a gloas slot land: block, pre-state, envelope.
+	blockPath := strings.TrimSuffix(capture, captureManifestName) + captureBlockName
+	assert.Equal(t, raws[163], e.readCorpusObject(blockPath))
+
+	require.NotNil(t, m.Prestate)
+	assert.Equal(t, testState(gvr, 160), e.readCorpusObject(statePath(m.Prestate.SHA256)))
+
+	require.NotNil(t, m.Envelope)
+
+	envelopePath := strings.TrimSuffix(capture, captureManifestName) + captureEnvelopeName
+	assert.Equal(t, testEnvelope(163), e.readCorpusObject(envelopePath))
+}
+
+// The fork boundary itself is the most interesting state transition on a devnet, and it is
+// only visible if both sides of it decode: an electra parent and a gloas child.
+func TestForkBoundaryElectraToGloas(t *testing.T) {
+	e := newEnv(t, nil)
+
+	gvr := fillRoot(0x11)
+	now := time.Now()
+
+	// Parent: the last electra block.
+	parent := testElectraBlock(t, 160, blockRootFor(159), stateRootFor(160))
+	e.seedBlock(testNode, 160, 160/32, blockRootFor(160), parent, now)
+	e.seedState(testNode, 160, stateRootFor(160), testState(gvr, 160), now)
+
+	// Child: the first gloas block, pointing at the electra parent.
+	child := testGloasBlock(t, 163, blockRootFor(160), stateRootFor(163), nil)
+	e.seedBlock(testNode, 163, 163/32, blockRootFor(163), child, now)
+
+	e.seedHeadAnchor(224)
+
+	e.promoter.tick(t.Context())
+
+	manifests := e.findManifests()
+	require.Len(t, manifests, 1)
+
+	m := e.readManifest(manifests[0])
+
+	assert.Equal(t, "gloas", m.Fork.Name)
+	assert.Contains(t, m.Promotion.Triggers, TriggerForkBoundary, "electra parent, gloas child is a fork boundary")
 }
