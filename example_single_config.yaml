@@ -59,6 +59,8 @@ agents:
       #   fetchBeaconBadBlob: true
       #   fetchExecutionBlockTrace: true
       #   fetchExecutionBadBlock: true
+      # Process-wide cap on debug_getBadBlocks responses being streamed at once.
+      # maxConcurrentExecutionBadBlockFetches: 4
       beacon:
         nodeAddress: http://instance-1:5052
         # Prysm

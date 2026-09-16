@@ -34,9 +34,27 @@ type Config struct {
 	// blocks, so a trace beyond that window is a guaranteed failure. The default
 	// follows geth's `reexec` default of 128 blocks.
 	ExecutionBlockTraceAgeThresholdBlocks uint64 `yaml:"executionBlockTraceAgeThresholdBlocks" default:"128"`
+
+	// MaxConcurrentExecutionBadBlockFetches bounds how many debug_getBadBlocks
+	// responses are being streamed at once across every agent in the process.
+	// Each in-flight stream holds one decoded bad block, so this is the knob
+	// that sizes the memory the bad block sweep may use. Applied process-wide
+	// by whichever agent starts first.
+	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"4"`
 }
 
-const defaultExecutionBlockTraceAgeThresholdBlocks = 128
+const (
+	defaultExecutionBlockTraceAgeThresholdBlocks = 128
+	defaultMaxConcurrentExecutionBadBlockFetches = 4
+)
+
+func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int64 {
+	if c.MaxConcurrentExecutionBadBlockFetches <= 0 {
+		return defaultMaxConcurrentExecutionBadBlockFetches
+	}
+
+	return int64(c.MaxConcurrentExecutionBadBlockFetches)
+}
 
 func (c *Config) GetExecutionBlockTraceAgeThresholdBlocks() uint64 {
 	if c.ExecutionBlockTraceAgeThresholdBlocks == 0 {

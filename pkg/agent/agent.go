@@ -94,6 +94,11 @@ type agent struct {
 	// workers tracks every background loop the agent owns so a shutdown can
 	// wait for them instead of abandoning them mid-fetch.
 	workers workerGroup
+
+	// indexedExecutionBadBlocks remembers which of the node's bad blocks the
+	// indexer already holds, so a poll only asks about the ones it has not
+	// confirmed before.
+	indexedExecutionBadBlocks hashSet
 }
 
 const (

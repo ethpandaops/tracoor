@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/0xsequence/ethkit/ethrpc"
 	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
@@ -24,6 +27,10 @@ type Node struct {
 	log    logrus.FieldLogger
 	rpc    *ethrpc.Provider
 
+	// httpClient carries the calls whose answers are streamed rather than
+	// buffered; the ethrpc provider reads every response whole.
+	httpClient *http.Client
+
 	services []services.Service
 
 	onReadyCallbacks []func(ctx context.Context) error
@@ -31,9 +38,10 @@ type Node struct {
 
 func NewNode(log logrus.FieldLogger, conf *Config) *Node {
 	return &Node{
-		config:   conf,
-		log:      log.WithField("module", "agent/ethereum/execution"),
-		services: []services.Service{},
+		config:     conf,
+		log:        log.WithField("module", "agent/ethereum/execution"),
+		services:   []services.Service{},
+		httpClient: &http.Client{},
 	}
 }
 
@@ -208,30 +216,80 @@ func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, e
 	return number, nil
 }
 
-func (n *Node) GetBadBlocks(ctx context.Context) (*BadBlocksResponse, error) {
-	data := jsonrpc.Message{}
+// errStalled reports a bad block stream that stopped producing bytes.
+var errStalled = errors.New("execution node stopped sending bad blocks")
 
-	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
-		"debug_getBadBlocks",
-	))
+// badBlocksRequest is the JSON-RPC call. debug_getBadBlocks takes no
+// parameters, so it never changes.
+const badBlocksRequest = `{"jsonrpc":"2.0","id":1,"method":"debug_getBadBlocks","params":[]}`
+
+// ForEachBadBlock streams debug_getBadBlocks and hands the blocks that pass
+// want to handle, one at a time, while the response is still arriving. Memory
+// is bounded by one bad block rather than by the node's whole list.
+//
+// A stream that legitimately runs for minutes cannot live under a whole-request
+// deadline, so instead the call is abandoned once no bytes have arrived for
+// stall, headers included.
+func (n *Node) ForEachBadBlock(ctx context.Context, stall time.Duration, want BadBlockFilter, handle BadBlockHandler) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+
+	stalled := time.AfterFunc(stall, func() { cancel(errStalled) })
+	defer stalled.Stop()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, n.config.NodeAddress, strings.NewReader(badBlocksRequest))
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to build debug_getBadBlocks request: %w", err)
 	}
 
-	if err := json.Unmarshal(rsp, &data); err != nil {
-		return nil, err
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	res, err := n.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("debug_getBadBlocks request failed: %w", stallCause(ctx, stall, err))
 	}
 
-	badBlocks := []BadBlock{}
-	if err := json.Unmarshal([]byte(data.Result), &badBlocks); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal bad blocks: %w", err)
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return fmt.Errorf("debug_getBadBlocks request failed: unexpected status %s", res.Status)
 	}
 
-	s := BadBlocksResponse{}
-
-	for _, block := range badBlocks {
-		s[block.Hash] = block
+	body := &progressReader{
+		reader: res.Body,
+		touch:  func() { stalled.Reset(stall) },
 	}
 
-	return &s, nil
+	if err := decodeBadBlocks(ctx, body, want, handle); err != nil {
+		return stallCause(ctx, stall, err)
+	}
+
+	return nil
+}
+
+// stallCause swaps the bare context error a stalled stream surfaces as for
+// one that says what actually happened.
+func stallCause(ctx context.Context, stall time.Duration, err error) error {
+	if errors.Is(context.Cause(ctx), errStalled) {
+		return fmt.Errorf("%w: no data for %s", errStalled, stall)
+	}
+
+	return err
+}
+
+// progressReader reports every byte that arrives so the stall timer can be
+// pushed back.
+type progressReader struct {
+	reader io.Reader
+	touch  func()
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.reader.Read(b)
+	if n > 0 {
+		p.touch()
+	}
+
+	return n, err
 }

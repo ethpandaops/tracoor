@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
@@ -15,6 +16,7 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
 	"github.com/ethpandaops/tracoor/pkg/store"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -135,51 +137,143 @@ func isEmptyJSONResult(data []byte) bool {
 	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
 }
 
+// badBlockFetchSlots bounds how many debug_getBadBlocks responses are being
+// streamed at once across every agent in the process. Sized once, from the
+// first agent to ask; agents share a process precisely so their config agrees.
+var (
+	badBlockFetchSlots     *semaphore.Weighted
+	badBlockFetchSlotsOnce sync.Once
+)
+
+func acquireBadBlockFetchSlot(ctx context.Context, limit int64) (func(), error) {
+	badBlockFetchSlotsOnce.Do(func() {
+		badBlockFetchSlots = semaphore.NewWeighted(limit)
+	})
+
+	if err := badBlockFetchSlots.Acquire(ctx, 1); err != nil {
+		return nil, err
+	}
+
+	return func() { badBlockFetchSlots.Release(1) }, nil
+}
+
+// hashSet is a concurrency-safe set of hashes whose zero value is ready to use.
+type hashSet struct {
+	mu    sync.Mutex
+	items map[string]struct{}
+}
+
+func (h *hashSet) has(hash string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	_, ok := h.items[hash]
+
+	return ok
+}
+
+func (h *hashSet) add(hash string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.items == nil {
+		h.items = make(map[string]struct{})
+	}
+
+	h.items[hash] = struct{}{}
+}
+
+// fetchAndIndexExecutionBadBlocks streams the node's bad block list and indexes
+// whatever in it is new. The node reports its entire history on every poll,
+// so almost every block in the stream is skipped on its hash alone, before
+// its body is ever decoded.
 func (s *agent) fetchAndIndexExecutionBadBlocks(ctx context.Context) error {
-	// Fetch the bad blocks from the execution node.
-	blocks, err := s.node.Execution().GetBadBlocks(ctx)
+	release, err := acquireBadBlockFetchSlot(ctx, s.Config.Ethereum.GetMaxConcurrentExecutionBadBlockFetches())
+	if err != nil {
+		return fmt.Errorf("failed to acquire execution bad block fetch slot: %w", err)
+	}
+
+	defer release()
+
+	network := string(s.node.Beacon().Metadata().Network.Name)
+
+	var reported, indexed int
+
+	err = s.node.Execution().ForEachBadBlock(ctx, s.Config.FetchTimeouts.ExecutionBadBlock(),
+		func(ctx context.Context, hash string) bool {
+			reported++
+
+			return s.executionBadBlockWanted(ctx, network, hash)
+		},
+		func(ctx context.Context, block *execution.BadBlock) error {
+			if ierr := s.indexExecutionBadBlock(ctx, network, block); ierr != nil {
+				s.log.
+					WithField("block_hash", block.Hash).
+					WithError(ierr).
+					Error("Failed to index execution bad block")
+
+				// One block failing is no reason to abandon the rest of the
+				// stream, unless the failure is the context going away.
+				return ctx.Err()
+			}
+
+			indexed++
+
+			return nil
+		},
+	)
 	if err != nil {
 		return err
 	}
 
-	for _, block := range *blocks {
-		b := block
-
-		if err := s.indexExecutionBadBlock(ctx, &b); err != nil {
-			s.log.WithError(err).Error("Failed to index execution bad block")
-		}
-	}
+	s.log.
+		WithField("reported", reported).
+		WithField("indexed", indexed).
+		Debug("Execution bad blocks scanned")
 
 	return nil
 }
 
-func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.BadBlock) error {
+// executionBadBlockWanted reports whether a bad block the node just listed
+// still needs indexing. Once the indexer has confirmed a block the answer is
+// remembered, so the indexer is only asked about hashes it has not confirmed
+// before rather than about the node's whole history every poll.
+func (s *agent) executionBadBlockWanted(ctx context.Context, network, hash string) bool {
+	if s.indexedExecutionBadBlocks.has(hash) {
+		return false
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.ExecutionBadBlock())
 	defer cancel()
 
-	// Check if we've already indexed this execution bad blocks.
-	// The bad blocks RPC returns the most recent bad blocks so theres a high likelihood we've already indexed them.
 	rsp, err := s.indexer.ListExecutionBadBlock(ctx, &indexer.ListExecutionBadBlockRequest{
 		Node:      s.Config.Name,
-		BlockHash: block.Hash,
-		Network:   string(s.node.Beacon().Metadata().Network.Name),
+		BlockHash: hash,
+		Network:   network,
 	})
 	if err != nil {
+		// These blocks are heavy, so an unanswered question means "not now"
+		// rather than "fetch it anyway"; the next poll asks again.
 		s.log.
-			WithField("block_hash", block.Hash).
+			WithField("block_hash", hash).
 			WithError(err).
-			Warn("Failed to check if execution bad block is already indexed. Since these blocks are heavy we will NOT attempt to fetch and index anyway")
+			Warn("Failed to check if execution bad block is already indexed; leaving it for the next poll")
 
-		return fmt.Errorf("failed to check if execution bad block is already indexed: %w", err)
+		return false
 	}
 
 	if rsp != nil && len(rsp.ExecutionBadBlocks) > 0 {
-		s.log.
-			WithField("block_hash", block.Hash).
-			Debug("Execution bad block already indexed")
+		s.indexedExecutionBadBlocks.add(hash)
 
-		return nil
+		return false
 	}
+
+	return true
+}
+
+func (s *agent) indexExecutionBadBlock(ctx context.Context, network string, block *execution.BadBlock) error {
+	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.ExecutionBadBlock())
+	defer cancel()
 
 	// Convert it to a byte array.
 	rawBlockData, err := json.Marshal(block)
@@ -205,11 +299,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 		return err
 	}
 
-	location := CreateExecutionBadBlockFileName(
-		s.Config.Name,
-		string(s.node.Beacon().Metadata().Network.Name),
-		block.Hash,
-	)
+	location := CreateExecutionBadBlockFileName(s.Config.Name, network, block.Hash)
 
 	location = fmt.Sprintf("%s.json", location)
 
@@ -231,7 +321,7 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 		FetchedAt:               timestamppb.New(time.Now()),
 		Location:                wrapperspb.String(location),
 		ContentEncoding:         wrapperspb.String(compression.Default.ContentEncoding),
-		Network:                 wrapperspb.String(string(s.node.Beacon().Metadata().Network.Name)),
+		Network:                 wrapperspb.String(network),
 		ExecutionImplementation: wrapperspb.String(s.node.Execution().Metadata().Client(ctx)),
 		NodeVersion:             wrapperspb.String(s.node.Execution().Metadata().ClientVersion()),
 		ContentHash:             wrapperspb.String(hex.EncodeToString(contentHash[:])),
@@ -260,6 +350,8 @@ func (s *agent) indexExecutionBadBlock(ctx context.Context, block *execution.Bad
 	if err != nil {
 		return errors.Wrapf(err, "failed to index execution bad block: %v", block.Hash)
 	}
+
+	s.indexedExecutionBadBlocks.add(block.Hash)
 
 	s.metrics.IncrementItemExported(ExecutionBadBlockQueue, s.Config.Name)
 
