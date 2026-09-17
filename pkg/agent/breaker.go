@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethpandaops/beacon/pkg/beacon/api"
 )
 
@@ -45,8 +45,8 @@ const (
 // transient failure, and extracts the node's own retry hint when it supplied
 // one.
 func classifyFailure(kind Queue, err error) (failureClass, time.Duration) {
-	var rpcErr *jsonrpc.Error
-	if goerrors.As(err, &rpcErr) && rpcErr.Code == jsonRPCMethodNotFound {
+	var rpcErr rpc.Error
+	if goerrors.As(err, &rpcErr) && rpcErr.ErrorCode() == jsonRPCMethodNotFound {
 		return failurePermanent, 0
 	}
 

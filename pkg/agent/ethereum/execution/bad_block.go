@@ -1,14 +1,15 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 
-	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
-	"github.com/0xsequence/ethkit/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type BadBlock struct {
@@ -33,6 +34,32 @@ type BadBlockHandler func(ctx context.Context, block *BadBlock) error
 // errBadBlocksEnvelope reports a debug_getBadBlocks response that is not the
 // JSON-RPC envelope the decoder walks.
 var errBadBlocksEnvelope = errors.New("malformed debug_getBadBlocks response")
+
+// rpcError is the error member of a JSON-RPC envelope. It satisfies rpc.Error
+// so a streamed call's failure classifies the same way as one made through
+// the rpc client.
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+var _ rpc.Error = (*rpcError)(nil)
+
+func (e *rpcError) Error() string {
+	return fmt.Sprintf("%s (code %d)", e.Message, e.Code)
+}
+
+func (e *rpcError) ErrorCode() int {
+	return e.Code
+}
+
+// isEmptyJSONResult reports whether a JSON-RPC result carries nothing: an
+// absent result and an explicit null both count.
+func isEmptyJSONResult(data []byte) bool {
+	trimmed := bytes.TrimSpace(data)
+
+	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
+}
 
 func (b *BadBlock) ParseBlockHeader() (*types.Header, error) {
 	var header types.Header
@@ -75,7 +102,7 @@ func decodeBadBlocks(ctx context.Context, body io.Reader, want BadBlockFilter, h
 			}
 		case "error":
 			// A pointer so that an explicit "error": null reads as no error.
-			var rpcErr *jsonrpc.Error
+			var rpcErr *rpcError
 			if err := dec.Decode(&rpcErr); err != nil {
 				return fmt.Errorf("%w: %w", errBadBlocksEnvelope, err)
 			}

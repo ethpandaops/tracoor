@@ -7,15 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xsequence/ethkit/ethrpc"
 	backoff "github.com/cenkalti/backoff/v4"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/tracoor/pkg/networks"
 	"github.com/go-co-op/gocron"
 	"github.com/sirupsen/logrus"
 )
 
 type MetadataService struct {
-	rpc *ethrpc.Provider
+	eth *ethclient.Client
 	log logrus.FieldLogger
 
 	Network *networks.Network
@@ -29,9 +29,9 @@ type MetadataService struct {
 	mu sync.Mutex
 }
 
-func NewMetadataService(log logrus.FieldLogger, rpc *ethrpc.Provider) MetadataService {
+func NewMetadataService(log logrus.FieldLogger, eth *ethclient.Client) MetadataService {
 	return MetadataService{
-		rpc:              rpc,
+		eth:              eth,
 		log:              log.WithField("module", "agent/ethereum/execution/metadata"),
 		Network:          &networks.Network{Name: networks.NetworkNameNone},
 		onReadyCallbacks: []func(context.Context) error{},
@@ -116,10 +116,7 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 func (m *MetadataService) Web3ClientVersion(ctx context.Context) (string, error) {
 	var version string
 
-	call := ethrpc.NewCallBuilder[string]("web3_clientVersion", nil)
-
-	_, err := m.rpc.Do(ctx, call.Into(&version))
-	if err != nil {
+	if err := m.eth.Client().CallContext(ctx, &version, "web3_clientVersion"); err != nil {
 		return "", err
 	}
 
@@ -146,7 +143,7 @@ func (m *MetadataService) ClientVersion() string {
 }
 
 func (m *MetadataService) updateSyncStatus(ctx context.Context) error {
-	status, err := m.rpc.SyncProgress(ctx)
+	status, err := m.eth.SyncProgress(ctx)
 	if err != nil {
 		// Check for context cancellation first
 		if ctx.Err() != nil {

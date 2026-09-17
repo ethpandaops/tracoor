@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
 	"github.com/ethpandaops/beacon/pkg/beacon/api"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +19,16 @@ func newTestBreaker() (*circuitBreaker, func(time.Duration)) {
 
 	return breaker, func(d time.Duration) { now = now.Add(d) }
 }
+
+// stubRPCError is what the rpc client hands back for a JSON-RPC error: the
+// concrete type is unexported, only the rpc.Error interface is promised.
+type stubRPCError struct {
+	code    int
+	message string
+}
+
+func (e *stubRPCError) Error() string  { return e.message }
+func (e *stubRPCError) ErrorCode() int { return e.code }
 
 func TestBreakerTripsAfterConsecutiveFailures(t *testing.T) {
 	breaker, _ := newTestBreaker()
@@ -194,13 +203,13 @@ func TestClassifyFailure(t *testing.T) {
 		{
 			name:          "json-rpc method not found is permanent",
 			kind:          ExecutionBlockTraceQueue,
-			err:           fmt.Errorf("call failed: %w", &jsonrpc.Error{Code: jsonRPCMethodNotFound, Message: "method not found"}),
+			err:           fmt.Errorf("call failed: %w", &stubRPCError{code: jsonRPCMethodNotFound, message: "method not found"}),
 			expectedClass: failurePermanent,
 		},
 		{
 			name:          "other json-rpc errors are transient",
 			kind:          ExecutionBlockTraceQueue,
-			err:           fmt.Errorf("call failed: %w", &jsonrpc.Error{Code: -32000, Message: "boom"}),
+			err:           fmt.Errorf("call failed: %w", &stubRPCError{code: -32000, message: "boom"}),
 			expectedClass: failureTransient,
 		},
 		{

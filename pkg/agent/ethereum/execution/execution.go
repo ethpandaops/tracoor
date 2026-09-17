@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xsequence/ethkit/ethrpc"
-	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution/services"
 	"github.com/sirupsen/logrus"
 )
@@ -25,10 +25,11 @@ var ErrBlockNotFound = errors.New("execution block not found")
 type Node struct {
 	config *Config
 	log    logrus.FieldLogger
-	rpc    *ethrpc.Provider
+	rpc    *rpc.Client
+	eth    *ethclient.Client
 
 	// httpClient carries the calls whose answers are streamed rather than
-	// buffered; the ethrpc provider reads every response whole.
+	// buffered; the rpc client reads every response whole.
 	httpClient *http.Client
 
 	services []services.Service
@@ -50,18 +51,19 @@ func (n *Node) OnReady(_ context.Context, callback func(ctx context.Context) err
 }
 
 func (n *Node) Start(ctx context.Context) error {
-	rpc, err := ethrpc.NewProvider(n.config.NodeAddress)
+	client, err := rpc.DialContext(ctx, n.config.NodeAddress)
 	if err != nil {
 		return err
 	}
 
-	metadata := services.NewMetadataService(n.log, rpc)
+	n.rpc = client
+	n.eth = ethclient.NewClient(client)
+
+	metadata := services.NewMetadataService(n.log, n.eth)
 
 	svcs := []services.Service{
 		&metadata,
 	}
-
-	n.rpc = rpc
 
 	n.services = svcs
 
@@ -103,6 +105,10 @@ func (n *Node) Start(ctx context.Context) error {
 }
 
 func (n *Node) Stop() error {
+	if n.rpc != nil {
+		n.rpc.Close()
+	}
+
 	return nil
 }
 
@@ -144,11 +150,7 @@ func (n *Node) getDebugBlockTraceParms(ctx context.Context, client string) map[s
 }
 
 func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (*[]byte, error) {
-	trace, err := n.rawResult(ctx, ethrpc.NewCall(
-		"debug_traceBlockByHash",
-		hash,
-		n.getDebugBlockTraceParms(ctx, client),
-	))
+	trace, err := n.rawResult(ctx, "debug_traceBlockByHash", hash, n.getDebugBlockTraceParms(ctx, client))
 	if err != nil {
 		return nil, err
 	}
@@ -156,47 +158,38 @@ func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (
 	return &trace, nil
 }
 
-// rawResult performs call and returns its JSON-RPC result. The envelope is
-// roughly as large as the result it carries, so it is confined to this frame
-// and unreachable by the time the caller works with the result.
-func (n *Node) rawResult(ctx context.Context, call ethrpc.Call) ([]byte, error) {
-	rsp, err := n.rpc.Do(ctx, call)
+// rawResult performs a call and returns its JSON-RPC result verbatim. A
+// response that carries no result at all reads as a JSON null, so callers
+// have one shape of "nothing" to check for.
+func (n *Node) rawResult(ctx context.Context, method string, args ...any) ([]byte, error) {
+	var result json.RawMessage
+
+	err := n.rpc.CallContext(ctx, &result, method, args...)
+	if errors.Is(err, rpc.ErrNoResult) {
+		return []byte("null"), nil
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	data := jsonrpc.Message{}
-	if err := json.Unmarshal(rsp, &data); err != nil {
-		return nil, err
-	}
-
-	return data.Result, nil
+	return result, nil
 }
 
 // BlockNumber returns the execution node's current head block number.
 func (n *Node) BlockNumber(ctx context.Context) (uint64, error) {
-	return n.rpc.BlockNumber(ctx)
+	return n.eth.BlockNumber(ctx)
 }
 
 // GetBlockNumberByHash resolves an execution block number from its hash.
 // Returns ErrBlockNotFound if the node does not (yet) have the block.
 func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, error) {
-	data := jsonrpc.Message{}
-
-	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
-		"eth_getBlockByHash",
-		hash,
-		false,
-	))
+	result, err := n.rawResult(ctx, "eth_getBlockByHash", hash, false)
 	if err != nil {
 		return 0, err
 	}
 
-	if err = json.Unmarshal(rsp, &data); err != nil {
-		return 0, err
-	}
-
-	if len(data.Result) == 0 || string(data.Result) == "null" {
+	if isEmptyJSONResult(result) {
 		return 0, ErrBlockNotFound
 	}
 
@@ -204,7 +197,7 @@ func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, e
 		Number string `json:"number"`
 	}{}
 
-	if err = json.Unmarshal([]byte(data.Result), &block); err != nil {
+	if err = json.Unmarshal(result, &block); err != nil {
 		return 0, err
 	}
 
