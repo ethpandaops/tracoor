@@ -17,11 +17,11 @@ const minioTestCredential = "minioadmin"
 
 func setupMinioContainer(ctx context.Context, bucketName string) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
-		Image:        "minio/minio",
+		Image:        "pgsty/minio:RELEASE.2026-08-04T00-00-00Z",
 		ExposedPorts: []string{"9000/tcp"},
 		Env: map[string]string{
-			"MINIO_ACCESS_KEY": minioTestCredential,
-			"MINIO_SECRET_KEY": minioTestCredential,
+			"MINIO_ROOT_USER":     minioTestCredential,
+			"MINIO_ROOT_PASSWORD": minioTestCredential,
 		},
 		Cmd:        []string{"server", "/data"},
 		WaitingFor: wait.ForListeningPort("9000/tcp").WithStartupTimeout(2 * time.Minute),
