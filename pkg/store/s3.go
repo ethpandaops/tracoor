@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -47,6 +48,11 @@ type S3Store struct {
 
 	config *S3StoreConfig
 
+	// batchDeletes is off when the endpoint carries a path. Object calls resolve keys beneath
+	// that path but DeleteObjects resolves above it, so a batch names keys that do not exist
+	// and reports them deleted.
+	batchDeletes bool
+
 	log  logrus.FieldLogger
 	opts *Options
 
@@ -67,6 +73,11 @@ type S3StoreConfig struct {
 
 // NewS3Store creates a new S3Store instance with the specified AWS configuration, bucket name, and key prefix.
 func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig, opts *Options) (*S3Store, error) {
+	endpoint, err := url.Parse(config.Endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("invalid s3 endpoint: %w", err)
+	}
+
 	// BaseEndpoint would re-route requests and orphan existing keys; the immutable-host resolver keeps them addressable.
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) { //nolint:staticcheck // see above
 		return aws.Endpoint{ //nolint:staticcheck // see above
@@ -108,6 +119,7 @@ func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig,
 		s3Client:     s3Client,
 		uploader:     uploader,
 		config:       config,
+		batchDeletes: strings.Trim(endpoint.Path, "/") == "",
 		log:          log,
 		opts:         opts,
 		basicMetrics: metrics,
@@ -824,6 +836,10 @@ func (s *S3Store) DeleteMany(ctx context.Context, locations []string) error {
 		return nil
 	}
 
+	if !s.batchDeletes {
+		return s.deleteEach(ctx, locations)
+	}
+
 	var (
 		failed   []string
 		firstErr error
@@ -882,6 +898,38 @@ func (s *S3Store) DeleteMany(ctx context.Context, locations []string) error {
 		for i := 0; i < removed; i++ {
 			s.basicMetrics.ObserveItemRemoved(string(UnknownDataType))
 		}
+	}
+
+	if len(failed) > 0 {
+		return &DeleteManyError{Failed: failed, Err: firstErr}
+	}
+
+	return nil
+}
+
+// deleteEach is DeleteMany one DeleteObject at a time, for endpoints where a batch cannot
+// address the keys. Deleting a key that is already gone succeeds, as it does in a batch.
+func (s *S3Store) deleteEach(ctx context.Context, locations []string) error {
+	var (
+		failed   []string
+		firstErr error
+	)
+
+	for _, location := range locations {
+		if _, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(s.config.BucketName),
+			Key:    aws.String(location),
+		}); err != nil {
+			failed = append(failed, location)
+
+			if firstErr == nil {
+				firstErr = err
+			}
+
+			continue
+		}
+
+		s.basicMetrics.ObserveItemRemoved(string(UnknownDataType))
 	}
 
 	if len(failed) > 0 {

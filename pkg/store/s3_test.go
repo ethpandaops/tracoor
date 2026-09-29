@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ethpandaops/tracoor/pkg/compression"
+	"github.com/sirupsen/logrus"
 )
 
 func TestS3StoreOperations(t *testing.T) {
@@ -59,6 +60,42 @@ func TestS3StoreOperations(t *testing.T) {
 	t.Run("DeleteMany", func(t *testing.T) {
 		testDeleteMany(ctx, t, store)
 	})
+}
+
+// TestS3StoreBucketInEndpointPath runs against an endpoint that carries the bucket in its path,
+// the shape R2 deployments use. Object keys then resolve beneath that path while bucket-level
+// calls resolve above it, so bulk deletes must still remove the objects the other calls wrote.
+func TestS3StoreBucketInEndpointPath(t *testing.T) {
+	bucket := "pathbucket"
+	ctx := context.Background()
+
+	container, endpoint, err := setupMinioContainer(ctx, bucket)
+	if err != nil {
+		t.Fatalf("Failed to setup minio: %v", err)
+	}
+
+	defer func() {
+		if err = container.Terminate(ctx); err != nil {
+			t.Fatalf("Failed to clean up: %v", err)
+		}
+	}()
+
+	store, err := NewS3Store("bucket_in_path", logrus.New(), &S3StoreConfig{
+		Endpoint:     "http://" + endpoint + "/" + bucket,
+		Region:       "us-east-1",
+		AccessKey:    minioTestCredential,
+		AccessSecret: minioTestCredential,
+		BucketName:   bucket,
+	}, DefaultOptions().SetMetricsEnabled(false))
+	if err != nil {
+		t.Fatalf("Failed to create S3 store: %v", err)
+	}
+
+	if err = store.Healthy(ctx); err != nil {
+		t.Fatalf("Expected the store to be healthy: %v", err)
+	}
+
+	testDeleteMany(ctx, t, store)
 }
 
 func testDeleteMany(ctx context.Context, t *testing.T, st Store) {
