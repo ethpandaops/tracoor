@@ -12,7 +12,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/creasty/defaults v1.7.0
 	github.com/ethereum/go-ethereum v1.17.6
-	github.com/ethpandaops/beacon v0.69.1-0.20260929045358-2d6a067fada6
+	github.com/ethpandaops/beacon v0.71.0
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/ethpandaops/go-eth2-client v0.1.7
 	github.com/glebarez/sqlite v1.10.0
