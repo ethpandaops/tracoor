@@ -103,18 +103,9 @@ func (i *API) GetConfig(ctx context.Context, req *api.GetConfigRequest) (*api.Ge
 }
 
 func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateRequest) (*api.ListBeaconStateResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconStateRequest{
@@ -149,6 +140,10 @@ func (i *API) ListBeaconState(ctx context.Context, req *api.ListBeaconStateReque
 			Network:              state.Network,
 			FetchedAt:            state.FetchedAt,
 			BeaconImplementation: state.BeaconImplementation,
+			ContentHash:          state.ContentHash,
+			VerifiedAt:           state.VerifiedAt,
+			ContentMatchedAt:     state.ContentMatchedAt,
+			AgreementCount:       state.AgreementCount,
 		}
 	}
 
@@ -187,7 +182,8 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconStateValuesRequest{
-		Fields: []indexer.ListUniqueBeaconStateValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconStateValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -236,18 +232,9 @@ func (i *API) ListUniqueBeaconStateValues(ctx context.Context, req *api.ListUniq
 }
 
 func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockRequest) (*api.ListBeaconBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBlockRequest{
@@ -282,6 +269,10 @@ func (i *API) ListBeaconBlock(ctx context.Context, req *api.ListBeaconBlockReque
 			Network:              block.Network,
 			FetchedAt:            block.FetchedAt,
 			BeaconImplementation: block.BeaconImplementation,
+			ContentHash:          block.ContentHash,
+			VerifiedAt:           block.VerifiedAt,
+			ContentMatchedAt:     block.ContentMatchedAt,
+			AgreementCount:       block.AgreementCount,
 		}
 	}
 
@@ -320,7 +311,8 @@ func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniq
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBlockValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -368,19 +360,139 @@ func (i *API) ListUniqueBeaconBlockValues(ctx context.Context, req *api.ListUniq
 	return response, nil
 }
 
-func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBlockRequest) (*api.ListBeaconBadBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
+func (i *API) ListExecutionPayloadEnvelope(ctx context.Context, req *api.ListExecutionPayloadEnvelopeRequest) (*api.ListExecutionPayloadEnvelopeResponse, error) {
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
+	rq := &indexer.ListExecutionPayloadEnvelopeRequest{
+		Id:                   req.Id,
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		Before:               req.Before,
+		After:                req.After,
+		BeaconImplementation: req.BeaconImplementation,
+
+		Pagination: pagination,
+	}
+
+	resp, err := i.indexer.ListExecutionPayloadEnvelope(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list execution payload envelopes: %w", err).Error())
+	}
+
+	protoEnvelopes := make([]*api.ExecutionPayloadEnvelope, len(resp.ExecutionPayloadEnvelopes))
+	for i, envelope := range resp.ExecutionPayloadEnvelopes {
+		protoEnvelopes[i] = &api.ExecutionPayloadEnvelope{
+			Id:                   envelope.Id,
+			Node:                 envelope.Node,
+			Slot:                 envelope.Slot,
+			Epoch:                envelope.Epoch,
+			BlockRoot:            envelope.BlockRoot,
+			NodeVersion:          envelope.NodeVersion,
+			Network:              envelope.Network,
+			FetchedAt:            envelope.FetchedAt,
+			BeaconImplementation: envelope.BeaconImplementation,
+			ContentHash:          envelope.ContentHash,
+			VerifiedAt:           envelope.VerifiedAt,
+			ContentMatchedAt:     envelope.ContentMatchedAt,
+			AgreementCount:       envelope.AgreementCount,
 		}
+	}
+
+	return &api.ListExecutionPayloadEnvelopeResponse{
+		ExecutionPayloadEnvelopes: protoEnvelopes,
+	}, nil
+}
+
+func (i *API) CountExecutionPayloadEnvelope(ctx context.Context, req *api.CountExecutionPayloadEnvelopeRequest) (*api.CountExecutionPayloadEnvelopeResponse, error) {
+	rq := &indexer.CountExecutionPayloadEnvelopeRequest{
+		Node:                 req.Node,
+		Slot:                 req.Slot,
+		Epoch:                req.Epoch,
+		BlockRoot:            req.BlockRoot,
+		NodeVersion:          req.NodeVersion,
+		Network:              req.Network,
+		BeaconImplementation: req.BeaconImplementation,
+		Before:               req.Before,
+		After:                req.After,
+	}
+
+	resp, err := i.indexer.CountExecutionPayloadEnvelope(ctx, rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to count execution payload envelopes: %w", err).Error())
+	}
+
+	return &api.CountExecutionPayloadEnvelopeResponse{
+		Count: wrapperspb.UInt64(resp.GetCount().GetValue()),
+	}, nil
+}
+
+func (i *API) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req *api.ListUniqueExecutionPayloadEnvelopeValuesRequest) (*api.ListUniqueExecutionPayloadEnvelopeValuesResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid request: %w", err).Error())
+	}
+
+	// Create our "indexer" equivalent structs
+	rq := indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest{
+		Fields:  []indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
+	}
+
+	for _, field := range req.Fields {
+		var f indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_Field
+
+		switch field {
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_node:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_node_version:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NODE_VERSION
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_network:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_NETWORK
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_slot:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_SLOT
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_epoch:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_EPOCH
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_block_root:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BLOCK_ROOT
+		case api.ListUniqueExecutionPayloadEnvelopeValuesRequest_beacon_implementation:
+			f = indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest_BEACON_IMPLEMENTATION
+		default:
+			return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid field: %s", field.String()).Error())
+		}
+
+		rq.Fields = append(rq.Fields, f)
+	}
+
+	// Call the indexer
+	resp, err := i.indexer.ListUniqueExecutionPayloadEnvelopeValues(ctx, &rq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Errorf("failed to list unique execution payload envelope values: %w", err).Error())
+	}
+
+	// Convert the response
+	response := &api.ListUniqueExecutionPayloadEnvelopeValuesResponse{
+		Node:                 resp.Node,
+		Slot:                 resp.Slot,
+		Epoch:                resp.Epoch,
+		BlockRoot:            resp.BlockRoot,
+		NodeVersion:          resp.NodeVersion,
+		Network:              resp.Network,
+		BeaconImplementation: resp.BeaconImplementation,
+	}
+
+	return response, nil
+}
+
+func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBlockRequest) (*api.ListBeaconBadBlockResponse, error) {
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBadBlockRequest{
@@ -415,6 +527,9 @@ func (i *API) ListBeaconBadBlock(ctx context.Context, req *api.ListBeaconBadBloc
 			Network:              block.Network,
 			FetchedAt:            block.FetchedAt,
 			BeaconImplementation: block.BeaconImplementation,
+			ContentHash:          block.ContentHash,
+			VerifiedAt:           block.VerifiedAt,
+			ContentMatchedAt:     block.ContentMatchedAt,
 		}
 	}
 
@@ -453,7 +568,8 @@ func (i *API) ListUniqueBeaconBadBlockValues(ctx context.Context, req *api.ListU
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBadBlockValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBadBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBadBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -502,18 +618,9 @@ func (i *API) ListUniqueBeaconBadBlockValues(ctx context.Context, req *api.ListU
 }
 
 func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobRequest) (*api.ListBeaconBadBlobResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListBeaconBadBlobRequest{
@@ -550,6 +657,9 @@ func (i *API) ListBeaconBadBlob(ctx context.Context, req *api.ListBeaconBadBlobR
 			FetchedAt:            blob.FetchedAt,
 			BeaconImplementation: blob.BeaconImplementation,
 			Index:                blob.Index,
+			ContentHash:          blob.ContentHash,
+			VerifiedAt:           blob.VerifiedAt,
+			ContentMatchedAt:     blob.ContentMatchedAt,
 		}
 	}
 
@@ -589,7 +699,8 @@ func (i *API) ListUniqueBeaconBadBlobValues(ctx context.Context, req *api.ListUn
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueBeaconBadBlobValuesRequest{
-		Fields: []indexer.ListUniqueBeaconBadBlobValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueBeaconBadBlobValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -641,18 +752,9 @@ func (i *API) ListUniqueBeaconBadBlobValues(ctx context.Context, req *api.ListUn
 }
 
 func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutionBlockTraceRequest) (*api.ListExecutionBlockTraceResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListExecutionBlockTraceRequest{
@@ -683,6 +785,10 @@ func (i *API) ListExecutionBlockTrace(ctx context.Context, req *api.ListExecutio
 			Network:                 trace.Network,
 			ExecutionImplementation: trace.ExecutionImplementation,
 			NodeVersion:             trace.NodeVersion,
+			ContentHash:             trace.ContentHash,
+			VerifiedAt:              trace.VerifiedAt,
+			ContentMatchedAt:        trace.ContentMatchedAt,
+			AgreementCount:          trace.AgreementCount,
 		}
 	}
 
@@ -720,7 +826,8 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueExecutionBlockTraceValuesRequest{
-		Fields: []indexer.ListUniqueExecutionBlockTraceValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueExecutionBlockTraceValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {
@@ -766,18 +873,9 @@ func (i *API) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *api.
 }
 
 func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionBadBlockRequest) (*api.ListExecutionBadBlockResponse, error) {
-	pagination := &indexer.PaginationCursor{
-		Limit:   100,
-		Offset:  0,
-		OrderBy: OrderFetchedAtDesc,
-	}
-
-	if req.Pagination != nil {
-		pagination = &indexer.PaginationCursor{
-			Limit:   req.Pagination.Limit,
-			Offset:  req.Pagination.Offset,
-			OrderBy: req.Pagination.OrderBy,
-		}
+	pagination, err := paginationFromRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Errorf("invalid pagination: %w", err).Error())
 	}
 
 	rq := &indexer.ListExecutionBadBlockRequest{
@@ -810,6 +908,9 @@ func (i *API) ListExecutionBadBlock(ctx context.Context, req *api.ListExecutionB
 			ExecutionImplementation: trace.ExecutionImplementation,
 			NodeVersion:             trace.NodeVersion,
 			BlockExtraData:          trace.BlockExtraData,
+			ContentHash:             trace.ContentHash,
+			VerifiedAt:              trace.VerifiedAt,
+			ContentMatchedAt:        trace.ContentMatchedAt,
 		}
 	}
 
@@ -848,7 +949,8 @@ func (i *API) ListUniqueExecutionBadBlockValues(ctx context.Context, req *api.Li
 
 	// Create our "indexer" equivalent structs
 	rq := indexer.ListUniqueExecutionBadBlockValuesRequest{
-		Fields: []indexer.ListUniqueExecutionBadBlockValuesRequest_Field{},
+		Fields:  []indexer.ListUniqueExecutionBadBlockValuesRequest_Field{},
+		Network: req.GetNetworkFilter(),
 	}
 
 	for _, field := range req.Fields {

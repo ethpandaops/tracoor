@@ -12,6 +12,7 @@ import (
 func generateRandomPermanentBlock() *PermanentBlock {
 	return &PermanentBlock{
 		Slot:      generateRandomInt64(),
+		Kind:      KindBeaconBlock,
 		BlockRoot: generateRandomString(32),
 		Network:   generateRandomString(5),
 	}
@@ -97,7 +98,7 @@ func TestGetPermanentBlockByBlockRoot(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Get the block by block root and network
-	result, err := indexer.GetPermanentBlockByBlockRoot(ctx, "test-block-root", "test-network")
+	result, err := indexer.GetPermanentBlockByBlockRoot(ctx, KindBeaconBlock, "test-block-root", "test-network")
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, block.BlockRoot, result.BlockRoot)
@@ -105,8 +106,14 @@ func TestGetPermanentBlockByBlockRoot(t *testing.T) {
 	assert.Equal(t, block.Slot, result.Slot)
 
 	// Try to get a non-existent block
-	result, err = indexer.GetPermanentBlockByBlockRoot(ctx, "non-existent", "test-network")
-	assert.Error(t, err)
+	result, err = indexer.GetPermanentBlockByBlockRoot(ctx, KindBeaconBlock, "non-existent", "test-network")
+	assert.ErrorIs(t, err, ErrPermanentBlockNotFound)
+	assert.Nil(t, result)
+
+	// A gloas block and its execution payload envelope share a block root; only the kind
+	// tells them apart, so the envelope must not resolve to the block's row.
+	result, err = indexer.GetPermanentBlockByBlockRoot(ctx, KindExecutionPayloadEnvelope, "test-block-root", "test-network")
+	assert.ErrorIs(t, err, ErrPermanentBlockNotFound)
 	assert.Nil(t, result)
 }
 

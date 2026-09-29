@@ -2,11 +2,12 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 
@@ -14,13 +15,28 @@ import (
 	"github.com/ethpandaops/tracoor/pkg/store"
 )
 
-// PermanentStoreBlock contains the minimal information needed to identify a block.
+// PermanentStoreResult is what became of a queued block. Archived is true only when the
+// block is known to be present in the permanent store; a full queue, a lost lock or a
+// worker error all report false, so a waiter can hold its row back rather than purge an
+// object the archive never received.
+type PermanentStoreResult struct {
+	Archived bool
+}
+
+// PermanentStoreBlock contains the minimal information needed to identify an archivable
+// artifact. Kind distinguishes the two artifacts that share a block root from gloas on -
+// the beacon block and its execution payload envelope - and an empty Kind means
+// persistence.KindBeaconBlock, which is what every caller meant before envelopes existed.
 type PermanentStoreBlock struct {
-	Location      string
-	BlockRoot     string
-	Network       string
-	Slot          phase0.Slot
-	ProcessedChan chan struct{}
+	Kind      string
+	Location  string
+	BlockRoot string
+	Network   string
+	Slot      phase0.Slot
+	// ProcessedChan, when non-nil, receives exactly one result and is then closed. It must
+	// be buffered: the send never blocks, so on an unbuffered channel a waiter that has
+	// already given up costs the result its value and the close reads as not archived.
+	ProcessedChan chan PermanentStoreResult
 }
 
 // PermanentStore ensures that at least one copy of each block per network is retained
@@ -31,13 +47,16 @@ type PermanentStore struct {
 	db      *persistence.Indexer
 	queue   chan PermanentStoreBlock
 	cache   *lru.Cache[string, bool]
-	enabled bool
+	enabled map[string]bool
 	stopped bool
 	nodeID  string
 }
 
 type PermanentStoreConfig struct {
 	Blocks BlockConfig `yaml:"blocks"`
+	// ExecutionPayloadEnvelopes is its own switch, but archiving gloas blocks without it
+	// keeps only half of each slot: the payload lives in the envelope from that fork on.
+	ExecutionPayloadEnvelopes BlockConfig `yaml:"executionPayloadEnvelopes"`
 }
 
 type BlockConfig struct {
@@ -52,12 +71,15 @@ func NewPermanentStore(log logrus.FieldLogger, st store.Store, db *persistence.I
 	}
 
 	return &PermanentStore{
-		log:     log.WithField("component", "permanent_store"),
-		store:   st,
-		db:      db,
-		queue:   make(chan PermanentStoreBlock, 5000),
-		cache:   cache,
-		enabled: conf.Blocks.Enabled,
+		log:   log.WithField("component", "permanent_store"),
+		store: st,
+		db:    db,
+		queue: make(chan PermanentStoreBlock, 5000),
+		cache: cache,
+		enabled: map[string]bool{
+			persistence.KindBeaconBlock:              conf.Blocks.Enabled,
+			persistence.KindExecutionPayloadEnvelope: conf.ExecutionPayloadEnvelopes.Enabled,
+		},
 		nodeID:  nodeID,
 		stopped: false,
 	}, nil
@@ -104,18 +126,36 @@ func (p *PermanentStore) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (p *PermanentStore) IsEnabled() bool {
-	return p.enabled
+// IsEnabledFor reports whether this kind of artifact is archived.
+func (p *PermanentStore) IsEnabledFor(kind string) bool {
+	return p.enabled[kind]
 }
 
-// QueueBlock adds a block to the queue for processing.
+// IsEnabled reports whether the permanent store archives anything at all.
+func (p *PermanentStore) IsEnabled() bool {
+	for _, on := range p.enabled {
+		if on {
+			return true
+		}
+	}
+
+	return false
+}
+
+// QueueBlock adds a block to the queue for processing. Every path that does not hand the block
+// to a worker signals ProcessedChan itself — with a not-archived result — so a caller waiting
+// on it is never stranded and never mistakes a dropped block for an archived one.
 func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
-	// Check if the permanent store is enabled
-	if !p.IsEnabled() {
+	// Check if the permanent store is enabled for this kind of artifact
+	if !p.IsEnabledFor(block.kind()) {
+		signalProcessed(block, false)
+
 		return
 	}
 
 	if p.stopped {
+		signalProcessed(block, false)
+
 		return
 	}
 
@@ -127,12 +167,30 @@ func (p *PermanentStore) QueueBlock(block PermanentStoreBlock) {
 			KeyLocation:  block.Location,
 		}).Debug("Queued block for permanent storage")
 	default:
+		signalProcessed(block, false)
+
 		p.log.WithFields(logrus.Fields{
 			KeyBlockRoot: block.BlockRoot,
 			KeyNetwork:   block.Network,
 			KeyLocation:  block.Location,
 		}).Warn("Failed to queue block for permanent storage, queue is full")
 	}
+}
+
+// signalProcessed delivers a block's result exactly once. The send never blocks — a waiter
+// that has already timed out must not strand a worker — and the close still wakes any
+// receiver the send could not reach, reading as a zero (not archived) result.
+func signalProcessed(block PermanentStoreBlock, archived bool) {
+	if block.ProcessedChan == nil {
+		return
+	}
+
+	select {
+	case block.ProcessedChan <- PermanentStoreResult{Archived: archived}:
+	default:
+	}
+
+	close(block.ProcessedChan)
 }
 
 // processQueue processes blocks from the queue.
@@ -149,6 +207,8 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 			// Skip empty blocks
 			if block.BlockRoot == "" || block.Network == "" || block.Location == "" {
+				signalProcessed(block, false)
+
 				continue
 			}
 
@@ -165,15 +225,17 @@ func (p *PermanentStore) processQueue(ctx context.Context) {
 
 // processBlock processes a single block.
 func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreBlock) error {
-	// Create a cache key for this block
-	cacheKey := fmt.Sprintf("%s:%s", block.Network, block.BlockRoot)
+	// Create a cache key for this artifact. The kind is in the key because a gloas block
+	// and its envelope share a block root: without it, archiving one would mark the other
+	// as already done and the object would be purged unarchived.
+	cacheKey := fmt.Sprintf("%s:%s:%s", block.kind(), block.Network, block.BlockRoot)
 
-	// Close the processed channel so that the caller can wait for the block to be processed
-	defer func() {
-		if block.ProcessedChan != nil {
-			close(block.ProcessedChan)
-		}
-	}()
+	// The result is delivered on the way out. archived flips to true only once the block is
+	// known to be in the permanent store, so a waiter never releases a row on a lost lock or
+	// a failed copy.
+	archived := false
+
+	defer func() { signalProcessed(block, archived) }()
 
 	// Check if we've already processed this block
 	if _, ok := p.cache.Get(cacheKey); ok {
@@ -182,75 +244,50 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit)")
 
+		archived = true
+
 		return nil
 	}
 
 	// Create a lock key for this block
 	lockKey := fmt.Sprintf("permanent_store:%s", cacheKey)
 
-	// Try to acquire a distributed lock with retries
+	// Try to acquire a distributed lock with retries. An unacquired lock is not an error:
+	// another instance holds it and is processing this block.
 	var acquired bool
-
-	var err error
 
 	retryInterval := 200 * time.Millisecond
 	maxRetryDuration := 35 * time.Second
 	startTime := time.Now()
 
 	for time.Since(startTime) < maxRetryDuration {
-		if acquired {
-			break
-		}
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			acquired, err = p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
+			a, err := p.db.AcquireLock(ctx, lockKey, p.nodeID, 30*time.Second)
 			if err != nil {
-				// If the error indicates someone else has the lock, retry
-				if err.Error() != "" && time.Since(startTime) < maxRetryDuration {
-					p.log.WithFields(logrus.Fields{
-						KeyBlockRoot: block.BlockRoot,
-						KeyNetwork:   block.Network,
-						KeyLockKey:   lockKey,
-						"error":      err.Error(),
-						"elapsed":    time.Since(startTime).String(),
-					}).Debug("Failed to acquire lock, retrying...")
-
-					time.Sleep(retryInterval)
-
-					continue
-				}
-
 				return fmt.Errorf("failed to acquire lock: %w", err)
 			}
 
-			if acquired {
+			if a {
+				acquired = true
+
 				break
-			}
-
-			// If we couldn't acquire the lock but there's no error, retry
-			if time.Since(startTime) < maxRetryDuration {
-				p.log.WithFields(logrus.Fields{
-					KeyBlockRoot: block.BlockRoot,
-					KeyNetwork:   block.Network,
-					KeyLockKey:   lockKey,
-					"elapsed":    time.Since(startTime).String(),
-				}).Debug("Failed to acquire lock, retrying...")
-
-				time.Sleep(retryInterval)
-
-				continue
 			}
 
 			p.log.WithFields(logrus.Fields{
 				KeyBlockRoot: block.BlockRoot,
 				KeyNetwork:   block.Network,
 				KeyLockKey:   lockKey,
-			}).Debug("Failed to acquire lock after retries, another instance is processing this block")
+				"elapsed":    time.Since(startTime).String(),
+			}).Debug("Failed to acquire lock, retrying...")
 
-			return nil
+			time.Sleep(retryInterval)
+		}
+
+		if acquired {
+			break
 		}
 	}
 
@@ -281,15 +318,18 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 			KeyNetwork:   block.Network,
 		}).Debug("Block already processed (cache hit after lock)")
 
+		archived = true
+
 		return nil
 	}
 
 	// Check if block is already recorded in database before checking the store
-	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.BlockRoot, block.Network)
-	if err != nil {
+	permanentBlock, err := p.db.GetPermanentBlockByBlockRoot(ctx, block.kind(), block.BlockRoot, block.Network)
+	if err != nil && !errors.Is(err, persistence.ErrPermanentBlockNotFound) {
 		p.log.WithError(err).WithFields(logrus.Fields{
 			KeyBlockRoot: block.BlockRoot,
 			KeyNetwork:   block.Network,
+			KeyKind:      block.kind(),
 		}).Error("Failed to check if block is already recorded in database")
 	} else if permanentBlock != nil {
 		p.log.WithFields(logrus.Fields{
@@ -299,6 +339,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 		// Add to cache to avoid future checks
 		p.cache.Add(cacheKey, true)
+
+		archived = true
 
 		return nil
 	}
@@ -321,6 +363,8 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 
 		// Add to cache to avoid future checks
 		p.cache.Add(cacheKey, true)
+
+		archived = true
 
 		// Ensure the block is recorded in the database even if it already exists in storage
 		if perr := p.recordPermanentBlock(ctx, block); perr != nil {
@@ -350,6 +394,10 @@ func (p *PermanentStore) processBlock(ctx context.Context, block PermanentStoreB
 		"to":         permanentLocation,
 	}).Info("Copied block to permanent location")
 
+	// The object is in the permanent location; a failure to record it below is recoverable
+	// and must not hold the source row back.
+	archived = true
+
 	// Record the block in the database
 	if perr := p.recordPermanentBlock(ctx, block); perr != nil {
 		p.log.WithError(perr).WithFields(logrus.Fields{
@@ -371,15 +419,33 @@ func (p *PermanentStore) recordPermanentBlock(ctx context.Context, block Permane
 	return p.db.InsertPermanentBlock(ctx, &persistence.PermanentBlock{
 		//nolint:gosec // At the mercy of the database
 		Slot:      int64(block.Slot),
+		Kind:      block.kind(),
 		BlockRoot: block.BlockRoot,
 		Network:   block.Network,
 	})
 }
 
-// GetPermanentLocation returns the permanent location for a block.
+// GetPermanentLocation returns the permanent location for an artifact. Beacon blocks keep
+// the layout they have always had, so archives written before envelopes existed still
+// resolve; every other kind gets its own subdirectory, which is also what keeps a block and
+// its envelope - same root, same extension - from being the same object.
 func (p *PermanentStore) GetPermanentLocation(block PermanentStoreBlock) string {
 	// Extract the file extension from the source location
 	extension := filepath.Ext(block.Location)
 
-	return filepath.Join("permanent", block.Network, block.BlockRoot+extension)
+	if block.kind() == persistence.KindBeaconBlock {
+		return filepath.Join("permanent", block.Network, block.BlockRoot+extension)
+	}
+
+	return filepath.Join("permanent", block.Network, block.kind(), block.BlockRoot+extension)
+}
+
+// kind is the artifact's kind, defaulting to a beacon block: every caller that predates
+// envelopes queues blocks and sets no kind.
+func (b PermanentStoreBlock) kind() string {
+	if b.Kind == "" {
+		return persistence.KindBeaconBlock
+	}
+
+	return b.Kind
 }

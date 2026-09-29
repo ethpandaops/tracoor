@@ -3,7 +3,6 @@ server:
   gatewayAddr: ":7007"
   pprofAddr: ":6060"
   preStopSleepSeconds: 1
-  ntpServer: time.google.com
 
   persistence:
     dsn: "file:/tmp/tracoor.db"
@@ -15,6 +14,23 @@ server:
         beaconStates: 30m
         executionBlockTraces: 30m
         beaconBlocks: 30m
+        executionPayloadEnvelopes: 30m
+    # Copy interesting (pre-state, block) pairs out of the retention buffer into a
+    # separate, append-only corpus that outlives the network. Opt-in, and never
+    # deletes anything. See example_server_config.yaml for every available option.
+    # NOTE: beaconStates/beaconBlocks/executionPayloadEnvelopes retention must exceed
+    # (lagEpochs + 1) * slotsPerEpoch * secondsPerSlot, or the server refuses to start
+    # - the 30m above is not enough for the 12s/32 network below.
+    # promotion:
+    #   enabled: true
+    #   lagEpochs: 2
+    #   checkInterval: 30s
+    #   slotsPerEpoch: 32
+    #   secondsPerSlot: 12s
+    #   store:              # the corpus; must NOT be the buffer store below
+    #     type: fs
+    #     config:
+    #       base_path: "/tmp/tracoor-corpus"
   # Use the following to configure Tracoor for a custom network
   # ethereum:
   #   config:
@@ -38,10 +54,13 @@ agents:
       # features:
       #   fetchBeaconState: true
       #   fetchBeaconBlock: true
+      #   fetchExecutionPayloadEnvelope: true
       #   fetchBeaconBadBlock: true
       #   fetchBeaconBadBlob: true
       #   fetchExecutionBlockTrace: true
       #   fetchExecutionBadBlock: true
+      # Process-wide cap on debug_getBadBlocks responses being streamed at once.
+      # maxConcurrentExecutionBadBlockFetches: 4
       beacon:
         nodeAddress: http://instance-1:5052
         # Prysm
@@ -67,12 +86,21 @@ agents:
 shared:
   metricsAddr: ":9091"
   logging: "debug"
+  # How long each agent waits for in-flight fetches and uploads after a
+  # shutdown signal. Keep it below the orchestrator's termination grace period.
+  shutdownTimeoutSeconds: 10
+  # Deadline for one fetch attempt, per artifact kind, shared by every agent
+  # (an agent may still set its own). The defaults suit agents running near
+  # their nodes; over a WAN link beacon states need minutes, not seconds.
+  # fetchTimeouts:
+  #   beaconStateSeconds: 30
+  #   beaconBlockSeconds: 30
+  #   executionPayloadEnvelopeSeconds: 60
+  #   executionBlockTraceSeconds: 60
+  #   executionBadBlockSeconds: 60
   indexer:
     address: localhost:8081
   store:
     type: fs
     config:
       base_path: "/tmp/tracoor"
-
-
-ethpandaops/tracoor:0.0.20-debian

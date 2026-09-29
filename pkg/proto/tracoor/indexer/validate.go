@@ -3,7 +3,29 @@ package indexer
 import (
 	"errors"
 	"fmt"
+	"regexp"
 )
+
+// contentHashPattern matches a sha256 digest in lower-case hex.
+var contentHashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// validateContentHash enforces the digest shape. It is required for the kinds that link a
+// deduplicated payload and optional for the bad_* kinds, which are hashed but never linked.
+func validateContentHash(hash string, required bool) error {
+	if hash == "" {
+		if required {
+			return errors.New("content_hash is required")
+		}
+
+		return nil
+	}
+
+	if !contentHashPattern.MatchString(hash) {
+		return errors.New("content_hash must be a 64 character lower-case hex sha256 digest")
+	}
+
+	return nil
+}
 
 func (s *BeaconState) Validate() error {
 	if s == nil {
@@ -56,6 +78,14 @@ func (req *CreateBeaconStateRequest) Validate() error {
 
 	if req.GetBeaconImplementation().Value == "" {
 		return fmt.Errorf("beacon implementation is required")
+	}
+
+	if err := validateContentHash(req.GetContentHash().GetValue(), true); err != nil {
+		return err
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
 	}
 
 	return nil
@@ -126,10 +156,94 @@ func (req *CreateBeaconBlockRequest) Validate() error {
 		return fmt.Errorf("beacon implementation is required")
 	}
 
+	if err := validateContentHash(req.GetContentHash().GetValue(), true); err != nil {
+		return err
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
+	}
+
 	return nil
 }
 
 func (r *ListUniqueBeaconBlockValuesRequest) Validate() error {
+	if r == nil {
+		return errors.New("request is nil")
+	}
+
+	if len(r.Fields) == 0 {
+		return errors.New("fields is required")
+	}
+
+	return nil
+}
+
+func (s *ExecutionPayloadEnvelope) Validate() error {
+	if s == nil {
+		return errors.New("execution payload envelope is nil")
+	}
+
+	if s.GetEpoch() == nil {
+		return errors.New("epoch is required")
+	}
+
+	if s.GetSlot() == nil {
+		return errors.New("slot is required")
+	}
+
+	if s.GetBlockRoot().Value == "" {
+		return errors.New("block root is required")
+	}
+
+	if s.GetId() == nil {
+		return errors.New("id is required")
+	}
+
+	if s.GetBeaconImplementation().GetValue() == "" {
+		return errors.New("beacon implementation is required")
+	}
+
+	return nil
+}
+
+func (req *CreateExecutionPayloadEnvelopeRequest) Validate() error {
+	if req.GetLocation().GetValue() == "" {
+		return fmt.Errorf("location is required")
+	}
+
+	if req.GetNode().GetValue() == "" {
+		return fmt.Errorf("node is required")
+	}
+
+	if req.Epoch == nil {
+		return fmt.Errorf("epoch is required")
+	}
+
+	if req.Slot == nil {
+		return fmt.Errorf("slot is required")
+	}
+
+	if req.GetBlockRoot().Value == "" {
+		return fmt.Errorf("block root is required")
+	}
+
+	if req.GetBeaconImplementation().Value == "" {
+		return fmt.Errorf("beacon implementation is required")
+	}
+
+	if err := validateContentHash(req.GetContentHash().GetValue(), true); err != nil {
+		return err
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
+	}
+
+	return nil
+}
+
+func (r *ListUniqueExecutionPayloadEnvelopeValuesRequest) Validate() error {
 	if r == nil {
 		return errors.New("request is nil")
 	}
@@ -192,6 +306,10 @@ func (req *CreateBeaconBadBlockRequest) Validate() error {
 
 	if req.GetBeaconImplementation().Value == "" {
 		return fmt.Errorf("beacon implementation is required")
+	}
+
+	if err := validateContentHash(req.GetContentHash().GetValue(), false); err != nil {
+		return err
 	}
 
 	return nil
@@ -270,6 +388,10 @@ func (req *CreateBeaconBadBlobRequest) Validate() error {
 		return fmt.Errorf("index is required")
 	}
 
+	if err := validateContentHash(req.GetContentHash().GetValue(), false); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -324,6 +446,14 @@ func (req *CreateExecutionBlockTraceRequest) Validate() error {
 
 	if req.GetNetwork().GetValue() == "" {
 		return fmt.Errorf("network is required")
+	}
+
+	if err := validateContentHash(req.GetContentHash().GetValue(), true); err != nil {
+		return err
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
 	}
 
 	return nil
@@ -406,6 +536,10 @@ func (req *CreateExecutionBadBlockRequest) Validate() error {
 		return fmt.Errorf("network is required")
 	}
 
+	if err := validateContentHash(req.GetContentHash().GetValue(), false); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -451,4 +585,64 @@ func (r *ListUniqueExecutionBadBlockValuesRequest) Validate() error {
 	}
 
 	return nil
+}
+
+func (req *GetBlobRequest) Validate() error {
+	if req.GetKind().GetValue() == "" {
+		return errors.New("kind is required")
+	}
+
+	if req.GetNetwork().GetValue() == "" {
+		return errors.New("network is required")
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
+	}
+
+	return nil
+}
+
+func (req *CreateBlobRequest) Validate() error {
+	if req.GetKind().GetValue() == "" {
+		return errors.New("kind is required")
+	}
+
+	if req.GetNetwork().GetValue() == "" {
+		return errors.New("network is required")
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
+	}
+
+	if req.GetLocation().GetValue() == "" {
+		return errors.New("location is required")
+	}
+
+	return validateContentHash(req.GetContentHash().GetValue(), true)
+}
+
+func (req *CreatePayloadDivergenceRequest) Validate() error {
+	if req.GetKind().GetValue() == "" {
+		return errors.New("kind is required")
+	}
+
+	if req.GetNetwork().GetValue() == "" {
+		return errors.New("network is required")
+	}
+
+	if req.GetNode().GetValue() == "" {
+		return errors.New("node is required")
+	}
+
+	if req.GetDedupKey().GetValue() == "" {
+		return errors.New("dedup_key is required")
+	}
+
+	if err := validateContentHash(req.GetActualHash().GetValue(), true); err != nil {
+		return err
+	}
+
+	return validateContentHash(req.GetExpectedHash().GetValue(), false)
 }

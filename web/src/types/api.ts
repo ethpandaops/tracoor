@@ -8,6 +8,10 @@ export interface BeaconState {
   node_version: string;
   network: string;
   beacon_implementation: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface BeaconBlock {
@@ -20,6 +24,26 @@ export interface BeaconBlock {
   node_version: string;
   network: string;
   beacon_implementation: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
+  agreement_count?: number;
+}
+
+export interface ExecutionPayloadEnvelope {
+  id: string;
+  node: string;
+  fetched_at: string;
+  slot: number;
+  epoch: number;
+  block_root: string;
+  node_version: string;
+  network: string;
+  beacon_implementation: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface BeaconBadBlock {
@@ -32,6 +56,9 @@ export interface BeaconBadBlock {
   node_version: string;
   network: string;
   beacon_implementation: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
 }
 
 export interface BeaconBadBlob {
@@ -45,6 +72,9 @@ export interface BeaconBadBlob {
   network: string;
   beacon_implementation: string;
   index: number;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
 }
 
 export interface ExecutionBlockTrace {
@@ -56,6 +86,10 @@ export interface ExecutionBlockTrace {
   node_version: string;
   network: string;
   execution_implementation: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
+  agreement_count?: number;
 }
 
 export interface ExecutionBadBlock {
@@ -68,6 +102,9 @@ export interface ExecutionBadBlock {
   network: string;
   execution_implementation: string;
   block_extra_data: string;
+  content_hash?: string;
+  verified_at?: string;
+  content_matched_at?: string;
 }
 
 export type BeaconStateField =
@@ -80,6 +117,15 @@ export type BeaconStateField =
   | 'beacon_implementation';
 
 export type BeaconBlockField =
+  | 'node'
+  | 'slot'
+  | 'epoch'
+  | 'block_root'
+  | 'node_version'
+  | 'network'
+  | 'beacon_implementation';
+
+export type ExecutionPayloadEnvelopeField =
   | 'node'
   | 'slot'
   | 'epoch'
@@ -184,6 +230,8 @@ export interface V1CountBeaconStateRequest {
 
 export interface V1ListUniqueBeaconStateValuesRequest {
   fields: BeaconStateField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1ListBeaconBlockRequest {
@@ -216,6 +264,42 @@ export interface V1CountBeaconBlockRequest {
 
 export interface V1ListUniqueBeaconBlockValuesRequest {
   fields: BeaconBlockField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
+}
+
+export interface V1ListExecutionPayloadEnvelopeRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1CountExecutionPayloadEnvelopeRequest {
+  node?: string;
+  slot?: number;
+  epoch?: number;
+  block_root?: string;
+  node_version?: string;
+  network?: string;
+  beacon_implementation?: string;
+  before?: string;
+  after?: string;
+  id?: string;
+  pagination?: PaginationCursor;
+}
+
+export interface V1ListUniqueExecutionPayloadEnvelopeValuesRequest {
+  fields: ExecutionPayloadEnvelopeField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1ListBeaconBadBlockRequest {
@@ -248,6 +332,8 @@ export interface V1CountBeaconBadBlockRequest {
 
 export interface V1ListUniqueBeaconBadBlockValuesRequest {
   fields: BeaconBadBlockField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1ListBeaconBadBlobRequest {
@@ -282,6 +368,8 @@ export interface V1CountBeaconBadBlobRequest {
 
 export interface V1ListUniqueBeaconBadBlobValuesRequest {
   fields: BeaconBadBlobField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1ListExecutionBlockTraceRequest {
@@ -312,6 +400,8 @@ export interface V1CountExecutionBlockTraceRequest {
 
 export interface V1ListUniqueExecutionBlockTraceValuesRequest {
   fields: ExecutionBlockTraceField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1ListExecutionBadBlockRequest {
@@ -344,6 +434,8 @@ export interface V1CountExecutionBadBlockRequest {
 
 export interface V1ListUniqueExecutionBadBlockValuesRequest {
   fields: ExecutionBadBlockField[];
+  /** Empty means unscoped; only the network dropdown itself leaves it unset. */
+  network?: string;
 }
 
 export interface V1GetConfigRequest {}
@@ -376,6 +468,24 @@ export interface V1CountBeaconBlockResponse {
 }
 
 export interface V1ListUniqueBeaconBlockValuesResponse {
+  node?: string[];
+  slot?: number[];
+  epoch?: number[];
+  block_root?: string[];
+  node_version?: string[];
+  network?: string[];
+  beacon_implementation?: string[];
+}
+
+export interface V1ListExecutionPayloadEnvelopeResponse {
+  execution_payload_envelopes?: ExecutionPayloadEnvelope[];
+}
+
+export interface V1CountExecutionPayloadEnvelopeResponse {
+  count?: number;
+}
+
+export interface V1ListUniqueExecutionPayloadEnvelopeValuesResponse {
   node?: string[];
   slot?: number[];
   epoch?: number[];

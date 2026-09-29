@@ -143,7 +143,7 @@ func TestIndexerBeaconBlockExpiration(t *testing.T) {
 	}
 
 	// Run the cleanup process
-	if perr := index.purgeOldBeaconBlocks(ctx); perr != nil {
+	if perr := index.purgeArtifacts(ctx, specForKind(t, index, persistence.KindBeaconBlock)); perr != nil {
 		t.Fatalf("failed to purge old beacon blocks: %v", perr)
 	}
 

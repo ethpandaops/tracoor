@@ -76,7 +76,15 @@ linters:
           - gocritic
           - gosec
           - wsl
+          - goconst
         path: _test\.go
+      # The agent, server and store packages repeat logrus field keys and
+      # prometheus label names (a fixed logging vocabulary) across many files;
+      # goconst flags the shared keys but turning them into Go constants adds
+      # no real value.
+      - linters:
+          - goconst
+        path: pkg/(agent|server|store)/
     paths:
       - third_party$
       - builtin$

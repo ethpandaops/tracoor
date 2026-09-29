@@ -3,7 +3,7 @@ package ethereum
 import (
 	"fmt"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution"
 )
@@ -28,30 +28,40 @@ type Config struct {
 	// the beacon node cache.
 	BeaconStateAgeThresholdEpochs uint64 `yaml:"beaconStateAgeThresholdEpochs" default:"1"`
 
-	// MaxConcurrentBeaconStateFetches bounds in-flight beacon state fetches across
-	// every agent in the process, capping peak memory independently of how many
-	// agents are configured. Applied process-wide by whichever agent starts first.
-	MaxConcurrentBeaconStateFetches int `yaml:"maxConcurrentBeaconStateFetches" default:"10"`
+	// ExecutionBlockTraceAgeThresholdBlocks is how far behind the execution head
+	// a block may be before its trace is no longer worth requesting. Execution
+	// clients retain only enough state to re-execute a bounded number of recent
+	// blocks, so a trace beyond that window is a guaranteed failure. The default
+	// follows geth's `reexec` default of 128 blocks.
+	ExecutionBlockTraceAgeThresholdBlocks uint64 `yaml:"executionBlockTraceAgeThresholdBlocks" default:"128"`
 
-	// MaxConcurrentExecutionBadBlockFetches bounds in-flight bad block fetches,
-	// as above.
-	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"10"`
+	// MaxConcurrentExecutionBadBlockFetches bounds how many debug_getBadBlocks
+	// responses are being streamed at once across every agent in the process.
+	// Each in-flight stream holds one decoded bad block, so this is the knob
+	// that sizes the memory the bad block sweep may use. Applied process-wide
+	// by whichever agent starts first.
+	MaxConcurrentExecutionBadBlockFetches int `yaml:"maxConcurrentExecutionBadBlockFetches" default:"4"`
 }
 
-func (c *Config) GetMaxConcurrentBeaconStateFetches() int {
-	if c.MaxConcurrentBeaconStateFetches <= 0 {
-		return 0
-	}
+const (
+	defaultExecutionBlockTraceAgeThresholdBlocks = 128
+	defaultMaxConcurrentExecutionBadBlockFetches = 4
+)
 
-	return c.MaxConcurrentBeaconStateFetches
-}
-
-func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int {
+func (c *Config) GetMaxConcurrentExecutionBadBlockFetches() int64 {
 	if c.MaxConcurrentExecutionBadBlockFetches <= 0 {
-		return 0
+		return defaultMaxConcurrentExecutionBadBlockFetches
 	}
 
-	return c.MaxConcurrentExecutionBadBlockFetches
+	return int64(c.MaxConcurrentExecutionBadBlockFetches)
+}
+
+func (c *Config) GetExecutionBlockTraceAgeThresholdBlocks() uint64 {
+	if c.ExecutionBlockTraceAgeThresholdBlocks == 0 {
+		return defaultExecutionBlockTraceAgeThresholdBlocks
+	}
+
+	return c.ExecutionBlockTraceAgeThresholdBlocks
 }
 
 func (c *Config) Validate() error {
@@ -72,12 +82,13 @@ func (c *Config) Validate() error {
 
 // Features contains feature flags for the agent.
 type Features struct {
-	FetchBeaconState         *bool `yaml:"fetchBeaconState" default:"true"`
-	FetchBeaconBlock         *bool `yaml:"fetchBeaconBlock" default:"true"`
-	FetchBeaconBadBlock      *bool `yaml:"fetchBeaconBadBlock" default:"true"`
-	FetchBeaconBadBlob       *bool `yaml:"fetchBeaconBadBlob" default:"true"`
-	FetchExecutionBlockTrace *bool `yaml:"fetchExecutionBlockTrace" default:"true"`
-	FetchExecutionBadBlock   *bool `yaml:"fetchExecutionBadBlock" default:"true"`
+	FetchBeaconState              *bool `yaml:"fetchBeaconState" default:"true"`
+	FetchBeaconBlock              *bool `yaml:"fetchBeaconBlock" default:"true"`
+	FetchExecutionPayloadEnvelope *bool `yaml:"fetchExecutionPayloadEnvelope" default:"true"`
+	FetchBeaconBadBlock           *bool `yaml:"fetchBeaconBadBlock" default:"true"`
+	FetchBeaconBadBlob            *bool `yaml:"fetchBeaconBadBlob" default:"true"`
+	FetchExecutionBlockTrace      *bool `yaml:"fetchExecutionBlockTrace" default:"true"`
+	FetchExecutionBadBlock        *bool `yaml:"fetchExecutionBadBlock" default:"true"`
 }
 
 func (f Features) Validate() error {
@@ -98,6 +109,14 @@ func (f Features) GetFetchBeaconBlock() bool {
 	}
 
 	return *f.FetchBeaconBlock
+}
+
+func (f Features) GetFetchExecutionPayloadEnvelope() bool {
+	if f.FetchExecutionPayloadEnvelope == nil {
+		return true // default value
+	}
+
+	return *f.FetchExecutionPayloadEnvelope
 }
 
 func (f Features) GetFetchBeaconBadBlock() bool {
@@ -141,6 +160,10 @@ func (f Features) EnabledFlags() []string {
 
 	if f.GetFetchBeaconBlock() {
 		enabled = append(enabled, "FetchBeaconBlock")
+	}
+
+	if f.GetFetchExecutionPayloadEnvelope() {
+		enabled = append(enabled, "FetchExecutionPayloadEnvelope")
 	}
 
 	if f.GetFetchBeaconBadBlock() {

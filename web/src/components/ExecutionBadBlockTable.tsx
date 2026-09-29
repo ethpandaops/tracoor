@@ -16,6 +16,7 @@ import { Link, useLocation } from 'wouter';
 
 import ExecutionBadBlockId from '@components/ExecutionBadBlockId';
 import Pagination from '@components/Pagination';
+import VerificationBadge from '@components/VerificationBadge';
 import useNetwork from '@contexts/network';
 import { Selection } from '@contexts/selection';
 import { useExecutionBadBlocks, useExecutionBadBlocksCount } from '@hooks/useQuery';
@@ -62,32 +63,42 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
     'executionBadBlockNodeVersion',
   ]);
 
-  const { data, isLoading, error } = useExecutionBadBlocks({
-    network: network ? network : undefined,
-    block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
-    block_number: executionBadBlockBlockNumber ? parseInt(executionBadBlockBlockNumber) : undefined,
-    node: executionBadBlockNode ? executionBadBlockNode : undefined,
-    node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
-    execution_implementation: executionBadBlockNodeImplementation
-      ? executionBadBlockNodeImplementation
-      : undefined,
-    pagination: {
-      limit: itemsPerPage,
-      offset: (currentPage - 1) * itemsPerPage,
-      order_by: `${sortConfig.key} ${sortConfig.direction}`,
+  const { data, isLoading, error } = useExecutionBadBlocks(
+    {
+      network: network ? network : undefined,
+      block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
+      block_number: executionBadBlockBlockNumber
+        ? parseInt(executionBadBlockBlockNumber)
+        : undefined,
+      node: executionBadBlockNode ? executionBadBlockNode : undefined,
+      node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
+      execution_implementation: executionBadBlockNodeImplementation
+        ? executionBadBlockNodeImplementation
+        : undefined,
+      pagination: {
+        limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage,
+        order_by: `${sortConfig.key} ${sortConfig.direction}`,
+      },
     },
-  });
+    Boolean(network),
+  );
 
-  const { data: count } = useExecutionBadBlocksCount({
-    network: network ? network : undefined,
-    block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
-    block_number: executionBadBlockBlockNumber ? parseInt(executionBadBlockBlockNumber) : undefined,
-    node: executionBadBlockNode ? executionBadBlockNode : undefined,
-    node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
-    execution_implementation: executionBadBlockNodeImplementation
-      ? executionBadBlockNodeImplementation
-      : undefined,
-  });
+  const { data: count } = useExecutionBadBlocksCount(
+    {
+      network: network ? network : undefined,
+      block_hash: executionBadBlockBlockHash ? executionBadBlockBlockHash : undefined,
+      block_number: executionBadBlockBlockNumber
+        ? parseInt(executionBadBlockBlockNumber)
+        : undefined,
+      node: executionBadBlockNode ? executionBadBlockNode : undefined,
+      node_version: executionBadBlockNodeVersion ? executionBadBlockNodeVersion : undefined,
+      execution_implementation: executionBadBlockNodeImplementation
+        ? executionBadBlockNodeImplementation
+        : undefined,
+    },
+    Boolean(network),
+  );
 
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 0;
 
@@ -116,6 +127,9 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
           <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
             <div className="h-5 w-[550px] bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
+          <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
+            <div className="h-5 w-32 bg-gray-600/35 rounded-xl animate-pulse"></div>
+          </td>
           <td className="whitespace-nowrap w-0 py-4 pl-4 pr-4 text-sm font-bold text-gray-600">
             <div className="h-5 w-20 bg-gray-600/35 rounded-xl animate-pulse"></div>
           </td>
@@ -127,7 +141,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
   let otherComp = undefined;
 
   // if loading or has error or has no data
-  if (isLoading) {
+  if (isLoading || !network) {
     otherComp = loading;
   } else if (error) {
     let message = 'Something went wrong fetching data';
@@ -137,7 +151,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={7}
+          colSpan={9}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-red-600 text-center text-xl"
         >
           {message}
@@ -148,7 +162,7 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
     otherComp = (
       <tr className="">
         <td
-          colSpan={7}
+          colSpan={9}
           className="whitespace-nowrap py-4 pl-4 pr-4 font-bold text-gray-600 text-center text-xl"
         >
           No data available
@@ -372,6 +386,12 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                   </th>
                   <th
                     scope="col"
+                    className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50 w-0"
+                  >
+                    <span className="whitespace-nowrap">Verification</span>
+                  </th>
+                  <th
+                    scope="col"
                     className="py-3.5 pl-4 pr-4 text-left text-sm font-semibold text-gray-50"
                   ></th>
                 </tr>
@@ -452,6 +472,13 @@ export default function ExecutionBadBlockTable({ id }: { id?: string }) {
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 hidden 3xl:table-cell">
                           {row.block_extra_data}
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-0">
+                          <VerificationBadge
+                            contentHash={row.content_hash}
+                            verifiedAt={row.verified_at}
+                            contentMatchedAt={row.content_matched_at}
+                          />
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-4 text-sm font-bold text-gray-600 w-1">
                           <div className="flex flex-row">

@@ -3,16 +3,18 @@ import { useFormContext, Controller } from 'react-hook-form';
 import Alert from '@components/Alert';
 import { CustomCombobox } from '@components/Combobox';
 import DebouncedInput from '@components/DebouncedInput';
+import useNetwork from '@contexts/network';
 import { useUniqueExecutionBlockTraceValues } from '@hooks/useQuery';
 
 export default function FilterForm() {
   const { control } = useFormContext();
+  const { network } = useNetwork();
 
-  const { data, isLoading, error } = useUniqueExecutionBlockTraceValues([
-    'node',
-    'node_version',
-    'execution_implementation',
-  ]);
+  const { data, isLoading, error } = useUniqueExecutionBlockTraceValues(
+    ['node', 'node_version', 'execution_implementation'],
+    network,
+    Boolean(network),
+  );
 
   let errorComp = undefined;
 

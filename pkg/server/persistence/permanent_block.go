@@ -6,23 +6,50 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// PermanentBlock represents a permanently stored block in the database.
-// This provides a mapping between slot, block_root, and network for
-// blocks that have been copied to permanent storage.
+// legacyPermanentBlockIndex is the pre-kind unique index on (block_root, network),
+// superseded by ux_permanent_blocks_kind_block_root_network and dropped at migration.
+const legacyPermanentBlockIndex = "ux_permanent_blocks_block_root_network"
+
+// ErrPermanentBlockNotFound is returned when no row records the artifact. It is an
+// ordinary answer on the archive path - almost every artifact is new - so callers must
+// be able to tell it apart from a database failure.
+var ErrPermanentBlockNotFound = errors.New("permanent block not found")
+
+// PermanentBlock represents a permanently stored artifact in the database.
+// This provides a mapping between kind, slot, block_root, and network for
+// artifacts that have been copied to permanent storage.
+//
+// It has no retention on purpose: it is the index of what was kept for ever, so a row that
+// expired would leave a permanent object nothing points at.
+//
+// Kind is part of the identity, not decoration. Gloas splits a slot across two artifacts -
+// the block and its execution payload envelope - which share a block root, so without kind
+// the second one to arrive would collide with the first and never be archived.
+//
+// The only production lookup is by (kind, block_root, network), so that triple carries the
+// one index, and unique makes it the integrity guarantee the get-before-insert flow in the
+// permanent store otherwise only approximates.
 type PermanentBlock struct {
-	gorm.Model
+	ID uint `gorm:"primaryKey"`
 	// We have to use int64 here as SQLite doesn't support uint64
-	Slot      int64  `gorm:"index:idx_permanent_block_slot,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:1"`
-	BlockRoot string `gorm:"index:idx_permanent_block_blockroot,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:2"`
-	Network   string `gorm:"index:idx_permanent_block_network,where:deleted_at IS NULL;index:idx_permanent_block_slot_blockroot_network,where:deleted_at IS NULL,priority:3"`
+	Slot      int64  `gorm:"not null;default:0"`
+	Kind      string `gorm:"not null;default:'beacon_block';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:1"`
+	BlockRoot string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:2"`
+	Network   string `gorm:"not null;default:'';uniqueIndex:ux_permanent_blocks_kind_block_root_network,priority:3"`
 }
 
 type PermanentBlockFilter struct {
 	Slot      *int64
+	Kind      *string
 	BlockRoot *string
 	Network   *string
+}
+
+func (f *PermanentBlockFilter) AddKind(kind string) {
+	f.Kind = &kind
 }
 
 func (f *PermanentBlockFilter) AddSlot(slot int64) {
@@ -42,6 +69,10 @@ func (f *PermanentBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 		query = query.Where("slot = ?", f.Slot)
 	}
 
+	if f.Kind != nil {
+		query = query.Where("kind = ?", f.Kind)
+	}
+
 	if f.BlockRoot != nil {
 		query = query.Where("block_root = ?", f.BlockRoot)
 	}
@@ -53,14 +84,19 @@ func (f *PermanentBlockFilter) ApplyToQuery(query *gorm.DB) (*gorm.DB, error) {
 	return query, nil
 }
 
-// InsertPermanentBlock inserts a permanent block record.
+// InsertPermanentBlock inserts a permanent block record. A record that already
+// exists is left alone rather than erroring: two replicas racing past the
+// distributed lock both believe they inserted, and both are right.
 func (i *Indexer) InsertPermanentBlock(ctx context.Context, block *PermanentBlock) error {
 	operation := OperationInsertPermanentBlock
 	i.metrics.ObserveOperation(operation)
 
 	query := i.db.WithContext(ctx)
 
-	result := query.Create(block)
+	result := query.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "kind"}, {Name: "block_root"}, {Name: "network"}},
+		DoNothing: true,
+	}).Create(block)
 	if result.Error != nil {
 		i.metrics.ObserveOperationError(operation)
 
@@ -85,16 +121,18 @@ func (i *Indexer) ListPermanentBlock(ctx context.Context, filter *PermanentBlock
 	}
 
 	if pagination != nil {
+		query = pagination.ApplyOffsetLimit(query)
+
+		// PermanentBlock has no fetched_at column, so the default ordering does not apply here.
 		if pagination.OrderBy != "" {
-			query = query.Order(pagination.OrderBy)
-		}
+			ordered, oerr := pagination.ApplyOrderBy(query)
+			if oerr != nil {
+				i.metrics.ObserveOperationError(operation)
 
-		if pagination.Limit > 0 {
-			query = query.Limit(pagination.Limit)
-		}
+				return nil, oerr
+			}
 
-		if pagination.Offset > 0 {
-			query = query.Offset(pagination.Offset)
+			query = ordered
 		}
 	}
 
@@ -136,8 +174,10 @@ func (i *Indexer) CountPermanentBlock(ctx context.Context, filter *PermanentBloc
 	return count, nil
 }
 
-// GetPermanentBlockByBlockRoot retrieves a permanent block by block root and network.
-func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, network string) (*PermanentBlock, error) {
+// GetPermanentBlockByBlockRoot retrieves a permanent artifact by kind, block root and
+// network. A row that is not there returns ErrPermanentBlockNotFound, which is the normal
+// answer and not a database error.
+func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, kind, blockRoot, network string) (*PermanentBlock, error) {
 	operation := OperationGetPermanentBlock
 	i.metrics.ObserveOperation(operation)
 
@@ -145,10 +185,10 @@ func (i *Indexer) GetPermanentBlockByBlockRoot(ctx context.Context, blockRoot, n
 
 	var permanentBlock PermanentBlock
 
-	result := query.Where("block_root = ? AND network = ?", blockRoot, network).First(&permanentBlock)
+	result := query.Where("kind = ? AND block_root = ? AND network = ?", kind, blockRoot, network).First(&permanentBlock)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, errors.New("permanent block not found")
+			return nil, ErrPermanentBlockNotFound
 		}
 
 		i.metrics.ObserveOperationError(operation)
@@ -184,10 +224,10 @@ func (i *Indexer) DistinctPermanentBlockValues(ctx context.Context, fields []str
 	}
 
 	// Create maps to track values we've already seen
-	valueSets := make(map[string]map[interface{}]bool)
+	valueSets := make(map[string]map[any]bool)
 
 	for _, field := range fields {
-		valueSets[field] = make(map[interface{}]bool)
+		valueSets[field] = make(map[any]bool)
 	}
 
 	// Create the SQL query with all fields
@@ -203,10 +243,10 @@ func (i *Indexer) DistinctPermanentBlockValues(ctx context.Context, fields []str
 	}
 	defer rows.Close()
 
-	values := make([]interface{}, len(fields))
+	values := make([]any, len(fields))
 
 	for rows.Next() {
-		valuePtrs := make([]interface{}, len(fields))
+		valuePtrs := make([]any, len(fields))
 
 		for i := range values {
 			valuePtrs[i] = &values[i]

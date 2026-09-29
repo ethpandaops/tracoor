@@ -24,6 +24,17 @@ jobs:
           # Extract suffix from branch name (e.g., 'dencun' from 'release/dencun')
           RELEASE_SUFFIX=${GITHUB_REF#refs/heads/release/}
 
+          # Bail out if HEAD is already tagged for this release branch. Re-runs and
+          # force-pushes that don't move HEAD would otherwise stack a second tag on
+          # the same commit, leaving two versions pointing at one build.
+          EXISTING_TAG=$(git tag --points-at HEAD \
+                      | grep -E "^v?[0-9]+\.[0-9]+\.[0-9]+-${RELEASE_SUFFIX}$" \
+                      | head -n 1)
+          if [[ -n "$EXISTING_TAG" ]]; then
+            echo "HEAD ($(git rev-parse --short HEAD)) is already tagged $EXISTING_TAG - nothing to release."
+            exit 0
+          fi
+
           # Fetch all tags and get the latest that matches the pattern
           # Using the refs/tags API
           LATEST_VERSION=$(curl --silent "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags" \

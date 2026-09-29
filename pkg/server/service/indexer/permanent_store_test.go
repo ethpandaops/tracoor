@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -55,9 +56,8 @@ func setupPermanentStore(t *testing.T) (*PermanentStore, store.Store, func()) {
 	nodeID := uuid.New().String()
 
 	permanentStore, err := NewPermanentStore(log, mockStore, indexer, nodeID, &PermanentStoreConfig{
-		Blocks: BlockConfig{
-			Enabled: true,
-		},
+		Blocks:                    BlockConfig{Enabled: true},
+		ExecutionPayloadEnvelopes: BlockConfig{Enabled: true},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, permanentStore)
@@ -86,13 +86,13 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
 	t.Run("queue and process block", func(t *testing.T) {
 		// Queue a block for processing with a channel
-		processChan := make(chan struct{})
+		processChan := make(chan PermanentStoreResult, 1)
 		blockInfo := PermanentStoreBlock{
 			Location:      blockLocation,
 			BlockRoot:     "0x1234",
@@ -105,8 +105,8 @@ func TestPermanentStoreQueueAndProcess(t *testing.T) {
 
 		// Wait for the block to be processed
 		select {
-		case <-processChan:
-			// Block was processed
+		case result := <-processChan:
+			require.True(t, result.Archived, "a processed block reports itself archived")
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("Block processing timed out")
 		}
@@ -148,12 +148,12 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
 	// Queue a block for processing with a channel
-	processChan1 := make(chan struct{})
+	processChan1 := make(chan PermanentStoreResult, 1)
 	blockInfo := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
@@ -191,7 +191,7 @@ func TestPermanentStoreProcessSameBlockTwice(t *testing.T) {
 	assert.Len(t, permanentBlocks, 1, "Permanent block should be recorded in the database")
 
 	// Process the same block again with a new channel
-	processChan2 := make(chan struct{})
+	processChan2 := make(chan PermanentStoreResult, 1)
 	blockInfo2 := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0x1234",
@@ -232,7 +232,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Save the first block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData1,
+		Data:     bytes.NewReader(blockData1),
 	})
 	require.NoError(t, err)
 
@@ -242,7 +242,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 	// Save the second block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation2,
-		Data:     &blockData2,
+		Data:     bytes.NewReader(blockData2),
 	})
 	require.NoError(t, err)
 
@@ -253,7 +253,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		BlockRoot:     "0x1234",
 		Network:       testNetwork,
 		Slot:          123,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan PermanentStoreResult, 1),
 	}
 
 	// Second block
@@ -262,7 +262,7 @@ func TestPermanentStoreDifferentNetworks(t *testing.T) {
 		BlockRoot:     "0x1234", // Same root
 		Network:       "goerli", // Different network
 		Slot:          123,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan PermanentStoreResult, 1),
 	}
 
 	permanentStore.QueueBlock(blockInfo1)
@@ -370,7 +370,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 	// Save the block to the mock store
 	_, err = mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
@@ -379,7 +379,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
 		Network:       testNetwork,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan PermanentStoreResult, 1),
 	}
 
 	permanentStore1.QueueBlock(blockInfo1)
@@ -420,7 +420,7 @@ func TestPermanentStoreDistributedLock(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xabcd",
 		Network:       testNetwork,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan PermanentStoreResult, 1),
 	}
 
 	permanentStore2.QueueBlock(blockInfo2)
@@ -451,12 +451,12 @@ func TestPermanentStoreStop(t *testing.T) {
 	// Save the block to the mock store
 	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{
 		Location: blockLocation,
-		Data:     &blockData,
+		Data:     bytes.NewReader(blockData),
 	})
 	require.NoError(t, err)
 
 	// Create a channel to track when processing is complete
-	processChan := make(chan struct{})
+	processChan := make(chan PermanentStoreResult, 1)
 
 	// Queue a block for processing with the channel
 	blockInfo := PermanentStoreBlock{
@@ -486,7 +486,7 @@ func TestPermanentStoreStop(t *testing.T) {
 
 	// Now test the stop procedure with a block in the queue
 	// Queue another block before stopping
-	processChan2 := make(chan struct{})
+	processChan2 := make(chan PermanentStoreResult, 1)
 	queuedBlock := PermanentStoreBlock{
 		Location:      blockLocation,
 		BlockRoot:     "0xqueued",
@@ -534,7 +534,7 @@ func TestPermanentStoreStop(t *testing.T) {
 		Location:      blockLocation,
 		BlockRoot:     "0xunprocessed",
 		Network:       testNetwork,
-		ProcessedChan: make(chan struct{}),
+		ProcessedChan: make(chan PermanentStoreResult, 1),
 		Slot:          3,
 	}
 	permanentStore.QueueBlock(unprocessedBlock)
@@ -577,13 +577,13 @@ func TestPermanentStoreLocation(t *testing.T) {
 	data := []byte("test data")
 	params := &store.SaveParams{
 		Location: blockInfo.Location,
-		Data:     &data,
+		Data:     bytes.NewReader(data),
 	}
 	_, err := mockStore.SaveBeaconBlock(ctx, params)
 	require.NoError(t, err)
 
 	// Verify we can find blocks by querying the permanent block table
-	processChan := make(chan struct{})
+	processChan := make(chan PermanentStoreResult, 1)
 	blockInfo.ProcessedChan = processChan
 
 	// Queue the block for processing
@@ -610,4 +610,159 @@ func TestPermanentStoreLocation(t *testing.T) {
 		assert.Equal(t, blockInfo.Network, blocks[0].Network)
 		assert.Equal(t, int64(blockInfo.Slot), blocks[0].Slot)
 	}
+}
+
+func TestQueueBlockAlwaysClosesProcessedChan(t *testing.T) {
+	newStore := func(t *testing.T, enabled bool) *PermanentStore {
+		t.Helper()
+
+		permanentStore, err := NewPermanentStore(logrus.New(), nil, nil, uuid.New().String(), &PermanentStoreConfig{
+			Blocks: BlockConfig{
+				Enabled: enabled,
+			},
+		})
+		require.NoError(t, err)
+
+		return permanentStore
+	}
+
+	newBlock := func() PermanentStoreBlock {
+		return PermanentStoreBlock{
+			Location:      blockLocation,
+			BlockRoot:     "0x1234",
+			Network:       testNetwork,
+			Slot:          123,
+			ProcessedChan: make(chan PermanentStoreResult, 1),
+		}
+	}
+
+	requireClosed := func(t *testing.T, block PermanentStoreBlock) {
+		t.Helper()
+
+		select {
+		case result := <-block.ProcessedChan:
+			require.False(t, result.Archived, "a block that never reached a worker must not report archived")
+		case <-time.After(time.Second):
+			t.Fatal("ProcessedChan was never signalled")
+		}
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		permanentStore := newStore(t, false)
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+
+	t.Run("stopped", func(t *testing.T) {
+		permanentStore := newStore(t, true)
+		permanentStore.stopped = true
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+
+	t.Run("queue full", func(t *testing.T) {
+		permanentStore := newStore(t, true)
+
+		// Nothing is draining the queue, so filling it forces the queue-full path.
+		for len(permanentStore.queue) < cap(permanentStore.queue) {
+			permanentStore.queue <- PermanentStoreBlock{}
+		}
+
+		block := newBlock()
+
+		permanentStore.QueueBlock(block)
+		requireClosed(t, block)
+	})
+}
+
+// From gloas on, a slot is two artifacts that share one block root: the beacon block and
+// the execution payload envelope carrying the payload the block no longer holds. They must
+// archive as two distinct objects and two distinct rows - if either collapses into the
+// other, one of them is purged having never been archived.
+func TestPermanentStoreArchivesBlockAndEnvelopeSharingABlockRoot(t *testing.T) {
+	ctx := context.Background()
+	permanentStore, mockStore, cleanup := setupPermanentStore(t)
+
+	defer cleanup()
+
+	const sharedRoot = "0xdeadbeef"
+
+	blockData := []byte("gloas beacon block")
+	envelopeData := []byte("signed execution payload envelope")
+
+	_, err := mockStore.SaveBeaconBlock(ctx, &store.SaveParams{Location: "blocks/gloas.ssz", Data: bytes.NewReader(blockData)})
+	require.NoError(t, err)
+
+	_, err = mockStore.SaveExecutionPayloadEnvelope(ctx, &store.SaveParams{Location: "envelopes/gloas.ssz", Data: bytes.NewReader(envelopeData)})
+	require.NoError(t, err)
+
+	items := []PermanentStoreBlock{
+		{Kind: persistence.KindBeaconBlock, Location: "blocks/gloas.ssz", BlockRoot: sharedRoot, Network: testNetwork, Slot: 777},
+		{Kind: persistence.KindExecutionPayloadEnvelope, Location: "envelopes/gloas.ssz", BlockRoot: sharedRoot, Network: testNetwork, Slot: 777},
+	}
+
+	for i := range items {
+		items[i].ProcessedChan = make(chan PermanentStoreResult, 1)
+
+		permanentStore.QueueBlock(items[i])
+
+		select {
+		case result := <-items[i].ProcessedChan:
+			require.True(t, result.Archived, "%s should report itself archived", items[i].Kind)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s processing timed out", items[i].Kind)
+		}
+	}
+
+	blockLoc := permanentStore.GetPermanentLocation(items[0])
+	envelopeLoc := permanentStore.GetPermanentLocation(items[1])
+
+	assert.NotEqual(t, blockLoc, envelopeLoc, "a block and its envelope must not resolve to one object")
+
+	got, err := mockStore.GetBeaconBlock(ctx, blockLoc)
+	require.NoError(t, err)
+	assert.Equal(t, blockData, *got)
+
+	got, err = mockStore.GetExecutionPayloadEnvelope(ctx, envelopeLoc)
+	require.NoError(t, err)
+	assert.Equal(t, envelopeData, *got, "the envelope must not have been overwritten by the block")
+
+	// Two rows, one per kind, both under the shared root.
+	filter := &persistence.PermanentBlockFilter{}
+	filter.AddBlockRoot(sharedRoot)
+	filter.AddNetwork(testNetwork)
+
+	rows, err := permanentStore.db.ListPermanentBlock(ctx, filter, &persistence.PaginationCursor{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "the block and the envelope are each recorded")
+
+	kinds := []string{rows[0].Kind, rows[1].Kind}
+	assert.ElementsMatch(t, []string{persistence.KindBeaconBlock, persistence.KindExecutionPayloadEnvelope}, kinds)
+}
+
+// A kind that is switched off is not archived, and its rows are handed back to the purge
+// unchanged rather than held for an archive that will never happen.
+func TestPermanentStoreRespectsPerKindEnablement(t *testing.T) {
+	indexer := setupMockIndexer(t)
+
+	log := logrus.New()
+
+	permanentStore, err := NewPermanentStore(log, nil, indexer, uuid.New().String(), &PermanentStoreConfig{
+		Blocks:                    BlockConfig{Enabled: true},
+		ExecutionPayloadEnvelopes: BlockConfig{Enabled: false},
+	})
+	require.NoError(t, err)
+
+	assert.True(t, permanentStore.IsEnabledFor(persistence.KindBeaconBlock))
+	assert.False(t, permanentStore.IsEnabledFor(persistence.KindExecutionPayloadEnvelope))
+	assert.True(t, permanentStore.IsEnabled(), "one enabled kind is enough to run the store")
+
+	off, err := NewPermanentStore(log, nil, indexer, uuid.New().String(), &PermanentStoreConfig{})
+	require.NoError(t, err)
+
+	assert.False(t, off.IsEnabled(), "nothing enabled means nothing to archive")
 }

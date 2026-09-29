@@ -5,18 +5,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
-	"github.com/0xsequence/ethkit/ethrpc"
-	"github.com/0xsequence/ethkit/ethrpc/jsonrpc"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/execution/services"
 	"github.com/sirupsen/logrus"
 )
 
+// ErrBlockNotFound is returned when the execution node does not know about
+// the requested block, e.g. a gloas payload that has not been revealed yet.
+var ErrBlockNotFound = errors.New("execution block not found")
+
 type Node struct {
 	config *Config
 	log    logrus.FieldLogger
-	rpc    *ethrpc.Provider
+	rpc    *rpc.Client
+	eth    *ethclient.Client
+
+	// httpClient carries the calls whose answers are streamed rather than
+	// buffered; the rpc client reads every response whole.
+	httpClient *http.Client
 
 	services []services.Service
 
@@ -25,9 +39,10 @@ type Node struct {
 
 func NewNode(log logrus.FieldLogger, conf *Config) *Node {
 	return &Node{
-		config:   conf,
-		log:      log.WithField("module", "agent/ethereum/execution"),
-		services: []services.Service{},
+		config:     conf,
+		log:        log.WithField("module", "agent/ethereum/execution"),
+		services:   []services.Service{},
+		httpClient: &http.Client{},
 	}
 }
 
@@ -36,18 +51,19 @@ func (n *Node) OnReady(_ context.Context, callback func(ctx context.Context) err
 }
 
 func (n *Node) Start(ctx context.Context) error {
-	rpc, err := ethrpc.NewProvider(n.config.NodeAddress)
+	client, err := rpc.DialContext(ctx, n.config.NodeAddress)
 	if err != nil {
 		return err
 	}
 
-	metadata := services.NewMetadataService(n.log, rpc)
+	n.rpc = client
+	n.eth = ethclient.NewClient(client)
+
+	metadata := services.NewMetadataService(n.log, n.eth)
 
 	svcs := []services.Service{
 		&metadata,
 	}
-
-	n.rpc = rpc
 
 	n.services = svcs
 
@@ -89,6 +105,10 @@ func (n *Node) Start(ctx context.Context) error {
 }
 
 func (n *Node) Stop() error {
+	if n.rpc != nil {
+		n.rpc.Close()
+	}
+
 	return nil
 }
 
@@ -130,50 +150,139 @@ func (n *Node) getDebugBlockTraceParms(ctx context.Context, client string) map[s
 }
 
 func (n *Node) GetRawDebugBlockTrace(ctx context.Context, hash, client string) (*[]byte, error) {
-	data := jsonrpc.Message{}
-
-	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
-		"debug_traceBlockByHash",
-		hash,
-		n.getDebugBlockTraceParms(ctx, client),
-	))
+	trace, err := n.rawResult(ctx, "debug_traceBlockByHash", hash, n.getDebugBlockTraceParms(ctx, client))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(rsp, &data); err != nil {
-		return nil, err
-	}
-
-	s := []byte(data.Result)
-
-	return &s, nil
+	return &trace, nil
 }
 
-func (n *Node) GetBadBlocks(ctx context.Context) (*BadBlocksResponse, error) {
-	data := jsonrpc.Message{}
+// rawResult performs a call and returns its JSON-RPC result verbatim. A
+// response that carries no result at all reads as a JSON null, so callers
+// have one shape of "nothing" to check for.
+func (n *Node) rawResult(ctx context.Context, method string, args ...any) ([]byte, error) {
+	var result json.RawMessage
 
-	rsp, err := n.rpc.Do(ctx, ethrpc.NewCall(
-		"debug_getBadBlocks",
-	))
+	err := n.rpc.CallContext(ctx, &result, method, args...)
+	if errors.Is(err, rpc.ErrNoResult) {
+		return []byte("null"), nil
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(rsp, &data); err != nil {
-		return nil, err
+	return result, nil
+}
+
+// BlockNumber returns the execution node's current head block number.
+func (n *Node) BlockNumber(ctx context.Context) (uint64, error) {
+	return n.eth.BlockNumber(ctx)
+}
+
+// GetBlockNumberByHash resolves an execution block number from its hash.
+// Returns ErrBlockNotFound if the node does not (yet) have the block.
+func (n *Node) GetBlockNumberByHash(ctx context.Context, hash string) (uint64, error) {
+	result, err := n.rawResult(ctx, "eth_getBlockByHash", hash, false)
+	if err != nil {
+		return 0, err
 	}
 
-	badBlocks := []BadBlock{}
-	if err := json.Unmarshal([]byte(data.Result), &badBlocks); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal bad blocks: %w", err)
+	if isEmptyJSONResult(result) {
+		return 0, ErrBlockNotFound
 	}
 
-	s := BadBlocksResponse{}
+	block := struct {
+		Number string `json:"number"`
+	}{}
 
-	for _, block := range badBlocks {
-		s[block.Hash] = block
+	if err = json.Unmarshal(result, &block); err != nil {
+		return 0, err
 	}
 
-	return &s, nil
+	number, err := strconv.ParseUint(strings.TrimPrefix(block.Number, "0x"), 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse block number %q: %w", block.Number, err)
+	}
+
+	return number, nil
+}
+
+// errStalled reports a bad block stream that stopped producing bytes.
+var errStalled = errors.New("execution node stopped sending bad blocks")
+
+// badBlocksRequest is the JSON-RPC call. debug_getBadBlocks takes no
+// parameters, so it never changes.
+const badBlocksRequest = `{"jsonrpc":"2.0","id":1,"method":"debug_getBadBlocks","params":[]}`
+
+// ForEachBadBlock streams debug_getBadBlocks and hands the blocks that pass
+// want to handle, one at a time, while the response is still arriving. Memory
+// is bounded by one bad block rather than by the node's whole list.
+//
+// A stream that legitimately runs for minutes cannot live under a whole-request
+// deadline, so instead the call is abandoned once no bytes have arrived for
+// stall, headers included.
+func (n *Node) ForEachBadBlock(ctx context.Context, stall time.Duration, want BadBlockFilter, handle BadBlockHandler) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+
+	stalled := time.AfterFunc(stall, func() { cancel(errStalled) })
+	defer stalled.Stop()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, n.config.NodeAddress, strings.NewReader(badBlocksRequest))
+	if err != nil {
+		return fmt.Errorf("failed to build debug_getBadBlocks request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	res, err := n.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("debug_getBadBlocks request failed: %w", stallCause(ctx, stall, err))
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return fmt.Errorf("debug_getBadBlocks request failed: unexpected status %s", res.Status)
+	}
+
+	body := &progressReader{
+		reader: res.Body,
+		touch:  func() { stalled.Reset(stall) },
+	}
+
+	if err := decodeBadBlocks(ctx, body, want, handle); err != nil {
+		return stallCause(ctx, stall, err)
+	}
+
+	return nil
+}
+
+// stallCause swaps the bare context error a stalled stream surfaces as for
+// one that says what actually happened.
+func stallCause(ctx context.Context, stall time.Duration, err error) error {
+	if errors.Is(context.Cause(ctx), errStalled) {
+		return fmt.Errorf("%w: no data for %s", errStalled, stall)
+	}
+
+	return err
+}
+
+// progressReader reports every byte that arrives so the stall timer can be
+// pushed back.
+type progressReader struct {
+	reader io.Reader
+	touch  func()
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.reader.Read(b)
+	if n > 0 {
+		p.touch()
+	}
+
+	return n, err
 }

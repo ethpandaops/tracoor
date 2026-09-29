@@ -18,6 +18,12 @@ type SharedConfig struct {
 	Store *store.Config `yaml:"store"`
 	// MetricsAddr is the address to serve metrics on.
 	MetricsAddr string `yaml:"metricsAddr" default:"localhost:8080"`
+	// ShutdownTimeoutSeconds bounds how long each agent waits for its in-flight
+	// fetches and uploads once a shutdown starts. One value covers every agent.
+	ShutdownTimeoutSeconds int `yaml:"shutdownTimeoutSeconds" default:"10"`
+	// FetchTimeouts bounds one fetch attempt per artifact kind. One set of
+	// values covers every agent; an agent may still set its own.
+	FetchTimeouts agent.FetchTimeouts `yaml:"fetchTimeouts"`
 }
 
 type Config struct {
@@ -39,6 +45,22 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("at least one agent configuration is required. If you just want to run the server, use the `server` subcommand instead")
 	}
 
+	// Agent names key metrics registration, storage handshakes and index rows,
+	// so a duplicate cannot be tolerated.
+	names := make(map[string]struct{}, len(c.Agents))
+
+	for _, a := range c.Agents {
+		if a.Name == "" {
+			return fmt.Errorf("every agent requires a name")
+		}
+
+		if _, ok := names[a.Name]; ok {
+			return fmt.Errorf("duplicate agent name: %s", a.Name)
+		}
+
+		names[a.Name] = struct{}{}
+	}
+
 	return nil
 }
 
@@ -53,6 +75,35 @@ func (c *Config) ApplyShared() error {
 		agent.Store = c.Shared.Store
 		agent.LoggingLevel = c.Shared.LoggingLevel
 		agent.MetricsAddr = c.Shared.MetricsAddr
+
+		// Unlike the fields above, an agent may want its own grace period — a
+		// node behind slow storage drains at a different rate to the rest — so
+		// the shared value only fills in the agents that did not set one.
+		if agent.ShutdownTimeoutSeconds == 0 {
+			agent.ShutdownTimeoutSeconds = c.Shared.ShutdownTimeoutSeconds
+		}
+
+		// Per-field, so an agent overriding one artifact's deadline still
+		// inherits the shared values for the rest.
+		if agent.FetchTimeouts.BeaconStateSeconds == 0 {
+			agent.FetchTimeouts.BeaconStateSeconds = c.Shared.FetchTimeouts.BeaconStateSeconds
+		}
+
+		if agent.FetchTimeouts.BeaconBlockSeconds == 0 {
+			agent.FetchTimeouts.BeaconBlockSeconds = c.Shared.FetchTimeouts.BeaconBlockSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionPayloadEnvelopeSeconds == 0 {
+			agent.FetchTimeouts.ExecutionPayloadEnvelopeSeconds = c.Shared.FetchTimeouts.ExecutionPayloadEnvelopeSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionBlockTraceSeconds == 0 {
+			agent.FetchTimeouts.ExecutionBlockTraceSeconds = c.Shared.FetchTimeouts.ExecutionBlockTraceSeconds
+		}
+
+		if agent.FetchTimeouts.ExecutionBadBlockSeconds == 0 {
+			agent.FetchTimeouts.ExecutionBadBlockSeconds = c.Shared.FetchTimeouts.ExecutionBadBlockSeconds
+		}
 	}
 
 	return nil

@@ -1,7 +1,12 @@
 package compression_test
 
 import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,9 +16,29 @@ import (
 )
 
 const (
-	testFilename   = "test"
-	testFilenameGz = "test.gz"
+	testFilename = "test"
+	// testFilenameUnknown carries an extension no algorithm claims, which is what a lookup has
+	// to reject rather than guess at.
+	testFilenameUnknown = "test.br"
+	testFilenameZst     = "test.zst"
+	testFilenameGz      = "test.gz"
 )
+
+// gzipCompress produces gzip bytes the way the pre-zstd releases did, since the Compressor
+// itself no longer writes gzip.
+func gzipCompress(t *testing.T, data []byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	w := gzip.NewWriter(&buf)
+
+	_, err := w.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	return buf.Bytes()
+}
 
 func TestNewCompressor(t *testing.T) {
 	c := compression.NewCompressor()
@@ -30,10 +55,23 @@ func TestCompressor_Compress(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name:      "Compress with Gzip",
+			name:      "Compress with Zstd",
+			data:      []byte("test data"),
+			algorithm: compression.Zstd,
+			wantErr:   false,
+		},
+		{
+			// Gzip is decode-only: old objects must stay readable, but nothing writes it.
+			name:      "Compress with Gzip is retired",
 			data:      []byte("test data"),
 			algorithm: compression.Gzip,
-			wantErr:   false,
+			wantErr:   true,
+		},
+		{
+			name:      "Compress with nil algorithm",
+			data:      []byte("test data"),
+			algorithm: nil,
+			wantErr:   true,
 		},
 		{
 			name:      "Compress with unsupported algorithm",
@@ -63,7 +101,8 @@ func TestCompressor_Decompress(t *testing.T) {
 	c := compression.NewCompressor()
 
 	testData := []byte("test data")
-	compressed, err := c.Compress(&testData, compression.Gzip)
+
+	compressedZstd, err := c.Compress(&testData, compression.Zstd)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -73,15 +112,21 @@ func TestCompressor_Decompress(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "Decompress Gzip",
-			data:     compressed,
+			name:     "Decompress Zstd",
+			data:     compressedZstd,
+			filename: testFilenameZst,
+			wantErr:  false,
+		},
+		{
+			name:     "Decompress legacy Gzip",
+			data:     gzipCompress(t, testData),
 			filename: testFilenameGz,
 			wantErr:  false,
 		},
 		{
-			name:     "Decompress with nil data",
-			data:     nil,
-			filename: testFilenameGz,
+			name:     "Decompress data that is not a valid frame",
+			data:     []byte("this was never compressed"),
+			filename: testFilenameZst,
 			wantErr:  true,
 		},
 		{
@@ -115,16 +160,16 @@ func TestAddExtension(t *testing.T) {
 		want      string
 	}{
 		{
-			name:      "Add Gzip extension",
+			name:      "Add Zstd extension",
 			filename:  testFilename,
-			algorithm: compression.Gzip,
-			want:      "test.gz",
+			algorithm: compression.Zstd,
+			want:      "test.zst",
 		},
 		{
 			name:      "Extension already present",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
-			want:      "test.gz",
+			filename:  testFilenameZst,
+			algorithm: compression.Zstd,
+			want:      "test.zst",
 		},
 	}
 
@@ -146,22 +191,28 @@ func TestRemoveExtension(t *testing.T) {
 		want      string
 	}{
 		{
-			name:      "Remove Gzip extension",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
-			want:      "test",
-		},
-		{
 			name:      "No extension to remove",
 			filename:  testFilename,
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
 			want:      "test",
 		},
 		{
-			name:      "Remove Gzip extension from .json.gz",
-			filename:  "test.json.gz",
+			name:      "Remove Zstd extension",
+			filename:  testFilenameZst,
+			algorithm: compression.Zstd,
+			want:      "test",
+		},
+		{
+			name:      "Remove Zstd extension from .ssz.zst",
+			filename:  "test.ssz.zst",
+			algorithm: compression.Zstd,
+			want:      "test.ssz",
+		},
+		{
+			name:      "Remove legacy Gzip extension",
+			filename:  "test.ssz.gz",
 			algorithm: compression.Gzip,
-			want:      "test.json",
+			want:      "test.ssz",
 		},
 	}
 
@@ -183,15 +234,36 @@ func TestHasCompressionExtension(t *testing.T) {
 		want      bool
 	}{
 		{
-			name:      "Has Gzip extension",
-			filename:  testFilenameGz,
-			algorithm: compression.Gzip,
+			name:      "Has Zstd extension",
+			filename:  testFilenameZst,
+			algorithm: compression.Zstd,
 			want:      true,
 		},
 		{
-			name:      "No Gzip extension",
+			name:      "No Zstd extension",
 			filename:  testFilename,
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
+			want:      false,
+		},
+		{
+			name:      "Unknown extension is not Zstd",
+			filename:  testFilenameUnknown,
+			algorithm: compression.Zstd,
+			want:      false,
+		},
+		{
+			// A nil algorithm reaches this function whenever a lookup failed upstream. It must
+			// answer rather than panic.
+			name:      "Nil algorithm",
+			filename:  testFilenameZst,
+			algorithm: nil,
+			want:      false,
+		},
+		{
+			// None has no extension of its own, so it must not match every filename.
+			name:      "None algorithm never matches",
+			filename:  testFilenameZst,
+			algorithm: compression.None,
 			want:      false,
 		},
 	}
@@ -214,7 +286,13 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "Get Gzip algorithm",
+			name:     "Get Zstd algorithm",
+			filename: testFilenameZst,
+			want:     compression.Zstd,
+			wantErr:  false,
+		},
+		{
+			name:     "Get legacy Gzip algorithm",
 			filename: testFilenameGz,
 			want:     compression.Gzip,
 			wantErr:  false,
@@ -222,6 +300,12 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 		{
 			name:     "Unsupported algorithm",
 			filename: "test.unsupported",
+			want:     nil,
+			wantErr:  true,
+		},
+		{
+			name:     "No extension at all",
+			filename: testFilename,
 			want:     nil,
 			wantErr:  true,
 		},
@@ -233,7 +317,7 @@ func TestGetCompressionAlgorithm(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result, err := compression.GetCompressionAlgorithm(testCase.filename)
 			if testCase.wantErr {
-				assert.Error(t, err)
+				require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
@@ -252,19 +336,19 @@ func TestCompressAndDecompress(t *testing.T) {
 		algorithm *compression.CompressionAlgorithm
 	}{
 		{
-			name:      "Compress and decompress with Gzip",
+			name:      "Compress and decompress with Zstd",
 			data:      []byte("This is a test string for compression and decompression"),
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
 		},
 		{
-			name:      "Compress and decompress empty data with Gzip",
+			name:      "Compress and decompress empty data with Zstd",
 			data:      []byte{},
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
 		},
 		{
-			name:      "Compress and decompress large data with Gzip",
+			name:      "Compress and decompress large data with Zstd",
 			data:      []byte(strings.Repeat("Large data test ", 1000)),
-			algorithm: compression.Gzip,
+			algorithm: compression.Zstd,
 		},
 	}
 
@@ -287,4 +371,285 @@ func TestCompressAndDecompress(t *testing.T) {
 			assert.Equal(t, testCase.data, decompressed, "Decompressed data should match original data")
 		})
 	}
+}
+
+func TestGetCompressionAlgorithmFromContentEncoding(t *testing.T) {
+	testCases := []struct {
+		name            string
+		contentEncoding string
+		want            *compression.CompressionAlgorithm
+		wantErr         bool
+	}{
+		{
+			// Nothing writes gzip anymore, but objects stored before zstd carry it.
+			name:            "Gzip encoding",
+			contentEncoding: "gzip",
+			want:            compression.Gzip,
+		},
+		{
+			name:            "Zstd encoding",
+			contentEncoding: "zstd",
+			want:            compression.Zstd,
+		},
+		{
+			name:            "Identity encoding",
+			contentEncoding: "identity",
+			want:            compression.None,
+		},
+		{
+			name:            "Empty encoding",
+			contentEncoding: "",
+			wantErr:         true,
+		},
+		{
+			name:            "Unknown encoding",
+			contentEncoding: "brotli",
+			wantErr:         true,
+		},
+	}
+
+	for _, tc := range testCases {
+		testCase := tc
+
+		t.Run(testCase.name, func(t *testing.T) {
+			result, err := compression.GetCompressionAlgorithmFromContentEncoding(testCase.contentEncoding)
+			if testCase.wantErr {
+				require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
+				assert.Nil(t, result)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, testCase.want, result)
+		})
+	}
+}
+
+func TestHasAnyCompressionExtension(t *testing.T) {
+	testCases := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{name: "Zstd", filename: testFilenameZst, want: true},
+		{name: "Suffixed Zstd", filename: "test.ssz.zst", want: true},
+		{name: "Gzip", filename: testFilenameGz, want: true},
+		{name: "No extension", filename: testFilename, want: false},
+		{name: "Uncompressed extension", filename: "test.ssz", want: false},
+		{name: "Empty filename", filename: "", want: false},
+	}
+
+	for _, tc := range testCases {
+		testCase := tc
+
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.want, compression.HasAnyCompressionExtension(testCase.filename))
+		})
+	}
+}
+
+func TestCompressor_Streams(t *testing.T) {
+	c := compression.NewCompressor()
+
+	payloads := map[string][]byte{
+		"empty":  {},
+		"small":  []byte("This is a test string for compression and decompression"),
+		"large":  []byte(strings.Repeat("Large data test ", 100000)),
+		"binary": bytes.Repeat([]byte{0x00, 0xff, 0x7f, 0x01}, 4096),
+	}
+
+	algorithms := []*compression.CompressionAlgorithm{
+		compression.Zstd,
+		compression.None,
+	}
+
+	for _, algorithm := range algorithms {
+		for name, payload := range payloads {
+			algo, data := algorithm, payload
+
+			t.Run(algo.Name+"/"+name, func(t *testing.T) {
+				var buf bytes.Buffer
+
+				w, err := c.NewWriter(algo, &buf)
+				require.NoError(t, err)
+
+				n, err := w.Write(data)
+				require.NoError(t, err)
+				require.Equal(t, len(data), n)
+				require.NoError(t, w.Close())
+
+				r, err := c.NewReader(algo, bytes.NewReader(buf.Bytes()))
+				require.NoError(t, err)
+
+				defer r.Close()
+
+				got, err := io.ReadAll(r)
+				require.NoError(t, err)
+				assert.True(t, bytes.Equal(data, got), "round-tripped stream should match the original")
+			})
+		}
+	}
+}
+
+func TestCompressor_StreamsInteroperateWithByteAPI(t *testing.T) {
+	c := compression.NewCompressor()
+
+	data := []byte(strings.Repeat("interop ", 5000))
+
+	for _, algorithm := range []*compression.CompressionAlgorithm{compression.Zstd} {
+		algo := algorithm
+
+		t.Run(algo.Name, func(t *testing.T) {
+			// Stream in, byte-slice out.
+			var buf bytes.Buffer
+
+			w, err := c.NewWriter(algo, &buf)
+			require.NoError(t, err)
+
+			_, err = w.Write(data)
+			require.NoError(t, err)
+			require.NoError(t, w.Close())
+
+			streamed := buf.Bytes()
+
+			decompressed, err := c.Decompress(&streamed, testFilename+algo.Extension)
+			require.NoError(t, err)
+			assert.Equal(t, data, decompressed)
+
+			// Byte-slice in, stream out.
+			compressed, err := c.Compress(&data, algo)
+			require.NoError(t, err)
+
+			r, err := c.NewReader(algo, bytes.NewReader(compressed))
+			require.NoError(t, err)
+
+			defer r.Close()
+
+			got, err := io.ReadAll(r)
+			require.NoError(t, err)
+			assert.Equal(t, data, got)
+		})
+	}
+}
+
+func TestCompressor_NewWriterAndReaderErrors(t *testing.T) {
+	c := compression.NewCompressor()
+
+	unsupported := &compression.CompressionAlgorithm{Name: "brotli", Extension: ".br", ContentEncoding: "br"}
+
+	_, err := c.NewWriter(unsupported, &bytes.Buffer{})
+	require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
+
+	_, err = c.NewWriter(nil, &bytes.Buffer{})
+	require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
+
+	_, err = c.NewWriter(compression.Zstd, nil)
+	require.Error(t, err)
+
+	_, err = c.NewReader(unsupported, bytes.NewReader(nil))
+	require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
+
+	_, err = c.NewReader(nil, bytes.NewReader(nil))
+	require.ErrorIs(t, err, compression.ErrUnsupportedAlgorithm)
+
+	_, err = c.NewReader(compression.Zstd, nil)
+	require.Error(t, err)
+}
+
+// TestCompressor_Concurrent exercises the shared zstd encoder and decoder from many goroutines at
+// once. Run with -race.
+func TestCompressor_Concurrent(t *testing.T) {
+	c := compression.NewCompressor()
+
+	const goroutines = 32
+
+	algorithms := []*compression.CompressionAlgorithm{compression.Zstd}
+
+	var wg sync.WaitGroup
+
+	for i := range goroutines {
+		wg.Add(1)
+
+		go func(id int) {
+			defer wg.Done()
+
+			algo := algorithms[id%len(algorithms)]
+			data := []byte(strings.Repeat(fmt.Sprintf("goroutine-%d ", id), 2000))
+
+			for range 10 {
+				// Byte-slice API, which shares one encoder and one decoder.
+				compressed, err := c.Compress(&data, algo)
+				if err != nil {
+					t.Errorf("compress: %v", err)
+
+					return
+				}
+
+				decompressed, err := c.Decompress(&compressed, testFilename+algo.Extension)
+				if err != nil {
+					t.Errorf("decompress: %v", err)
+
+					return
+				}
+
+				if !bytes.Equal(data, decompressed) {
+					t.Errorf("byte-slice round trip mismatch for %s", algo.Name)
+
+					return
+				}
+
+				// Stream API, which builds per-stream state.
+				var buf bytes.Buffer
+
+				w, err := c.NewWriter(algo, &buf)
+				if err != nil {
+					t.Errorf("new writer: %v", err)
+
+					return
+				}
+
+				if _, err = w.Write(data); err != nil {
+					t.Errorf("stream write: %v", err)
+
+					return
+				}
+
+				if err = w.Close(); err != nil {
+					t.Errorf("stream close: %v", err)
+
+					return
+				}
+
+				r, err := c.NewReader(algo, bytes.NewReader(buf.Bytes()))
+				if err != nil {
+					t.Errorf("new reader: %v", err)
+
+					return
+				}
+
+				got, err := io.ReadAll(r)
+
+				if cerr := r.Close(); cerr != nil {
+					t.Errorf("stream reader close: %v", cerr)
+
+					return
+				}
+
+				if err != nil {
+					t.Errorf("stream read: %v", err)
+
+					return
+				}
+
+				if !bytes.Equal(data, got) {
+					t.Errorf("stream round trip mismatch for %s", algo.Name)
+
+					return
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
 }

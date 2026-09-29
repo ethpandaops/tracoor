@@ -3,13 +3,18 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/ethpandaops/tracoor/pkg/yaml"
 	"github.com/sirupsen/logrus"
 )
 
 type SaveParams struct {
-	Data            *[]byte
+	// Data is streamed to the backend rather than buffered, so the caller may
+	// hand over a pipe whose length is not known up front. A reader that fails
+	// part way through must leave nothing published: every implementation
+	// either aborts the transfer or discards the partial object.
+	Data            io.Reader
 	Location        string
 	ContentEncoding string
 }
@@ -35,6 +40,15 @@ type Store interface {
 	// Copy copies a file from one location to another
 	Copy(ctx context.Context, params *CopyParams) error
 
+	// DeleteMany removes objects in bulk regardless of their data type. A location that is
+	// already absent counts as removed. When some locations cannot be removed the returned
+	// error is a *DeleteManyError naming exactly those, so the caller can retry or
+	// quarantine them without re-deleting the rest.
+	DeleteMany(ctx context.Context, locations []string) error
+
+	// SaveRaw saves arbitrary bytes to the store at the given location
+	SaveRaw(ctx context.Context, params *SaveParams) (string, error)
+
 	// StorageHandshakeTokenExists checks if a storage handshake token exists in the store
 	StorageHandshakeTokenExists(ctx context.Context, node string) (bool, error)
 	// SaveStorageHandshakeToken saves a storage handshake token to the store
@@ -59,6 +73,14 @@ type Store interface {
 	GetBeaconBlockURL(ctx context.Context, params *GetURLParams) (string, error)
 	// DeleteBeaconBlock deletes a beacon block from the store
 	DeleteBeaconBlock(ctx context.Context, location string) error
+	// SaveExecutionPayloadEnvelope saves an execution payload envelope to the store
+	SaveExecutionPayloadEnvelope(ctx context.Context, params *SaveParams) (string, error)
+	// GetExecutionPayloadEnvelope fetches an execution payload envelope from the store
+	GetExecutionPayloadEnvelope(ctx context.Context, location string) (*[]byte, error)
+	// GetExecutionPayloadEnvelopeURL returns a URL for the execution payload envelope
+	GetExecutionPayloadEnvelopeURL(ctx context.Context, params *GetURLParams) (string, error)
+	// DeleteExecutionPayloadEnvelope deletes an execution payload envelope from the store
+	DeleteExecutionPayloadEnvelope(ctx context.Context, location string) error
 
 	// SaveBeaconBadBlock saves a beacon bad block to the store
 	SaveBeaconBadBlock(ctx context.Context, params *SaveParams) (string, error)

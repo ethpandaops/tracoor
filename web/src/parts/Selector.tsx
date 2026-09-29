@@ -15,6 +15,7 @@ import {
   useUniqueBeaconBadBlobValues,
   useUniqueExecutionBlockTraceValues,
   useUniqueExecutionBadBlockValues,
+  useUniqueExecutionPayloadEnvelopeValues,
 } from '@hooks/useQuery';
 
 const categories: { name: string; tabs: Selection[] }[] = [
@@ -23,6 +24,7 @@ const categories: { name: string; tabs: Selection[] }[] = [
     tabs: [
       Selection.beacon_state,
       Selection.beacon_block,
+      Selection.execution_payload_envelope,
       Selection.beacon_bad_block,
       Selection.beacon_bad_blob,
     ],
@@ -45,6 +47,7 @@ const categories: { name: string; tabs: Selection[] }[] = [
 const tabs: { id: Selection; name: string }[] = [
   { id: Selection.beacon_state, name: 'Beacon states' },
   { id: Selection.beacon_block, name: 'Beacon blocks' },
+  { id: Selection.execution_payload_envelope, name: 'Execution payload envelopes' },
   { id: Selection.beacon_bad_block, name: 'Beacon bad blocks' },
   { id: Selection.beacon_bad_blob, name: 'Beacon bad blobs' },
   { id: Selection.execution_block_trace, name: 'Execution block traces' },
@@ -65,6 +68,8 @@ export default function Selector() {
     if (index !== -1 && index !== selectedIndex) setSelectedIndex(index);
   }, [currentSelection]);
 
+  // The network dropdown is the one unique-values caller that stays unscoped: it has to see
+  // every network in order to offer them.
   const locationCategory = useMemo(() => {
     return categories.find((category) => category.tabs.includes(currentSelection));
   }, [currentSelection]);
@@ -75,6 +80,7 @@ export default function Selector() {
     error: beaconStateError,
   } = useUniqueBeaconStateValues(
     ['network'],
+    undefined,
     [
       Selection.beacon_state,
       Selection.ncli_state_transition,
@@ -87,19 +93,41 @@ export default function Selector() {
     data: beaconBlockData,
     isLoading: beaconBlockIsLoading,
     error: beaconBlockError,
-  } = useUniqueBeaconBlockValues(['network'], currentSelection === Selection.beacon_block);
+  } = useUniqueBeaconBlockValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_block,
+  );
+
+  const {
+    data: executionPayloadEnvelopeData,
+    isLoading: executionPayloadEnvelopeIsLoading,
+    error: executionPayloadEnvelopeError,
+  } = useUniqueExecutionPayloadEnvelopeValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.execution_payload_envelope,
+  );
 
   const {
     data: beaconBadBlockData,
     isLoading: beaconBadBlockIsLoading,
     error: beaconBadBlockError,
-  } = useUniqueBeaconBadBlockValues(['network'], currentSelection === Selection.beacon_bad_block);
+  } = useUniqueBeaconBadBlockValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_bad_block,
+  );
 
   const {
     data: beaconBadBlobData,
     isLoading: beaconBadBlobIsLoading,
     error: beaconBadBlobError,
-  } = useUniqueBeaconBadBlobValues(['network'], currentSelection === Selection.beacon_bad_blob);
+  } = useUniqueBeaconBadBlobValues(
+    ['network'],
+    undefined,
+    currentSelection === Selection.beacon_bad_blob,
+  );
 
   const {
     data: executionBlockTraceData,
@@ -107,6 +135,7 @@ export default function Selector() {
     error: executionBlockTraceError,
   } = useUniqueExecutionBlockTraceValues(
     ['network'],
+    undefined,
     [Selection.execution_block_trace, Selection.go_evm_lab_diff].includes(currentSelection),
   );
 
@@ -116,6 +145,7 @@ export default function Selector() {
     error: executionBadBlockError,
   } = useUniqueExecutionBadBlockValues(
     ['network'],
+    undefined,
     currentSelection === Selection.execution_bad_block,
   );
 
@@ -132,6 +162,10 @@ export default function Selector() {
         break;
       case Selection.beacon_block:
         if (currentSelection !== Selection.beacon_block) setSelection(Selection.beacon_block);
+        break;
+      case Selection.execution_payload_envelope:
+        if (currentSelection !== Selection.execution_payload_envelope)
+          setSelection(Selection.execution_payload_envelope);
         break;
       case Selection.beacon_bad_block:
         if (currentSelection !== Selection.beacon_bad_block)
@@ -185,6 +219,11 @@ export default function Selector() {
       data = beaconBlockData?.network;
       error = beaconBlockError;
       isLoading = beaconBlockIsLoading;
+      break;
+    case Selection.execution_payload_envelope:
+      data = executionPayloadEnvelopeData?.network;
+      error = executionPayloadEnvelopeError;
+      isLoading = executionPayloadEnvelopeIsLoading;
       break;
     case Selection.beacon_bad_block:
       data = beaconBadBlockData?.network;

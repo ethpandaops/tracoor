@@ -44,10 +44,19 @@ export function getLCLIConfig(config: Config): {
   };
 }
 
+// The fork zcli is told to parse a BeaconState as, when the server config does not name
+// one. A stale guess produces a command that simply fails to parse the state, so this
+// tracks the newest fork tracoor decodes rather than sitting on whatever was current when
+// the fallback was written. Deployments on an older fork should set
+// server.ethereum.tools.zcli.fork explicitly.
+const DEFAULT_ZCLI_FORK = 'gloas';
+
 export function getZCLIConfig(config: Config): {
   fork: string;
 } {
   return {
-    fork: config?.ethereum?.tools?.zcli?.fork ? config?.ethereum?.tools?.zcli?.fork : 'deneb',
+    fork: config?.ethereum?.tools?.zcli?.fork
+      ? config?.ethereum?.tools?.zcli?.fork
+      : DEFAULT_ZCLI_FORK,
   };
 }
