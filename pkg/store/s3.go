@@ -43,7 +43,7 @@ type S3Store struct {
 
 	// uploader streams bodies of unknown length. PutObject cannot: it needs a
 	// known content length, which a pipe does not have.
-	uploader *manager.Uploader
+	uploader *manager.Uploader //nolint:staticcheck // transfermanager is not a drop-in for streamed multipart uploads
 
 	config *S3StoreConfig
 
@@ -67,8 +67,9 @@ type S3StoreConfig struct {
 
 // NewS3Store creates a new S3Store instance with the specified AWS configuration, bucket name, and key prefix.
 func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig, opts *Options) (*S3Store, error) {
-	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
-		return aws.Endpoint{
+	// BaseEndpoint would re-route requests and orphan existing keys; the immutable-host resolver keeps them addressable.
+	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) { //nolint:staticcheck // see above
+		return aws.Endpoint{ //nolint:staticcheck // see above
 			PartitionID:       "aws",
 			SigningRegion:     config.Region,
 			URL:               config.Endpoint,
@@ -76,10 +77,14 @@ func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig,
 		}, nil
 	})
 
+	// Checksums only where the S3 API mandates them: streamed uploads cannot be hashed up front,
+	// and S3-compatible stores differ in which flexible-checksum headers they accept.
 	cfg := aws.Config{
 		Region:                      config.Region,
 		EndpointResolverWithOptions: resolver,
 		Credentials:                 credentials.NewStaticCredentialsProvider(config.AccessKey, config.AccessSecret, ""),
+		RequestChecksumCalculation:  aws.RequestChecksumCalculationWhenRequired,
+		ResponseChecksumValidation:  aws.ResponseChecksumValidationWhenRequired,
 	}
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -88,7 +93,7 @@ func NewS3Store(namespace string, log logrus.FieldLogger, config *S3StoreConfig,
 
 	metrics := GetBasicMetricsInstance(namespace, string(S3StoreType), opts.MetricsEnabled)
 
-	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
+	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) { //nolint:staticcheck // see S3Store.uploader
 		u.PartSize = uploadPartSize
 		u.Concurrency = uploadConcurrency
 		// A streamed body cannot be hashed before it is sent, so the payload
@@ -145,7 +150,7 @@ func (s *S3Store) putStream(ctx context.Context, params *SaveParams, dataType Da
 		input.ContentEncoding = aws.String(params.ContentEncoding)
 	}
 
-	if _, err := s.uploader.Upload(ctx, input); err != nil {
+	if _, err := s.uploader.Upload(ctx, input); err != nil { //nolint:staticcheck // see S3Store.uploader
 		var apiErr smithy.APIError
 
 		if errors.As(err, &apiErr) {
@@ -794,7 +799,7 @@ func (s *S3Store) Copy(ctx context.Context, params *CopyParams) error {
 			ContentEncoding:    getResult.ContentEncoding,
 			ContentLanguage:    getResult.ContentLanguage,
 			CacheControl:       getResult.CacheControl,
-			Expires:            getResult.Expires,
+			Expires:            getResult.Expires, //nolint:staticcheck // PutObject takes a parsed time, not ExpiresString
 		}
 
 		// Put the object
