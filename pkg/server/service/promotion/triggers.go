@@ -82,8 +82,7 @@ func (p *Promoter) decodedTriggers(block *spec.VersionedSignedBeaconBlock) []str
 // builder requests count too: they are the same kind of rare, state-moving
 // event the trigger exists to catch.
 func hasExecutionRequests(block *spec.VersionedSignedBeaconBlock) bool {
-	if body := gloasBody(block); body != nil {
-		r := body.ParentExecutionRequests
+	if r, ok := parentExecutionRequests(block); ok {
 		if r == nil {
 			return false
 		}
@@ -104,23 +103,23 @@ func hasExecutionRequests(block *spec.VersionedSignedBeaconBlock) bool {
 	return len(deposits)+len(withdrawals)+len(consolidations) > 0
 }
 
-// gloasBody returns the block body for the gloas-shaped forks, or nil when the
-// block is an earlier fork. Heze reuses the gloas containers.
-func gloasBody(block *spec.VersionedSignedBeaconBlock) *gloas.BeaconBlockBody {
-	var b *gloas.SignedBeaconBlock
-
+// parentExecutionRequests returns the parent payload's execution requests
+// for the gloas-shaped forks. ok is false when the block is an earlier fork.
+func parentExecutionRequests(block *spec.VersionedSignedBeaconBlock) (requests *gloas.ExecutionRequests, ok bool) {
 	switch block.Version {
 	case spec.DataVersionGloas:
-		b = block.Gloas
+		if b := block.Gloas; b != nil && b.Message != nil && b.Message.Body != nil {
+			return b.Message.Body.ParentExecutionRequests, true
+		}
+
+		return nil, true
 	case spec.DataVersionHeze:
-		b = block.Heze
+		if b := block.Heze; b != nil && b.Message != nil && b.Message.Body != nil {
+			return b.Message.Body.ParentExecutionRequests, true
+		}
+
+		return nil, true
 	default:
-		return nil
+		return nil, false
 	}
-
-	if b == nil || b.Message == nil {
-		return nil
-	}
-
-	return b.Message.Body
 }
