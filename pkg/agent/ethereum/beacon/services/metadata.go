@@ -241,7 +241,7 @@ func (m *MetadataService) fetchSpec(ctx context.Context) error {
 
 	spec, err := m.beacon.FetchSpec(ctx)
 	if err != nil {
-		m.log.WithError(err).Warn("Failed to refresh spec from beacon node, keeping the cached copy")
+		m.log.WithError(err).Debug("Failed to refresh spec from beacon node, falling back to the cached copy")
 
 		spec, err = m.beacon.Spec()
 	}
