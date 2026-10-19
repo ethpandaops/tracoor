@@ -11,6 +11,7 @@ package beacon
 type VersionImmuneBlock struct {
 	Data struct {
 		Message struct {
+			Slot string `json:"slot"`
 			Body struct {
 				ExecutionPayload struct {
 					BlockNumber string `json:"block_number"`
