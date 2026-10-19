@@ -76,12 +76,12 @@ func (s *agent) allowArtifact(kind Queue) bool {
 // runQueueItem runs one queued item under its attempt budget and the node's
 // circuit breaker. Failures never escape: an item that runs out of attempts is
 // dropped and counted, because a missed artifact is routine rather than an
-// error condition.
-func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.FieldLogger, fn func(context.Context) error) {
+// error condition. A non-zero return is the delay before runWorker retries an item set aside.
+func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.FieldLogger, retry retryPolicy, fn func(context.Context) error) time.Duration {
 	if !s.allowArtifact(kind) {
 		logCtx.Debug("Skipping item, node is not currently serving this artifact")
 
-		return
+		return 0
 	}
 
 	var (
@@ -96,11 +96,11 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 		if err == nil {
 			s.breaker.RecordSuccess(kind)
 
-			return
+			return 0
 		}
 
 		if ctx.Err() != nil {
-			return
+			return 0
 		}
 
 		if goerrors.Is(err, errItemStale) {
@@ -112,7 +112,16 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 		if goerrors.Is(err, errItemNotAvailable) {
 			reason = dropReasonNotAvailable
 
-			continue
+			if retry.revealBy.IsZero() {
+				continue
+			}
+
+			// An immediate retry lands in the same moment that missed the reveal, so spread them across its window.
+			if delay, ok := retry.untilRevealed(s.revealBackoff, time.Now()); ok {
+				return s.retryItem(kind, logCtx, reason, err, delay)
+			}
+
+			break
 		}
 
 		if goerrors.Is(err, errPayloadDivergent) {
@@ -121,20 +130,16 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 			break
 		}
 
-		if goerrors.Is(err, errStoreUnavailable) {
-			// The store could not take the payload. Retrying would re-read the
-			// whole artifact from a node that has done nothing wrong, and a
-			// store that is down is down for every node at once.
+		if goerrors.Is(err, errStoreUnavailable) || goerrors.Is(err, errIndexerUnavailable) {
+			// Shared by every node, so the node is not read again now; the item waits the outage out.
 			reason = dropReasonStoreUnavailable
+			if goerrors.Is(err, errIndexerUnavailable) {
+				reason = dropReasonIndexerUnavailable
+			}
 
-			break
-		}
-
-		if goerrors.Is(err, errIndexerUnavailable) {
-			// The indexer could not answer for or record the payload. Like a
-			// store outage it is shared by every node, so retrying the read and
-			// blaming the node are both wrong.
-			reason = dropReasonIndexerUnavailable
+			if delay, ok := s.outageBackoff.after(retry.retries); ok {
+				return s.retryItem(kind, logCtx, reason, err, delay)
+			}
 
 			break
 		}
@@ -176,4 +181,6 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 		WithError(err).
 		WithField("reason", reason).
 		Debug("Dropping queue item")
+
+	return 0
 }

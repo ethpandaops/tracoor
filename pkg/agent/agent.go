@@ -13,6 +13,7 @@ import (
 	//nolint:gosec // only exposed if pprofAddr config is set
 	_ "net/http/pprof"
 
+	bn "github.com/ethpandaops/beacon/pkg/beacon"
 	eth2v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
@@ -82,9 +83,17 @@ type agent struct {
 
 	breaker *circuitBreaker
 
+	// revealBackoff and outageBackoff pace retries of unrevealed artifacts and of store or indexer outages.
+	revealBackoff backoff
+	outageBackoff backoff
+
 	// pending collapses duplicate work: a reorg re-derives the same slots for
 	// every artifact kind, and the queues block on send.
 	pending *pendingItems
+
+	// payloadEventsMu guards payloadEventsSubscribed, set once the execution_payload stream is open.
+	payloadEventsMu         sync.Mutex
+	payloadEventsSubscribed bool
 
 	// noGloasForkOnce keeps the "this network schedules no gloas fork" notice
 	// to one line: the check runs once per slot, and the answer never changes
@@ -153,6 +162,8 @@ func New(ctx context.Context, log logrus.FieldLogger, config *Config) (*agent, e
 		executionBadBlockQueue:        make(chan *ExecutionBadBlockRequest, 1000),
 		compressor:                    compression.NewCompressor(),
 		breaker:                       newCircuitBreaker(),
+		revealBackoff:                 defaultRevealBackoff,
+		outageBackoff:                 defaultOutageBackoff,
 		pending:                       newPendingItems(),
 	}, nil
 }
@@ -236,6 +247,17 @@ func (s *agent) Start(ctx context.Context) error {
 		s.workers.Go(func() { s.processBeaconBadBlockQueue(ctx) })
 		s.workers.Go(func() { s.processBeaconBadBlobQueue(ctx) })
 
+		// Rechecked on every spec refresh: a network can schedule its envelope fork while the agent runs.
+		if spec, err := s.node.Beacon().Node().Spec(); err == nil {
+			s.watchExecutionPayloads(ctx, spec)
+		}
+
+		s.node.Beacon().Node().OnSpecUpdated(ctx, func(_ context.Context, event *bn.SpecUpdatedEvent) error {
+			s.watchExecutionPayloads(ctx, event.Spec)
+
+			return nil
+		})
+
 		s.node.Beacon().Node().OnBlock(ctx, func(ctx context.Context, event *eth2v1.BlockEvent) error {
 			logCtx := s.log.WithFields(logrus.Fields{
 				"event_topic": "block",
@@ -258,13 +280,8 @@ func (s *agent) Start(ctx context.Context) error {
 			// callback: the beacon library dispatches events synchronously, so
 			// sleeping here would hold up every later event from this node.
 			s.workers.Go(func() {
-				timer := time.NewTimer(blockSettleDelay)
-				defer timer.Stop()
-
-				select {
-				case <-ctx.Done():
+				if !waitFor(ctx, blockSettleDelay) {
 					return
-				case <-timer.C:
 				}
 
 				s.enqueueBeaconState(ctx, event.Slot)

@@ -18,6 +18,7 @@ func newQueueTestAgent(name string, size int) *agent {
 	s.pending = newPendingItems()
 	s.beaconStateQueue = make(chan *BeaconStateRequest, size)
 	s.beaconBlockQueue = make(chan *BeaconBlockRequest, size)
+	s.executionPayloadEnvelopeQueue = make(chan *ExecutionPayloadEnvelopeRequest, size)
 	s.executionBlockTraceQueue = make(chan *ExecutionBlockTraceRequest, size)
 	s.executionBadBlockQueue = make(chan *ExecutionBadBlockRequest, size)
 
@@ -128,12 +129,14 @@ func TestRunWorkerReenqueuesAnItemARedoWasRequestedFor(t *testing.T) {
 
 	handled := 0
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(*BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(*BeaconStateRequest) time.Duration {
 		handled++
 
 		if handled == 2 {
 			cancel()
 		}
+
+		return 0
 	})
 
 	require.Equal(t, 2, handled, "the collision re-runs the item exactly once")

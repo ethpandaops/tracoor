@@ -17,21 +17,30 @@ import (
 type queueItem struct {
 	key        string
 	enqueuedAt time.Time
+	// retries counts how many times the item has been set aside to retry later.
+	retries int
 }
 
 func newQueueItem(key string) queueItem {
 	return queueItem{key: key, enqueuedAt: time.Now()}
 }
 
-func (i queueItem) claimKey() string { return i.key }
+func (i *queueItem) claimKey() string { return i.key }
 
-func (i queueItem) acceptedAt() time.Time { return i.enqueuedAt }
+func (i *queueItem) acceptedAt() time.Time { return i.enqueuedAt }
+
+// markRetry readies the item to go back on its queue after being set aside.
+func (i *queueItem) markRetry() {
+	i.retries++
+	i.enqueuedAt = time.Now()
+}
 
 // queued is the shape every queue worker relies on, satisfied by embedding
 // queueItem.
 type queued interface {
 	claimKey() string
 	acceptedAt() time.Time
+	markRetry()
 }
 
 type BeaconStateRequest struct {
@@ -243,11 +252,21 @@ func slotIdentifier(slot phase0.Slot) string {
 // was held; requeue then puts it back through the normal claim path, once. It
 // runs off the worker because the queue can be full, and the worker blocking on
 // a send into the queue it alone drains would deadlock it.
-func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue <-chan T, requeue func(item T), handle func(item T)) {
+//
+// A non-zero handle result retries the item after that delay, with its claim released meanwhile.
+func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue chan T, requeue func(item T), handle func(item T) time.Duration) {
 	drainQueue(ctx, queue, func(item T) {
+		var retryIn time.Duration
+
 		defer func() {
-			if s.releaseQueueItem(item.claimKey()) && requeue != nil {
+			redo := s.releaseQueueItem(item.claimKey())
+
+			switch {
+			case redo && requeue != nil:
+				// A fresh run re-resolves everything a retry would have.
 				s.workers.Go(func() { requeue(item) })
+			case retryIn > 0:
+				retryLater(ctx, s, kind, queue, item, retryIn)
 			}
 		}()
 
@@ -260,7 +279,7 @@ func runWorker[T queued](ctx context.Context, s *agent, kind Queue, queue <-chan
 			s.metrics.ObserveQueueItemProcessingTime(kind, time.Since(start), s.Config.Name)
 		}()
 
-		handle(item)
+		retryIn = handle(item)
 	})
 }
 
@@ -273,12 +292,12 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 		s.enqueueBeaconState(ctx, stateRequest.Slot)
 	}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(stateRequest *BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, requeue, func(stateRequest *BeaconStateRequest) time.Duration {
 		_, nowEpoch, err := s.node.Beacon().Metadata().Wallclock().Now()
 		if err != nil {
 			s.log.WithError(err).Error("Failed to get current time")
 
-			return
+			return 0
 		}
 
 		targetEpoch := s.node.Beacon().Metadata().Wallclock().Epochs().FromSlot(uint64(stateRequest.Slot))
@@ -291,10 +310,12 @@ func (s *agent) processBeaconStateQueue(ctx context.Context) {
 			s.metrics.IncrementItemSkipped(BeaconStateQueue, s.Config.Name)
 			s.metrics.IncrementItemDropped(BeaconStateQueue, s.Config.Name, dropReasonStale)
 
-			return
+			return 0
 		}
 
-		s.runQueueItem(ctx, BeaconStateQueue, logCtx, func(ctx context.Context) error {
+		retry := retryPolicy{retries: stateRequest.retries}
+
+		return s.runQueueItem(ctx, BeaconStateQueue, logCtx, retry, func(ctx context.Context) error {
 			return s.fetchAndIndexBeaconState(ctx, stateRequest.Slot)
 		})
 	})
@@ -309,10 +330,11 @@ func (s *agent) processBeaconBlockQueue(ctx context.Context) {
 		s.enqueueBeaconBlock(ctx, blockRequest.Slot)
 	}
 
-	runWorker(ctx, s, BeaconBlockQueue, s.beaconBlockQueue, requeue, func(blockRequest *BeaconBlockRequest) {
+	runWorker(ctx, s, BeaconBlockQueue, s.beaconBlockQueue, requeue, func(blockRequest *BeaconBlockRequest) time.Duration {
 		logCtx := s.log.WithField("slot", blockRequest.Slot)
+		retry := retryPolicy{retries: blockRequest.retries}
 
-		s.runQueueItem(ctx, BeaconBlockQueue, logCtx, func(ctx context.Context) error {
+		return s.runQueueItem(ctx, BeaconBlockQueue, logCtx, retry, func(ctx context.Context) error {
 			return s.fetchAndIndexBeaconBlock(ctx, blockRequest.Slot)
 		})
 	})
@@ -327,10 +349,14 @@ func (s *agent) processExecutionPayloadEnvelopeQueue(ctx context.Context) {
 		s.enqueueExecutionPayloadEnvelope(ctx, envelopeRequest.Slot)
 	}
 
-	runWorker(ctx, s, ExecutionPayloadEnvelopeQueue, s.executionPayloadEnvelopeQueue, requeue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) {
+	runWorker(ctx, s, ExecutionPayloadEnvelopeQueue, s.executionPayloadEnvelopeQueue, requeue, func(envelopeRequest *ExecutionPayloadEnvelopeRequest) time.Duration {
 		logCtx := s.log.WithField("slot", envelopeRequest.Slot)
+		retry := retryPolicy{
+			retries:  envelopeRequest.retries,
+			revealBy: revealDeadline(s.node.Beacon().Metadata().Wallclock(), envelopeRequest.Slot),
+		}
 
-		s.runQueueItem(ctx, ExecutionPayloadEnvelopeQueue, logCtx, func(ctx context.Context) error {
+		return s.runQueueItem(ctx, ExecutionPayloadEnvelopeQueue, logCtx, retry, func(ctx context.Context) error {
 			return s.fetchAndIndexExecutionPayloadEnvelope(ctx, envelopeRequest.Slot)
 		})
 	})
@@ -341,12 +367,14 @@ func (s *agent) processBeaconBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconBadBlockQueue, s.beaconBadBlockQueue, nil, func(badBlockRequest *BeaconBadBlockRequest) {
+	runWorker(ctx, s, BeaconBadBlockQueue, s.beaconBadBlockQueue, nil, func(badBlockRequest *BeaconBadBlockRequest) time.Duration {
 		if err := s.fetchAndIndexBeaconBadBlocks(ctx, badBlockRequest.Path); err != nil {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index beacon bad blocks")
 		}
+
+		return 0
 	})
 }
 
@@ -355,12 +383,14 @@ func (s *agent) processBeaconBadBlobQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, BeaconBadBlobQueue, s.beaconBadBlobQueue, nil, func(badBlobRequest *BeaconBadBlobRequest) {
+	runWorker(ctx, s, BeaconBadBlobQueue, s.beaconBadBlobQueue, nil, func(badBlobRequest *BeaconBadBlobRequest) time.Duration {
 		if err := s.fetchAndIndexBeaconBadBlobs(ctx, badBlobRequest.Path); err != nil {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index beacon bad blobs")
 		}
+
+		return 0
 	})
 }
 
@@ -373,10 +403,11 @@ func (s *agent) processExecutionBlockTraceQueue(ctx context.Context) {
 		s.enqueueExecutionBlockTrace(ctx, traceRequest.BlockID)
 	}
 
-	runWorker(ctx, s, ExecutionBlockTraceQueue, s.executionBlockTraceQueue, requeue, func(traceRequest *ExecutionBlockTraceRequest) {
+	runWorker(ctx, s, ExecutionBlockTraceQueue, s.executionBlockTraceQueue, requeue, func(traceRequest *ExecutionBlockTraceRequest) time.Duration {
 		logCtx := s.log.WithField("block_id", traceRequest.BlockID)
+		retry := retryPolicy{retries: traceRequest.retries}
 
-		s.runQueueItem(ctx, ExecutionBlockTraceQueue, logCtx, func(ctx context.Context) error {
+		return s.runQueueItem(ctx, ExecutionBlockTraceQueue, logCtx, retry, func(ctx context.Context) error {
 			blockHash, blockNumber, err := s.resolveExecutionBlock(ctx, traceRequest.BlockID)
 			if err != nil {
 				return err
@@ -396,11 +427,13 @@ func (s *agent) processExecutionBadBlockQueue(ctx context.Context) {
 		return
 	}
 
-	runWorker(ctx, s, ExecutionBadBlockQueue, s.executionBadBlockQueue, nil, func(_ *ExecutionBadBlockRequest) {
+	runWorker(ctx, s, ExecutionBadBlockQueue, s.executionBadBlockQueue, nil, func(_ *ExecutionBadBlockRequest) time.Duration {
 		if err := s.fetchAndIndexExecutionBadBlocks(ctx); err != nil {
 			s.log.
 				WithError(err).
 				Error("Failed to fetch and index execution bad blocks")
 		}
+
+		return 0
 	})
 }

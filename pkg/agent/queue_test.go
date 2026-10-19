@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
@@ -22,10 +23,12 @@ func TestRunWorkerMeasuresAnItemTheHandlerGaveUpOn(t *testing.T) {
 
 	s.beaconStateQueue <- &BeaconStateRequest{Slot: 3, queueItem: newQueueItem(pendingKey(BeaconStateQueue, "3"))}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) time.Duration {
 		// A handler that returns without doing the work is the case the timing
 		// used to miss entirely.
 		cancel()
+
+		return 0
 	})
 
 	require.Equal(t, waits+1, testutil.CollectAndCount(s.metrics.queueWaitTime))
@@ -42,8 +45,10 @@ func TestRunWorkerReleasesTheClaimWhateverHappens(t *testing.T) {
 
 	s.beaconStateQueue <- &BeaconStateRequest{Slot: 9, queueItem: newQueueItem(key)}
 
-	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) {
+	runWorker(ctx, s, BeaconStateQueue, s.beaconStateQueue, nil, func(*BeaconStateRequest) time.Duration {
 		cancel()
+
+		return 0
 	})
 
 	require.True(t, s.pending.claim(key, false), "an item the worker gave up on must still release its claim")
