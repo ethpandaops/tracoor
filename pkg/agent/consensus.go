@@ -195,7 +195,8 @@ func (s *agent) fetchAndIndexBeaconState(ctx context.Context, slot phase0.Slot) 
 				return nil, errors.Wrap(ferr, "failed to open beacon state")
 			}
 
-			return sourceFromResponse(raw), nil
+			// A node asked for an empty slot by number may serve the state of the block before it.
+			return guardSlot(sourceFromResponse(raw), raw.ContentType, beaconStateSlotOffset, slot), nil
 		},
 		compressor: s.compressor,
 		save:       s.store.SaveBeaconState,
@@ -247,12 +248,10 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 	ctx, cancel := context.WithTimeout(ctx, s.Config.FetchTimeouts.BeaconBlock())
 	defer cancel()
 
-	blockRoot, err := s.node.Beacon().Node().FetchBlockRoot(ctx, fmt.Sprintf("%d", slot))
+	blockRootAsString, err := blockRootAtSlot(ctx, s.node.Beacon().Node(), slot)
 	if err != nil {
-		return errors.Wrap(err, "failed to fetch beacon block root")
+		return err
 	}
-
-	blockRootAsString := blockRoot.String()
 
 	network := string(s.node.Beacon().Metadata().Network.Name)
 
@@ -314,7 +313,7 @@ func (s *agent) fetchAndIndexBeaconBlock(ctx context.Context, slot phase0.Slot) 
 				return nil, errors.Wrap(ferr, "failed to open beacon block")
 			}
 
-			return sourceFromResponse(raw), nil
+			return guardSlot(sourceFromResponse(raw), raw.ContentType, signedBlockSlotOffset, slot), nil
 		},
 		compressor: s.compressor,
 		save:       s.store.SaveBeaconBlock,
@@ -384,12 +383,10 @@ func (s *agent) fetchAndIndexExecutionPayloadEnvelope(ctx context.Context, slot 
 		return nil
 	}
 
-	blockRoot, err := s.node.Beacon().Node().FetchBlockRoot(ctx, fmt.Sprintf("%d", slot))
+	blockRootAsString, err := blockRootAtSlot(ctx, s.node.Beacon().Node(), slot)
 	if err != nil {
-		return errors.Wrap(err, "failed to fetch beacon block root")
+		return err
 	}
-
-	blockRootAsString := blockRoot.String()
 
 	network := string(s.node.Beacon().Metadata().Network.Name)
 

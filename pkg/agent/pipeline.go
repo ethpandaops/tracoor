@@ -212,11 +212,11 @@ func compressInto(
 // Only the node's own failures are marked as incomplete transfers. A read that
 // ended because this side ran out of time or was shut down says nothing about
 // what the node was serving, and counting it as truncation would blame a node
-// for a deadline it never saw.
+// for a deadline it never saw. A payload refused for naming another slot arrived intact.
 func readPayload(src *payloadSource, dst io.Writer, hasher hash.Hash) (int64, error) {
 	written, err := io.Copy(io.MultiWriter(dst, hasher), src.body)
 	if err != nil {
-		if goerrors.Is(err, context.Canceled) || goerrors.Is(err, context.DeadlineExceeded) {
+		if goerrors.Is(err, context.Canceled) || goerrors.Is(err, context.DeadlineExceeded) || goerrors.Is(err, errSlotMismatch) {
 			return written, fmt.Errorf("failed to stream payload: %w", err)
 		}
 

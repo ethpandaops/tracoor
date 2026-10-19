@@ -12,8 +12,10 @@ const (
 	dropReasonAttemptsExhausted  = "attempts_exhausted"
 	dropReasonCircuitOpen        = "circuit_open"
 	dropReasonDivergent          = "divergent"
+	dropReasonEmptySlot          = "empty_slot"
 	dropReasonIndexerUnavailable = "indexer_unavailable"
 	dropReasonNotAvailable       = "not_available"
+	dropReasonSlotMismatch       = "slot_mismatch"
 	dropReasonStale              = "stale"
 	dropReasonStoreUnavailable   = "store_unavailable"
 	dropReasonUnsupported        = "unsupported"
@@ -40,6 +42,12 @@ var (
 	// than to the node: a lookup or record RPC failed. Like a store outage it
 	// hits every node at once, so it is never held against the node.
 	errIndexerUnavailable = goerrors.New("indexer unavailable")
+
+	// errSlotEmpty marks a slot the node holds no block for, whether it said so or answered with an earlier block.
+	errSlotEmpty = goerrors.New("slot has no block")
+
+	// errSlotMismatch marks a payload asked for by slot whose own slot field names another one.
+	errSlotMismatch = goerrors.New("payload belongs to another slot")
 )
 
 // attemptBudgets bounds how many times a single queued item may be attempted.
@@ -109,6 +117,19 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 			break
 		}
 
+		// Final for this slot on this node: another read would get the same answer.
+		if goerrors.Is(err, errSlotEmpty) {
+			reason = dropReasonEmptySlot
+
+			break
+		}
+
+		if goerrors.Is(err, errSlotMismatch) {
+			reason = dropReasonSlotMismatch
+
+			break
+		}
+
 		if goerrors.Is(err, errItemNotAvailable) {
 			reason = dropReasonNotAvailable
 
@@ -159,8 +180,10 @@ func (s *agent) runQueueItem(ctx context.Context, kind Queue, logCtx logrus.Fiel
 	// perfectly well, it just answered differently, and pausing it would stop
 	// collecting the very evidence that makes the finding useful. Nor is a store
 	// or indexer outage, either of which would otherwise pause every node in the
-	// fleet at once.
+	// fleet at once. Nor is an empty slot, or a node answering one with another slot's payload.
 	if reason != dropReasonStale &&
+		reason != dropReasonEmptySlot &&
+		reason != dropReasonSlotMismatch &&
 		reason != dropReasonNotAvailable &&
 		reason != dropReasonDivergent &&
 		reason != dropReasonStoreUnavailable &&

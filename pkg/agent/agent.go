@@ -14,6 +14,7 @@ import (
 	_ "net/http/pprof"
 
 	bn "github.com/ethpandaops/beacon/pkg/beacon"
+	beaconapi "github.com/ethpandaops/beacon/pkg/beacon/api"
 	eth2v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum"
@@ -507,11 +508,19 @@ func (s *agent) resolveExecutionBlock(ctx context.Context, blockID string) (hash
 
 	block, err := s.node.Beacon().GetVersionImmuneBlock(ctx, blockID)
 	if err != nil {
+		if _, bySlot := slotID(blockID); bySlot && errors.Is(err, beaconapi.ErrNotFound) {
+			return "", 0, fmt.Errorf("%w: no block at slot %s", errSlotEmpty, blockID)
+		}
+
 		return "", 0, fmt.Errorf("failed to fetch beacon block: %w", err)
 	}
 
 	if block == nil {
 		return "", 0, errors.New("beacon node returned a nil block")
+	}
+
+	if serr := checkBlockAtSlot(blockID, block); serr != nil {
+		return "", 0, serr
 	}
 
 	payload := block.Data.Message.Body.ExecutionPayload
