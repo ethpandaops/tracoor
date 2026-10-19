@@ -19,15 +19,21 @@ func newTestAgent(name string) *agent {
 	log.SetOutput(io.Discard)
 
 	return &agent{
-		Config:  &Config{Name: name},
-		log:     log,
-		metrics: GetMetricsInstance(namespace),
-		breaker: newCircuitBreaker(),
+		Config:        &Config{Name: name},
+		log:           log,
+		metrics:       GetMetricsInstance(namespace),
+		breaker:       newCircuitBreaker(),
+		revealBackoff: defaultRevealBackoff,
+		outageBackoff: defaultOutageBackoff,
 	}
 }
 
 func droppedCount(s *agent, kind Queue, reason string) float64 {
 	return testutil.ToFloat64(s.metrics.itemsDropped.WithLabelValues(string(kind), s.Config.Name, reason))
+}
+
+func retriedCount(s *agent, kind Queue, reason string) float64 {
+	return testutil.ToFloat64(s.metrics.itemsRetried.WithLabelValues(string(kind), s.Config.Name, reason))
 }
 
 func unsupportedCount(s *agent, kind Queue) float64 {
@@ -47,7 +53,7 @@ func TestRunQueueItemStopsOnSuccess(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(context.Background(), BeaconBlockQueue, s.log, func(context.Context) error {
+	s.runQueueItem(context.Background(), BeaconBlockQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		return nil
@@ -62,7 +68,7 @@ func TestRunQueueItemRetriesUpToBudget(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(context.Background(), BeaconBlockQueue, s.log, func(context.Context) error {
+	s.runQueueItem(context.Background(), BeaconBlockQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		if calls < 3 {
@@ -81,7 +87,7 @@ func TestRunQueueItemCountsExhaustedBudget(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(context.Background(), BeaconStateQueue, s.log, func(context.Context) error {
+	s.runQueueItem(context.Background(), BeaconStateQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		return goerrors.New("transient")
@@ -98,11 +104,11 @@ func TestRunQueueItemSpendsOneBreakerFailurePerItem(t *testing.T) {
 	failing := func(context.Context) error { return goerrors.New("transient") }
 
 	for i := 1; i < breakerFailureThreshold; i++ {
-		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, failing)
+		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, retryPolicy{}, failing)
 		require.True(t, s.breaker.Allow(BeaconStateQueue))
 	}
 
-	s.runQueueItem(context.Background(), BeaconStateQueue, s.log, failing)
+	s.runQueueItem(context.Background(), BeaconStateQueue, s.log, retryPolicy{}, failing)
 
 	require.False(t, s.breaker.Allow(BeaconStateQueue))
 	require.Equal(t, float64(1), unsupportedCount(s, BeaconStateQueue))
@@ -114,7 +120,7 @@ func TestRunQueueItemStopsOnPermanentFailure(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, func(context.Context) error {
+	s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		return &api.HTTPStatusError{StatusCode: http.StatusNotImplemented}
@@ -133,7 +139,7 @@ func TestRunQueueItemSkipsWhenBreakerIsOpen(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, func(context.Context) error {
+	s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		return nil
@@ -149,7 +155,7 @@ func TestRunQueueItemDoesNotBlameNodeForAbsentArtifact(t *testing.T) {
 	calls := 0
 
 	for i := 0; i < breakerFailureThreshold+1; i++ {
-		s.runQueueItem(context.Background(), ExecutionPayloadEnvelopeQueue, s.log, func(context.Context) error {
+		s.runQueueItem(context.Background(), ExecutionPayloadEnvelopeQueue, s.log, retryPolicy{}, func(context.Context) error {
 			calls++
 
 			return fmt.Errorf("%w: never revealed", errItemNotAvailable)
@@ -168,7 +174,7 @@ func TestRunQueueItemDropsStaleItemsWithoutRetrying(t *testing.T) {
 	calls := 0
 
 	for i := 0; i < breakerFailureThreshold+1; i++ {
-		s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, func(context.Context) error {
+		s.runQueueItem(context.Background(), ExecutionBlockTraceQueue, s.log, retryPolicy{}, func(context.Context) error {
 			calls++
 
 			return fmt.Errorf("%w: execution block 1", errItemStale)
@@ -186,7 +192,7 @@ func TestRunQueueItemDropsDivergentItemsWithoutBlamingTheNode(t *testing.T) {
 	calls := 0
 
 	for i := 0; i < breakerFailureThreshold+1; i++ {
-		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, func(context.Context) error {
+		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, retryPolicy{}, func(context.Context) error {
 			calls++
 
 			return fmt.Errorf("%w: slot 1", errPayloadDivergent)
@@ -206,7 +212,7 @@ func TestRunQueueItemStopsOnCancelledContext(t *testing.T) {
 
 	calls := 0
 
-	s.runQueueItem(ctx, BeaconBlockQueue, s.log, func(context.Context) error {
+	s.runQueueItem(ctx, BeaconBlockQueue, s.log, retryPolicy{}, func(context.Context) error {
 		calls++
 
 		cancel()
@@ -232,8 +238,10 @@ func TestRunQueueItemDoesNotBlameTheNodeForAStoreOutage(t *testing.T) {
 		return fmt.Errorf("%w: bucket is unreachable", errStoreUnavailable)
 	}
 
+	spent := retryPolicy{retries: s.outageBackoff.limit}
+
 	for i := 0; i < breakerFailureThreshold+1; i++ {
-		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, failing)
+		require.Zero(t, s.runQueueItem(context.Background(), BeaconStateQueue, s.log, spent, failing))
 	}
 
 	require.Equal(t, breakerFailureThreshold+1, calls, "the node is not read again for a failure that was not its own")
@@ -257,8 +265,10 @@ func TestRunQueueItemDoesNotBlameTheNodeForAnIndexerOutage(t *testing.T) {
 		return fmt.Errorf("%w: rpc error: code = Unavailable", errIndexerUnavailable)
 	}
 
+	spent := retryPolicy{retries: s.outageBackoff.limit}
+
 	for i := 0; i < breakerFailureThreshold+1; i++ {
-		s.runQueueItem(context.Background(), BeaconStateQueue, s.log, failing)
+		require.Zero(t, s.runQueueItem(context.Background(), BeaconStateQueue, s.log, spent, failing))
 	}
 
 	require.Equal(t, breakerFailureThreshold+1, calls, "the node is not read again for a failure that was not its own")

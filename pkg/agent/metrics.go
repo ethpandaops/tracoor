@@ -16,6 +16,7 @@ type Metrics struct {
 	itemExported            *prometheus.CounterVec
 	queueItemSkipped        *prometheus.CounterVec
 	itemsDropped            *prometheus.CounterVec
+	itemsRetried            *prometheus.CounterVec
 	artifactUnsupported     *prometheus.CounterVec
 	blobCreated             *prometheus.CounterVec
 	blobReused              *prometheus.CounterVec
@@ -82,6 +83,11 @@ func GetMetricsInstance(namespace string) *Metrics {
 				Name:      "items_dropped_total",
 				Help:      "The number of items discarded without being indexed",
 			}, []string{labelQueue, labelAgent, labelReason}),
+			itemsRetried: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "items_retried_total",
+				Help:      "The number of times an item was set aside to be tried again later rather than dropped",
+			}, []string{labelQueue, labelAgent, labelReason}),
 			artifactUnsupported: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "artifact_unsupported_total",
@@ -140,6 +146,7 @@ func GetMetricsInstance(namespace string) *Metrics {
 		prometheus.MustRegister(metricsInstance.itemExported)
 		prometheus.MustRegister(metricsInstance.queueItemSkipped)
 		prometheus.MustRegister(metricsInstance.itemsDropped)
+		prometheus.MustRegister(metricsInstance.itemsRetried)
 		prometheus.MustRegister(metricsInstance.artifactUnsupported)
 		prometheus.MustRegister(metricsInstance.blobCreated)
 		prometheus.MustRegister(metricsInstance.blobReused)
@@ -177,6 +184,10 @@ func (m *Metrics) IncrementItemSkipped(queue Queue, agentName string) {
 
 func (m *Metrics) IncrementItemDropped(queue Queue, agentName, reason string) {
 	m.itemsDropped.WithLabelValues(string(queue), agentName, reason).Inc()
+}
+
+func (m *Metrics) IncrementItemRetried(queue Queue, agentName, reason string) {
+	m.itemsRetried.WithLabelValues(string(queue), agentName, reason).Inc()
 }
 
 func (m *Metrics) IncrementArtifactUnsupported(queue Queue, agentName string) {

@@ -8,6 +8,9 @@ import (
 	"time"
 
 	bn "github.com/ethpandaops/beacon/pkg/beacon"
+	eth2client "github.com/ethpandaops/go-eth2-client"
+	"github.com/ethpandaops/go-eth2-client/api"
+	eth2v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/tracoor/pkg/agent/ethereum/beacon/services"
 	"github.com/ethpandaops/tracoor/pkg/mime"
 	"github.com/go-co-op/gocron"
@@ -85,6 +88,19 @@ func (b *Node) GetVersionImmuneBlock(ctx context.Context, blockID string) (*Vers
 	}
 
 	return block, nil
+}
+
+// SubscribeExecutionPayloads streams execution_payload events until ctx ends, apart from the library's topics so it can be opened late.
+func (b *Node) SubscribeExecutionPayloads(ctx context.Context, handler func(ctx context.Context, event *eth2v1.ExecutionPayloadEvent)) error {
+	provider, ok := b.beacon.Service().(eth2client.EventsProvider)
+	if !ok {
+		return errors.New("beacon client does not support event streams")
+	}
+
+	return provider.Events(ctx, &api.EventsOpts{
+		Topics:                  []string{"execution_payload"},
+		ExecutionPayloadHandler: handler,
+	})
 }
 
 func (b *Node) Start(ctx context.Context) error {

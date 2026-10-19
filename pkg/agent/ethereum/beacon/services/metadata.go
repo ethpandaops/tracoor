@@ -235,10 +235,17 @@ func (m *MetadataService) DeriveNetwork(_ context.Context) error {
 	return nil
 }
 
-func (m *MetadataService) fetchSpec(_ context.Context) error {
+// fetchSpec re-reads the node's spec so a fork scheduled after startup is seen.
+func (m *MetadataService) fetchSpec(ctx context.Context) error {
 	m.log.Debug("Fetching spec from beacon node")
 
-	spec, err := m.beacon.Spec()
+	spec, err := m.beacon.FetchSpec(ctx)
+	if err != nil {
+		m.log.WithError(err).Warn("Failed to refresh spec from beacon node, keeping the cached copy")
+
+		spec, err = m.beacon.Spec()
+	}
+
 	if err != nil {
 		m.log.WithError(err).Error("Failed to fetch spec from beacon node")
 
