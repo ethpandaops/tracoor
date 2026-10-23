@@ -157,7 +157,7 @@ func (n *Node) ShouldIgnoreEventFromSlot(slot phase0.Slot) (bool, error) {
 
 	currentSlot := wallclock.Slots().Current()
 
-	if phase0.Slot(currentSlot.Number())-slot > n.syncToleranceSlots {
+	if current := phase0.Slot(currentSlot.Number()); current > slot && current-slot > n.syncToleranceSlots {
 		return true, nil
 	}
 
