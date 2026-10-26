@@ -12,9 +12,9 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/creasty/defaults v1.7.0
 	github.com/ethereum/go-ethereum v1.17.6
-	github.com/ethpandaops/beacon v0.71.0
-	github.com/ethpandaops/ethwallclock v0.3.0
-	github.com/ethpandaops/go-eth2-client v0.1.7
+	github.com/ethpandaops/beacon v0.73.0
+	github.com/ethpandaops/ethwallclock v0.5.0
+	github.com/ethpandaops/go-eth2-client v0.1.12
 	github.com/glebarez/sqlite v1.10.0
 	github.com/go-co-op/gocron v1.27.1
 	github.com/google/uuid v1.6.0
@@ -109,8 +109,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pk910/dynamic-ssz v1.3.3-0.20260812091520-ef568569f9c1 // indirect
-	github.com/pk910/hashtree-bindings v0.2.5 // indirect
+	github.com/pk910/dynamic-ssz v1.3.3-0.20260921152246-990798fa9718 // indirect
+	github.com/pk910/hashtree-bindings v0.2.6 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect

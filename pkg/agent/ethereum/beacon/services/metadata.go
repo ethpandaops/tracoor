@@ -187,7 +187,7 @@ func (m *MetadataService) RefreshAll(ctx context.Context) error {
 	}
 
 	if m.Genesis != nil && m.Spec != nil && m.wallclock == nil {
-		if newWallclock := ethwallclock.NewEthereumBeaconChain(m.Genesis.GenesisTime, m.Spec.SecondsPerSlot.AsDuration(), uint64(m.Spec.SlotsPerEpoch)); newWallclock != nil {
+		if newWallclock := beacon.NewWallclock(m.Genesis.GenesisTime, m.Spec); newWallclock != nil {
 			m.mu.Lock()
 
 			m.wallclock = newWallclock
