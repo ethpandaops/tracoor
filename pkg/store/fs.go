@@ -141,7 +141,15 @@ func (s *FSStore) getFile(path string) (*[]byte, error) {
 }
 
 func (s *FSStore) removeFile(path string) error {
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return ErrNotFound
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (s *FSStore) SaveRaw(ctx context.Context, params *SaveParams) (string, error) {
