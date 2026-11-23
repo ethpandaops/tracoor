@@ -54,11 +54,12 @@ func TestDistinctBeaconBlockValuesNetworkScoped(t *testing.T) {
 
 	insertDistinctBeaconBlockFixture(t, indexer)
 
-	// node and slot ride the loose index scan, node_version is a fallback DISTINCT, and
-	// network exercises the prefixed scan collapsing to the filtered network itself.
+	// node, slot, node_version and beacon_implementation ride the loose index scan, epoch is
+	// a fallback DISTINCT, and network exercises the prefixed scan collapsing to the filtered
+	// network itself.
 	results, err := indexer.DistinctBeaconBlockValues(
 		context.Background(),
-		[]string{KeyNode, KeySlot, KeyNodeVersion, KeyNetwork},
+		[]string{KeyNode, KeySlot, KeyNodeVersion, KeyBeaconImplementation, KeyEpoch, KeyNetwork},
 		"mainnet",
 	)
 	require.NoError(t, err)
@@ -66,13 +67,13 @@ func TestDistinctBeaconBlockValuesNetworkScoped(t *testing.T) {
 	require.ElementsMatch(t, []string{"node-a", "node-b"}, results.Node)
 	require.ElementsMatch(t, []uint64{1, 2, 3}, results.Slot)
 	require.ElementsMatch(t, []string{"v1", "v2"}, results.NodeVersion)
+	require.ElementsMatch(t, []string{"impl-mainnet"}, results.BeaconImplementation)
+	require.ElementsMatch(t, []uint64{0}, results.Epoch)
 	require.ElementsMatch(t, []string{"mainnet"}, results.Network)
 
 	// Unrequested fields stay empty.
-	require.Empty(t, results.Epoch)
 	require.Empty(t, results.BlockRoot)
 	require.Empty(t, results.Location)
-	require.Empty(t, results.BeaconImplementation)
 }
 
 func TestDistinctBeaconBlockValuesEmptyNetwork(t *testing.T) {
@@ -85,7 +86,7 @@ func TestDistinctBeaconBlockValuesEmptyNetwork(t *testing.T) {
 	// values (node-b, slot 2) must still appear exactly once.
 	results, err := indexer.DistinctBeaconBlockValues(
 		context.Background(),
-		[]string{KeyNode, KeySlot, KeyNodeVersion, KeyNetwork},
+		[]string{KeyNode, KeySlot, KeyNodeVersion, KeyBeaconImplementation, KeyNetwork},
 		"",
 	)
 	require.NoError(t, err)
@@ -93,6 +94,7 @@ func TestDistinctBeaconBlockValuesEmptyNetwork(t *testing.T) {
 	require.ElementsMatch(t, []string{"node-a", "node-b", "node-c"}, results.Node)
 	require.ElementsMatch(t, []uint64{1, 2, 3, 4}, results.Slot)
 	require.ElementsMatch(t, []string{"v1", "v2", "v3"}, results.NodeVersion)
+	require.ElementsMatch(t, []string{"impl-mainnet", "impl-holesky"}, results.BeaconImplementation)
 	require.ElementsMatch(t, []string{"mainnet", "holesky"}, results.Network)
 }
 
@@ -149,8 +151,8 @@ func TestDistinctExecutionBlockTraceValues(t *testing.T) {
 			ID:                      uuid.New().String(),
 			Node:                    row.node,
 			FetchedAt:               time.Now(),
-			ExecutionImplementation: "geth",
-			NodeVersion:             "v1",
+			ExecutionImplementation: "geth-" + row.network,
+			NodeVersion:             "v1-" + row.node,
 			Location:                "loc",
 			Network:                 row.network,
 			BlockHash:               row.blockHash,
@@ -158,11 +160,12 @@ func TestDistinctExecutionBlockTraceValues(t *testing.T) {
 		}))
 	}
 
-	// block_hash is loose-scanned through the dedupe unique index, block_number falls back
-	// to a plain DISTINCT.
+	// block_hash is loose-scanned through the dedupe unique index, node_version and
+	// execution_implementation through their (network, <field>) indexes, and block_number
+	// falls back to a plain DISTINCT.
 	scoped, err := indexer.DistinctExecutionBlockTraceValues(
 		ctx,
-		[]string{KeyBlockHash, KeyBlockNumber, KeyNode},
+		[]string{KeyBlockHash, KeyBlockNumber, KeyNode, KeyNodeVersion, KeyExecutionImplementation},
 		"mainnet",
 	)
 	require.NoError(t, err)
@@ -170,6 +173,8 @@ func TestDistinctExecutionBlockTraceValues(t *testing.T) {
 	require.ElementsMatch(t, []string{"0xaa", "0xbb"}, scoped.BlockHash)
 	require.ElementsMatch(t, []int64{100, 101}, scoped.BlockNumber)
 	require.ElementsMatch(t, []string{"node-a", "node-b"}, scoped.Node)
+	require.ElementsMatch(t, []string{"v1-node-a", "v1-node-b"}, scoped.NodeVersion)
+	require.ElementsMatch(t, []string{"geth-mainnet"}, scoped.ExecutionImplementation)
 
 	all, err := indexer.DistinctExecutionBlockTraceValues(
 		ctx,
@@ -181,4 +186,90 @@ func TestDistinctExecutionBlockTraceValues(t *testing.T) {
 	require.ElementsMatch(t, []string{"0xaa", "0xbb", "0xcc"}, all.BlockHash)
 	require.ElementsMatch(t, []int64{7, 100, 101}, all.BlockNumber)
 	require.ElementsMatch(t, []string{"mainnet", "holesky"}, all.Network)
+}
+
+// TestDistinctLooseScanFieldsAreIndexed pins every loose-scanned field to an index that
+// leads (network, <field>). The loose scan is only cheap because each recursion step is one
+// index seek; on an unindexed column the same CTE degrades to a full scan per distinct value,
+// which is worse than the plain DISTINCT it replaced. Network itself only needs an index
+// leading network.
+func TestDistinctLooseScanFieldsAreIndexed(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	tables := []distinctTable{
+		beaconStateDistinct,
+		beaconBlockDistinct,
+		executionPayloadEnvelopeDistinct,
+		beaconBadBlockDistinct,
+		beaconBadBlobDistinct,
+		executionBlockTraceDistinct,
+		executionBadBlockDistinct,
+	}
+
+	for _, table := range tables {
+		leading := indexLeadingColumns(t, indexer, table.name)
+
+		for field, strategy := range table.fields {
+			if strategy != distinctLooseScan {
+				continue
+			}
+
+			want := []string{KeyNetwork, field}
+			if field == KeyNetwork {
+				want = []string{KeyNetwork}
+			}
+
+			found := false
+
+			for _, cols := range leading {
+				if len(cols) >= len(want) && slicesEqual(cols[:len(want)], want) {
+					found = true
+
+					break
+				}
+			}
+
+			require.True(t, found, "%s.%s is loose-scanned but no index leads %v", table.name, field, want)
+		}
+	}
+}
+
+// indexLeadingColumns returns each index's columns in key order, unique and plain alike.
+func indexLeadingColumns(t *testing.T, indexer *Indexer, table string) [][]string {
+	t.Helper()
+
+	var names []string
+
+	require.NoError(t, indexer.db.Raw(
+		"SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?", table,
+	).Scan(&names).Error)
+
+	out := make([][]string, 0, len(names))
+
+	for _, name := range names {
+		var cols []string
+
+		require.NoError(t, indexer.db.Raw(
+			"SELECT name FROM pragma_index_info(?) ORDER BY seqno", name,
+		).Scan(&cols).Error)
+
+		out = append(out, cols)
+	}
+
+	return out
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }

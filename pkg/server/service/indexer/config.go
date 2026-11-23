@@ -23,6 +23,15 @@ type Config struct {
 	// collected. It must exceed the longest plausible fetch-plus-upload plus the agents'
 	// payload-lookup cache TTL, so an agent mid-hash cannot link to a payload being deleted.
 	BlobGCGracePeriod human.Duration `yaml:"blobGcGracePeriod" default:"10m"`
+
+	ReadCache ReadCacheConfig `yaml:"readCache"`
+}
+
+// ReadCacheConfig bounds the cache in front of the filter-value and count reads. A zero TTL
+// disables it.
+type ReadCacheConfig struct {
+	TTL        human.Duration `yaml:"ttl" default:"30s"`
+	MaxEntries int            `yaml:"maxEntries" default:"4096"`
 }
 
 func (c *Config) Validate() error {

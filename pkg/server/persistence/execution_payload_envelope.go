@@ -18,8 +18,8 @@ type ExecutionPayloadEnvelope struct {
 	Epoch                int64     `gorm:"not null;default:0"`
 	BlockRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_execution_payload_envelopes_dedupe,priority:3"`
 	FetchedAt            time.Time `gorm:"not null;index:ix_execution_payload_envelopes_fetched_at;index:ix_execution_payload_envelopes_network_node_fetched_at,priority:3;index:ix_execution_payload_envelopes_network_fetched_at,priority:2"`
-	BeaconImplementation string    `gorm:"not null;default:''"`
-	NodeVersion          string    `gorm:"not null;default:''"`
+	BeaconImplementation string    `gorm:"not null;default:'';index:ix_execution_payload_envelopes_network_beacon_implementation,priority:2"`
+	NodeVersion          string    `gorm:"not null;default:'';index:ix_execution_payload_envelopes_network_node_version,priority:2"`
 	ContentEncoding      string    `gorm:"not null;default:''"`
 	Location             string    `gorm:"not null;default:''"`
 	ContentHash          string    `gorm:"not null;default:'';size:64"`
@@ -28,7 +28,7 @@ type ExecutionPayloadEnvelope struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_payload_envelopes_dedupe,priority:1;index:ix_execution_payload_envelopes_network_node_fetched_at,priority:1;index:ix_execution_payload_envelopes_network_fetched_at,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_payload_envelopes_dedupe,priority:1;index:ix_execution_payload_envelopes_network_node_fetched_at,priority:1;index:ix_execution_payload_envelopes_network_fetched_at,priority:1;index:ix_execution_payload_envelopes_network_node_version,priority:1;index:ix_execution_payload_envelopes_network_beacon_implementation,priority:1"`
 }
 
 // BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
@@ -253,8 +253,9 @@ type DistinctExecutionPayloadEnvelopeValueResults struct {
 // executionPayloadEnvelopeDistinct declares how each requested field's distinct values are
 // resolved. Loose-scannable fields lead an index right after network: node via
 // ix_execution_payload_envelopes_network_node_fetched_at(network, node, fetched_at), slot
-// via ux_execution_payload_envelopes_dedupe(network, slot, block_root, node), and network
-// leads both.
+// via ux_execution_payload_envelopes_dedupe(network, slot, block_root, node), node_version
+// and beacon_implementation via their own (network, <field>) indexes, and network leads all
+// of them.
 var executionPayloadEnvelopeDistinct = distinctTable{
 	name: "execution_payload_envelopes",
 	fields: map[string]distinctStrategy{
@@ -263,9 +264,9 @@ var executionPayloadEnvelopeDistinct = distinctTable{
 		KeyNetwork:              distinctLooseScan,
 		KeyEpoch:                distinctFullScan,
 		KeyBlockRoot:            distinctFullScan,
-		KeyNodeVersion:          distinctFullScan,
+		KeyNodeVersion:          distinctLooseScan,
 		KeyLocation:             distinctFullScan,
-		KeyBeaconImplementation: distinctFullScan,
+		KeyBeaconImplementation: distinctLooseScan,
 	},
 }
 

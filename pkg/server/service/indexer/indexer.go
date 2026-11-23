@@ -77,6 +77,9 @@ type Indexer struct {
 	// archiveBudget bounds how long one page of blocks may spend waiting on the permanent
 	// store before the rest of the page is left for the next cycle.
 	archiveBudget time.Duration
+
+	// reads caches the filter-value and count responses; nil when disabled.
+	reads *readCache
 }
 
 func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *persistence.Indexer, st store.Store, ethereumConfig *ethereum.Config) (*Indexer, error) {
@@ -88,6 +91,8 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		return nil, errors.Wrap(err, "failed to create permanent store")
 	}
 
+	metrics := NewMetrics(metricsNamespace)
+
 	i := &Indexer{
 		log:            log.WithField("server/module", ServiceType),
 		db:             db,
@@ -95,7 +100,8 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		config:         conf,
 		ethereumConfig: ethereumConfig,
 		permanentStore: permanentStore,
-		metrics:        NewMetrics(metricsNamespace),
+		metrics:        metrics,
+		reads:          newReadCache(conf.ReadCache.TTL.Duration, conf.ReadCache.MaxEntries, metrics),
 		reaper:         newObjectReaper(),
 		disagreements:  newDisagreementReporter(),
 		blobs:          newBlobQuarantine(),
@@ -467,7 +473,7 @@ func (i *Indexer) ListBeaconState(ctx context.Context, req *indexer.ListBeaconSt
 	}, nil
 }
 
-func (i *Indexer) CountBeaconState(ctx context.Context, req *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
+func (i *Indexer) countBeaconState(ctx context.Context, req *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
 	filter := &persistence.BeaconStateFilter{}
 
 	if req.Id != "" {
@@ -525,7 +531,7 @@ func (i *Indexer) CountBeaconState(ctx context.Context, req *indexer.CountBeacon
 	}, nil
 }
 
-func (i *Indexer) ListUniqueBeaconStateValues(ctx context.Context, req *indexer.ListUniqueBeaconStateValuesRequest) (*indexer.ListUniqueBeaconStateValuesResponse, error) {
+func (i *Indexer) listUniqueBeaconStateValues(ctx context.Context, req *indexer.ListUniqueBeaconStateValuesRequest) (*indexer.ListUniqueBeaconStateValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -731,7 +737,7 @@ func (i *Indexer) ListBeaconBlock(ctx context.Context, req *indexer.ListBeaconBl
 	}, nil
 }
 
-func (i *Indexer) CountBeaconBlock(ctx context.Context, req *indexer.CountBeaconBlockRequest) (*indexer.CountBeaconBlockResponse, error) {
+func (i *Indexer) countBeaconBlock(ctx context.Context, req *indexer.CountBeaconBlockRequest) (*indexer.CountBeaconBlockResponse, error) {
 	filter := &persistence.BeaconBlockFilter{}
 
 	if req.Id != "" {
@@ -789,7 +795,7 @@ func (i *Indexer) CountBeaconBlock(ctx context.Context, req *indexer.CountBeacon
 	}, nil
 }
 
-func (i *Indexer) ListUniqueBeaconBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBlockValuesRequest) (*indexer.ListUniqueBeaconBlockValuesResponse, error) {
+func (i *Indexer) listUniqueBeaconBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBlockValuesRequest) (*indexer.ListUniqueBeaconBlockValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -997,7 +1003,7 @@ func (i *Indexer) ListExecutionPayloadEnvelope(ctx context.Context, req *indexer
 	}, nil
 }
 
-func (i *Indexer) CountExecutionPayloadEnvelope(ctx context.Context, req *indexer.CountExecutionPayloadEnvelopeRequest) (*indexer.CountExecutionPayloadEnvelopeResponse, error) {
+func (i *Indexer) countExecutionPayloadEnvelope(ctx context.Context, req *indexer.CountExecutionPayloadEnvelopeRequest) (*indexer.CountExecutionPayloadEnvelopeResponse, error) {
 	filter := &persistence.ExecutionPayloadEnvelopeFilter{}
 
 	if req.Id != "" {
@@ -1055,7 +1061,7 @@ func (i *Indexer) CountExecutionPayloadEnvelope(ctx context.Context, req *indexe
 	}, nil
 }
 
-func (i *Indexer) ListUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req *indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest) (*indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse, error) {
+func (i *Indexer) listUniqueExecutionPayloadEnvelopeValues(ctx context.Context, req *indexer.ListUniqueExecutionPayloadEnvelopeValuesRequest) (*indexer.ListUniqueExecutionPayloadEnvelopeValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -1239,7 +1245,7 @@ func (i *Indexer) ListBeaconBadBlock(ctx context.Context, req *indexer.ListBeaco
 	}, nil
 }
 
-func (i *Indexer) CountBeaconBadBlock(ctx context.Context, req *indexer.CountBeaconBadBlockRequest) (*indexer.CountBeaconBadBlockResponse, error) {
+func (i *Indexer) countBeaconBadBlock(ctx context.Context, req *indexer.CountBeaconBadBlockRequest) (*indexer.CountBeaconBadBlockResponse, error) {
 	filter := &persistence.BeaconBadBlockFilter{}
 
 	if req.Id != "" {
@@ -1297,7 +1303,7 @@ func (i *Indexer) CountBeaconBadBlock(ctx context.Context, req *indexer.CountBea
 	}, nil
 }
 
-func (i *Indexer) ListUniqueBeaconBadBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlockValuesRequest) (*indexer.ListUniqueBeaconBadBlockValuesResponse, error) {
+func (i *Indexer) listUniqueBeaconBadBlockValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlockValuesRequest) (*indexer.ListUniqueBeaconBadBlockValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -1485,7 +1491,7 @@ func (i *Indexer) ListBeaconBadBlob(ctx context.Context, req *indexer.ListBeacon
 	}, nil
 }
 
-func (i *Indexer) CountBeaconBadBlob(ctx context.Context, req *indexer.CountBeaconBadBlobRequest) (*indexer.CountBeaconBadBlobResponse, error) {
+func (i *Indexer) countBeaconBadBlob(ctx context.Context, req *indexer.CountBeaconBadBlobRequest) (*indexer.CountBeaconBadBlobResponse, error) {
 	filter := &persistence.BeaconBadBlobFilter{}
 
 	if req.Id != "" {
@@ -1547,7 +1553,7 @@ func (i *Indexer) CountBeaconBadBlob(ctx context.Context, req *indexer.CountBeac
 	}, nil
 }
 
-func (i *Indexer) ListUniqueBeaconBadBlobValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlobValuesRequest) (*indexer.ListUniqueBeaconBadBlobValuesResponse, error) {
+func (i *Indexer) listUniqueBeaconBadBlobValues(ctx context.Context, req *indexer.ListUniqueBeaconBadBlobValuesRequest) (*indexer.ListUniqueBeaconBadBlobValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -1736,7 +1742,7 @@ func (i *Indexer) ListExecutionBlockTrace(ctx context.Context, req *indexer.List
 	}, nil
 }
 
-func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.CountExecutionBlockTraceRequest) (*indexer.CountExecutionBlockTraceResponse, error) {
+func (i *Indexer) countExecutionBlockTrace(ctx context.Context, req *indexer.CountExecutionBlockTraceRequest) (*indexer.CountExecutionBlockTraceResponse, error) {
 	filter := &persistence.ExecutionBlockTraceFilter{}
 
 	if req.Id != "" {
@@ -1790,7 +1796,7 @@ func (i *Indexer) CountExecutionBlockTrace(ctx context.Context, req *indexer.Cou
 	}, nil
 }
 
-func (i *Indexer) ListUniqueExecutionBlockTraceValues(ctx context.Context, req *indexer.ListUniqueExecutionBlockTraceValuesRequest) (*indexer.ListUniqueExecutionBlockTraceValuesResponse, error) {
+func (i *Indexer) listUniqueExecutionBlockTraceValues(ctx context.Context, req *indexer.ListUniqueExecutionBlockTraceValuesRequest) (*indexer.ListUniqueExecutionBlockTraceValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -1965,7 +1971,7 @@ func (i *Indexer) ListExecutionBadBlock(ctx context.Context, req *indexer.ListEx
 	}, nil
 }
 
-func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.CountExecutionBadBlockRequest) (*indexer.CountExecutionBadBlockResponse, error) {
+func (i *Indexer) countExecutionBadBlock(ctx context.Context, req *indexer.CountExecutionBadBlockRequest) (*indexer.CountExecutionBadBlockResponse, error) {
 	filter := &persistence.ExecutionBadBlockFilter{}
 
 	if req.Id != "" {
@@ -2023,7 +2029,7 @@ func (i *Indexer) CountExecutionBadBlock(ctx context.Context, req *indexer.Count
 	}, nil
 }
 
-func (i *Indexer) ListUniqueExecutionBadBlockValues(ctx context.Context, req *indexer.ListUniqueExecutionBadBlockValuesRequest) (*indexer.ListUniqueExecutionBadBlockValuesResponse, error) {
+func (i *Indexer) listUniqueExecutionBadBlockValues(ctx context.Context, req *indexer.ListUniqueExecutionBadBlockValuesRequest) (*indexer.ListUniqueExecutionBadBlockValuesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}

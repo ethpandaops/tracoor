@@ -11,6 +11,8 @@ const (
 	labelReason  = "reason"
 	labelNetwork = "network"
 	labelCause   = "cause"
+	labelMethod  = "method"
+	labelResult  = "result"
 )
 
 // Metrics covers what retention does and what it declines to do. The skip reasons matter as
@@ -24,6 +26,7 @@ type Metrics struct {
 	blobGCSkipped   *prometheus.CounterVec
 	rootDivergence  *prometheus.CounterVec
 	archiveHoldback *prometheus.CounterVec
+	readCache       *prometheus.CounterVec
 }
 
 var (
@@ -72,6 +75,11 @@ func NewMetrics(namespace string) *Metrics {
 				Name:      "permanent_archive_holdback_total",
 				Help:      "Block rows retention held back from purge because their archive was not confirmed, by reason",
 			}, []string{labelReason}),
+			readCache: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "read_cache_requests_total",
+				Help:      "Cached read requests (filter values and counts) by method and whether they hit the cache, shared a load or missed",
+			}, []string{labelMethod, labelResult}),
 		}
 
 		prometheus.MustRegister(
@@ -82,6 +90,7 @@ func NewMetrics(namespace string) *Metrics {
 			m.blobGCSkipped,
 			m.rootDivergence,
 			m.archiveHoldback,
+			m.readCache,
 		)
 
 		metricsInstance = m

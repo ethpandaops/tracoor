@@ -11,8 +11,8 @@ type ExecutionBlockTrace struct {
 	ID                      string    `gorm:"primaryKey"`
 	Node                    string    `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:3;index:ix_execution_block_traces_network_node_fetched_at,priority:2"`
 	FetchedAt               time.Time `gorm:"not null;index:ix_execution_block_traces_fetched_at;index:ix_execution_block_traces_network_node_fetched_at,priority:3;index:ix_execution_block_traces_network_fetched_at,priority:2"`
-	ExecutionImplementation string    `gorm:"not null;default:''"`
-	NodeVersion             string    `gorm:"not null;default:''"`
+	ExecutionImplementation string    `gorm:"not null;default:'';index:ix_execution_block_traces_network_execution_implementation,priority:2"`
+	NodeVersion             string    `gorm:"not null;default:'';index:ix_execution_block_traces_network_node_version,priority:2"`
 	ContentEncoding         string    `gorm:"not null;default:''"`
 	Location                string    `gorm:"not null;default:''"`
 	ContentHash             string    `gorm:"not null;default:'';size:64"`
@@ -21,7 +21,7 @@ type ExecutionBlockTrace struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:1;index:ix_execution_block_traces_network_node_fetched_at,priority:1;index:ix_execution_block_traces_network_fetched_at,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:1;index:ix_execution_block_traces_network_node_fetched_at,priority:1;index:ix_execution_block_traces_network_fetched_at,priority:1;index:ix_execution_block_traces_network_node_version,priority:1;index:ix_execution_block_traces_network_execution_implementation,priority:1"`
 	BlockHash        string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:2"`
 	BlockNumber      int64  `gorm:"not null;default:0"`
 }
@@ -238,7 +238,9 @@ type DistinctExecutionBlockTraceValueResults struct {
 // executionBlockTraceDistinct declares how each requested field's distinct values are
 // resolved. Loose-scannable fields lead an index right after network: node via
 // ix_execution_block_traces_network_node_fetched_at(network, node, fetched_at), block_hash
-// via ux_execution_block_traces_dedupe(network, block_hash, node), and network leads both.
+// via ux_execution_block_traces_dedupe(network, block_hash, node), node_version and
+// execution_implementation via their own (network, <field>) indexes, and network leads all
+// of them.
 var executionBlockTraceDistinct = distinctTable{
 	name: "execution_block_traces",
 	fields: map[string]distinctStrategy{
@@ -247,8 +249,8 @@ var executionBlockTraceDistinct = distinctTable{
 		KeyNetwork:                 distinctLooseScan,
 		KeyBlockNumber:             distinctFullScan,
 		KeyLocation:                distinctFullScan,
-		KeyExecutionImplementation: distinctFullScan,
-		KeyNodeVersion:             distinctFullScan,
+		KeyExecutionImplementation: distinctLooseScan,
+		KeyNodeVersion:             distinctLooseScan,
 	},
 }
 

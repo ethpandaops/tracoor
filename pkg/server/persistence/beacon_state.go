@@ -18,8 +18,8 @@ type BeaconState struct {
 	Epoch                int64     `gorm:"not null;default:0"`
 	StateRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:3"`
 	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_states_fetched_at;index:ix_beacon_states_network_node_fetched_at,priority:3;index:ix_beacon_states_network_fetched_at,priority:2"`
-	BeaconImplementation string    `gorm:"not null;default:''"`
-	NodeVersion          string    `gorm:"not null;default:''"`
+	BeaconImplementation string    `gorm:"not null;default:'';index:ix_beacon_states_network_beacon_implementation,priority:2"`
+	NodeVersion          string    `gorm:"not null;default:'';index:ix_beacon_states_network_node_version,priority:2"`
 	ContentEncoding      string    `gorm:"not null;default:''"`
 	Location             string    `gorm:"not null;default:''"`
 	ContentHash          string    `gorm:"not null;default:'';size:64"`
@@ -28,7 +28,7 @@ type BeaconState struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:1;index:ix_beacon_states_network_node_fetched_at,priority:1;index:ix_beacon_states_network_fetched_at,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:1;index:ix_beacon_states_network_node_fetched_at,priority:1;index:ix_beacon_states_network_fetched_at,priority:1;index:ix_beacon_states_network_node_version,priority:1;index:ix_beacon_states_network_beacon_implementation,priority:1"`
 }
 
 // BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone
@@ -253,7 +253,10 @@ type DistinctBeaconStateValueResults struct {
 // beaconStateDistinct declares how each requested field's distinct values are resolved.
 // Loose-scannable fields lead an index right after network: node via
 // ix_beacon_states_network_node_fetched_at(network, node, fetched_at), slot via
-// ux_beacon_states_dedupe(network, slot, state_root, node), and network leads both.
+// ux_beacon_states_dedupe(network, slot, state_root, node), node_version and
+// beacon_implementation via their own (network, <field>) indexes, and network leads all of
+// them. Those two feed the UI's filter dropdowns on every page load, so a full scan there
+// costs a read of the whole table per visitor.
 var beaconStateDistinct = distinctTable{
 	name: "beacon_states",
 	fields: map[string]distinctStrategy{
@@ -262,9 +265,9 @@ var beaconStateDistinct = distinctTable{
 		KeyNetwork:              distinctLooseScan,
 		KeyEpoch:                distinctFullScan,
 		KeyStateRoot:            distinctFullScan,
-		KeyNodeVersion:          distinctFullScan,
+		KeyNodeVersion:          distinctLooseScan,
 		KeyLocation:             distinctFullScan,
-		KeyBeaconImplementation: distinctFullScan,
+		KeyBeaconImplementation: distinctLooseScan,
 	},
 }
 
