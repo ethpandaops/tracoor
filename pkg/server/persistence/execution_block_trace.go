@@ -21,9 +21,9 @@ type ExecutionBlockTrace struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:1;index:ix_execution_block_traces_network_node_fetched_at,priority:1;index:ix_execution_block_traces_network_fetched_at,priority:1;index:ix_execution_block_traces_network_node_version,priority:1;index:ix_execution_block_traces_network_execution_implementation,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:1;index:ix_execution_block_traces_network_node_fetched_at,priority:1;index:ix_execution_block_traces_network_fetched_at,priority:1;index:ix_execution_block_traces_network_node_version,priority:1;index:ix_execution_block_traces_network_execution_implementation,priority:1;index:ix_execution_block_traces_network_block_number,priority:1"`
 	BlockHash        string `gorm:"not null;default:'';uniqueIndex:ux_execution_block_traces_dedupe,priority:2"`
-	BlockNumber      int64  `gorm:"not null;default:0"`
+	BlockNumber      int64  `gorm:"not null;default:0;index:ix_execution_block_traces_network_block_number,priority:2"`
 }
 
 // BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone

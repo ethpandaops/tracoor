@@ -15,8 +15,8 @@ type BeaconState struct {
 	// but slot 9223372036854775808 is probably around the heat death
 	// of the universe so we should be OK.
 	Slot                 int64     `gorm:"not null;default:0;uniqueIndex:ux_beacon_states_dedupe,priority:2"`
-	Epoch                int64     `gorm:"not null;default:0"`
-	StateRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:3"`
+	Epoch                int64     `gorm:"not null;default:0;index:ix_beacon_states_network_epoch,priority:2"`
+	StateRoot            string    `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:3;index:ix_beacon_states_network_state_root,priority:2"`
 	FetchedAt            time.Time `gorm:"not null;index:ix_beacon_states_fetched_at;index:ix_beacon_states_network_node_fetched_at,priority:3;index:ix_beacon_states_network_fetched_at,priority:2"`
 	BeaconImplementation string    `gorm:"not null;default:'';index:ix_beacon_states_network_beacon_implementation,priority:2"`
 	NodeVersion          string    `gorm:"not null;default:'';index:ix_beacon_states_network_node_version,priority:2"`
@@ -28,7 +28,7 @@ type BeaconState struct {
 	// ContentMatchedAt is set when the hash was compared against an existing
 	// payload and matched.
 	ContentMatchedAt *time.Time
-	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:1;index:ix_beacon_states_network_node_fetched_at,priority:1;index:ix_beacon_states_network_fetched_at,priority:1;index:ix_beacon_states_network_node_version,priority:1;index:ix_beacon_states_network_beacon_implementation,priority:1"`
+	Network          string `gorm:"not null;default:'';uniqueIndex:ux_beacon_states_dedupe,priority:1;index:ix_beacon_states_network_node_fetched_at,priority:1;index:ix_beacon_states_network_fetched_at,priority:1;index:ix_beacon_states_network_node_version,priority:1;index:ix_beacon_states_network_beacon_implementation,priority:1;index:ix_beacon_states_network_epoch,priority:1;index:ix_beacon_states_network_state_root,priority:1"`
 }
 
 // BeforeSave keeps every stored timestamp in UTC. The drivers render a time.Time in the zone

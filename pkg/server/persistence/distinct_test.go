@@ -220,17 +220,7 @@ func TestDistinctLooseScanFieldsAreIndexed(t *testing.T) {
 				want = []string{KeyNetwork}
 			}
 
-			found := false
-
-			for _, cols := range leading {
-				if len(cols) >= len(want) && slicesEqual(cols[:len(want)], want) {
-					found = true
-
-					break
-				}
-			}
-
-			require.True(t, found, "%s.%s is loose-scanned but no index leads %v", table.name, field, want)
+			require.True(t, hasLeadingIndex(leading, want), "%s.%s is loose-scanned but no index leads %v", table.name, field, want)
 		}
 	}
 }
@@ -260,6 +250,17 @@ func indexLeadingColumns(t *testing.T, indexer *Indexer, table string) [][]strin
 	return out
 }
 
+// hasLeadingIndex reports whether any index's key starts with want, in order.
+func hasLeadingIndex(leading [][]string, want []string) bool {
+	for _, cols := range leading {
+		if len(cols) >= len(want) && slicesEqual(cols[:len(want)], want) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -272,4 +273,34 @@ func slicesEqual(a, b []string) bool {
 	}
 
 	return true
+}
+
+// TestListFilterAndSortColumnsAreIndexed pins every column the web UI's tables filter or sort
+// the high-volume tables by to an index leading (network, <column>). The UI always scopes a
+// list to one network, so with that index a filtered count is a range scan and a sorted page
+// reads one page of the index; without it, both read every row of the network. The bad-block
+// and bad-blob tables are small enough to scan.
+func TestListFilterAndSortColumnsAreIndexed(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	beacon := []string{"fetched_at", "node", "slot", "epoch", "node_version", "beacon_implementation"}
+
+	columns := map[string][]string{
+		"beacon_states":               append([]string{"state_root"}, beacon...),
+		"beacon_blocks":               append([]string{"block_root"}, beacon...),
+		"execution_payload_envelopes": append([]string{"block_root"}, beacon...),
+		"execution_block_traces": {
+			"fetched_at", "node", "block_hash", "block_number", "node_version", "execution_implementation",
+		},
+	}
+
+	for table, cols := range columns {
+		leading := indexLeadingColumns(t, indexer, table)
+
+		for _, col := range cols {
+			want := []string{KeyNetwork, col}
+			require.True(t, hasLeadingIndex(leading, want), "%s is filtered or sorted by %s but no index leads %v", table, col, want)
+		}
+	}
 }
