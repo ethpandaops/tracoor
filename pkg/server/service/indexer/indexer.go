@@ -93,6 +93,11 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 
 	metrics := NewMetrics(metricsNamespace)
 
+	var reads *readCache
+	if !conf.ReadCache.Disabled {
+		reads = newReadCache(conf.ReadCache.TTL.Duration, conf.ReadCache.MaxEntries, metrics)
+	}
+
 	i := &Indexer{
 		log:            log.WithField("server/module", ServiceType),
 		db:             db,
@@ -101,7 +106,7 @@ func NewIndexer(ctx context.Context, log logrus.FieldLogger, conf *Config, db *p
 		ethereumConfig: ethereumConfig,
 		permanentStore: permanentStore,
 		metrics:        metrics,
-		reads:          newReadCache(conf.ReadCache.TTL.Duration, conf.ReadCache.MaxEntries, metrics),
+		reads:          reads,
 		reaper:         newObjectReaper(),
 		disagreements:  newDisagreementReporter(),
 		blobs:          newBlobQuarantine(),

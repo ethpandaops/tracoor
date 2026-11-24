@@ -78,7 +78,7 @@ func NewMetrics(namespace string) *Metrics {
 			readCache: prometheus.NewCounterVec(prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "read_cache_requests_total",
-				Help:      "Cached read requests (filter values and counts) by method and whether they hit the cache, shared a load or missed",
+				Help:      "Cached read requests (filter values and counts) by method and result: hit (served from the cache), miss (started a database load) or shared (waited on a load another request started)",
 			}, []string{labelMethod, labelResult}),
 		}
 

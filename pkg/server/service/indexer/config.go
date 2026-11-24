@@ -27,10 +27,15 @@ type Config struct {
 	ReadCache ReadCacheConfig `yaml:"readCache"`
 }
 
-// ReadCacheConfig bounds the cache in front of the filter-value and count reads. A zero TTL
-// disables it.
+// ReadCacheConfig bounds the cache in front of the filter-value and count reads.
 type ReadCacheConfig struct {
-	TTL        human.Duration `yaml:"ttl" default:"30s"`
+	// Disabled sends every read straight to the database. It is a flag rather than a zero
+	// TTL because the server applies defaults again after loading the config, which turns an
+	// explicit 0 back into the default.
+	Disabled bool `yaml:"disabled"`
+	// TTL stays under the UI's 6s count staleTime, so a cached total is never older than one
+	// the UI would have kept on its own.
+	TTL        human.Duration `yaml:"ttl" default:"5s"`
 	MaxEntries int            `yaml:"maxEntries" default:"4096"`
 }
 

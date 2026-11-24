@@ -2,58 +2,85 @@ package indexer
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2/expirable"
-	"golang.org/x/sync/singleflight"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 const (
 	readCacheHit    = "hit"
 	readCacheMiss   = "miss"
 	readCacheShared = "shared"
-
-	// readCacheLoadTimeout bounds a shared load. It is detached from the caller that started
-	// it, so something has to stop it if the database never answers.
-	readCacheLoadTimeout = 30 * time.Second
 )
 
 // readCache memoizes the responses of the filter-dropdown (ListUnique*Values) and Count*
-// handlers for a short TTL. The web UI issues both on every page load and neither needs to
-// be fresher than the UI's own 60s staleTime, yet each one is a database walk: the dropdowns
-// a query per field, the counts an index scan over every row the filter matches. Uncached,
-// a crawler or scraper replaying them turns straight into database CPU.
+// handlers for a short TTL. The web UI issues both on every page load, and each one is a
+// database walk: the dropdowns a query per field, the counts an index scan over every row the
+// filter matches. Uncached, a crawler or scraper replaying them turns straight into database
+// CPU. The UI refetches counts once they are 6s old and filter values at 60s, so a TTL under
+// 6s never shows a page an older answer than the UI would have kept on its own.
 //
-// Concurrent misses on one key share a single load (singleflight), so a burst of identical
-// requests costs one query rather than one per request. Only successful responses are kept.
+// Concurrent misses on one key share a single load, so a burst of identical requests costs
+// one query rather than one per request. Only successful responses are kept. A load runs for
+// as long as any caller still waits on it and is cancelled once they have all gone, as the
+// query behind an uncached request would be.
 type readCache struct {
-	entries *expirable.LRU[string, proto.Message]
-	group   singleflight.Group
+	ttl     time.Duration
+	entries *lru.Cache[string, readCacheEntry]
 	metrics *Metrics
+
+	mu    sync.Mutex
+	loads map[string]*readLoad
 }
 
-// newReadCache returns nil when ttl is not positive, which disables caching: every read then
-// goes straight to the database.
+type readCacheEntry struct {
+	resp    proto.Message
+	expires time.Time
+}
+
+// readLoad is one in-flight database read and the callers waiting on it. waiters is guarded
+// by readCache.mu; val and err are written before done is closed and read only after it.
+type readLoad struct {
+	done    chan struct{}
+	cancel  context.CancelFunc
+	waiters int
+	val     proto.Message
+	err     error
+}
+
+// newReadCache returns nil when ttl or size is not positive, which disables caching: every
+// read then goes straight to the database.
 func newReadCache(ttl time.Duration, size int, metrics *Metrics) *readCache {
 	if ttl <= 0 || size <= 0 {
 		return nil
 	}
 
+	entries, err := lru.New[string, readCacheEntry](size)
+	if err != nil {
+		return nil
+	}
+
 	return &readCache{
-		entries: expirable.NewLRU[string, proto.Message](size, nil, ttl),
+		ttl:     ttl,
+		entries: entries,
 		metrics: metrics,
+		loads:   make(map[string]*readLoad),
 	}
 }
 
 // cachedRead serves req from the cache, or loads it once for every concurrent caller asking
-// the same thing. The key is the method plus the deterministic wire encoding of the request,
-// so any field that changes the answer changes the key. Callers get their own clone: the
-// cached message is shared and must never be handed out for mutation.
+// the same thing. Callers get their own clone: the cached message is shared and must never be
+// handed out for mutation.
 func cachedRead[Req, Resp proto.Message](
 	ctx context.Context,
 	c *readCache,
-	method string,
 	req Req,
 	load func(context.Context, Req) (Resp, error),
 ) (Resp, error) {
@@ -61,65 +88,117 @@ func cachedRead[Req, Resp proto.Message](
 		return load(ctx, req)
 	}
 
-	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(req)
+	key, err := readCacheKey(req)
 	if err != nil {
 		return load(ctx, req)
 	}
 
-	key := method + "\x00" + string(raw)
+	method := readCacheMethod(req)
 
-	if cached, ok := c.entries.Get(key); ok {
-		if resp, ok := proto.Clone(cached).(Resp); ok {
-			c.observe(method, readCacheHit)
+	if cached, ok := c.get(key); ok {
+		c.observe(method, readCacheHit)
 
-			return resp, nil
-		}
+		return cloneAs[Resp](cached)
 	}
 
-	ch := c.group.DoChan(key, func() (any, error) {
-		// The load outlives the caller that started it: other callers may be waiting on it,
-		// and its result is cached for the ones after them.
-		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), readCacheLoadTimeout)
-		defer cancel()
-
-		resp, err := load(loadCtx, req)
-		if err != nil {
-			return nil, err
-		}
-
-		c.entries.Add(key, resp)
-
-		return resp, nil
+	l, started := c.join(ctx, key, func(loadCtx context.Context) (proto.Message, error) {
+		return load(loadCtx, req)
 	})
 
-	var zero Resp
+	if started {
+		c.observe(method, readCacheMiss)
+	} else {
+		c.observe(method, readCacheShared)
+	}
 
 	select {
 	case <-ctx.Done():
+		c.leave(key, l)
+
+		var zero Resp
+
 		return zero, ctx.Err()
-	case res := <-ch:
-		if res.Shared {
-			c.observe(method, readCacheShared)
-		} else {
-			c.observe(method, readCacheMiss)
-		}
+	case <-l.done:
+	}
 
-		if res.Err != nil {
-			return zero, res.Err
-		}
+	if l.err != nil {
+		var zero Resp
 
-		// The key carries the method, so a load only ever produces its own method's type.
-		msg, ok := res.Val.(proto.Message)
-		if !ok {
-			return load(ctx, req)
-		}
+		return zero, l.err
+	}
 
-		resp, ok := proto.Clone(msg).(Resp)
-		if !ok {
-			return load(ctx, req)
-		}
+	return cloneAs[Resp](l.val)
+}
 
-		return resp, nil
+func (c *readCache) get(key string) (proto.Message, bool) {
+	entry, ok := c.entries.Get(key)
+	if !ok || time.Now().After(entry.expires) {
+		// An expired entry is left for the next load to overwrite: removing it here could
+		// race that load and drop the fresh one.
+		return nil, false
+	}
+
+	return entry.resp, true
+}
+
+// join adds the caller to the load in flight for key, starting one if there is none, and
+// reports whether it started it.
+func (c *readCache) join(ctx context.Context, key string, load func(context.Context) (proto.Message, error)) (*readLoad, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	l, ok := c.loads[key]
+	if !ok {
+		// The load belongs to every caller that joins it, not just this one, so it ignores
+		// this caller's cancellation; leave() cancels it once the last caller has gone.
+		loadCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+
+		l = &readLoad{done: make(chan struct{}), cancel: cancel}
+		c.loads[key] = l
+
+		go c.run(loadCtx, key, l, load)
+	}
+
+	l.waiters++
+
+	return l, !ok
+}
+
+func (c *readCache) run(ctx context.Context, key string, l *readLoad, load func(context.Context) (proto.Message, error)) {
+	defer l.cancel()
+
+	val, err := load(ctx)
+	if err == nil {
+		// Cached before the load is retired, so a caller arriving in between finds one or
+		// the other.
+		c.entries.Add(key, readCacheEntry{resp: val, expires: time.Now().Add(c.ttl)})
+	}
+
+	c.mu.Lock()
+	if c.loads[key] == l {
+		delete(c.loads, key)
+	}
+	c.mu.Unlock()
+
+	l.val, l.err = val, err
+	close(l.done)
+}
+
+// leave drops a caller that stopped waiting, and cancels the load when it was the last one.
+func (c *readCache) leave(key string, l *readLoad) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	l.waiters--
+	if l.waiters > 0 {
+		return
+	}
+
+	l.cancel()
+
+	// A caller arriving after this starts a fresh load instead of joining a cancelled one.
+	if c.loads[key] == l {
+		delete(c.loads, key)
 	}
 }
 
@@ -129,4 +208,62 @@ func (c *readCache) observe(method, result string) {
 	}
 
 	c.metrics.readCache.WithLabelValues(method, result).Inc()
+}
+
+// readCacheKey identifies a request by its message type and a digest of its deterministic
+// wire encoding, so any field that can change the answer changes the key. Every cached method
+// has its own request type, so two methods never share a key.
+//
+// A ListUnique request's fields are sorted and deduplicated first. The response has one slot
+// per field and the store skips repeats, so neither order nor repeats change the answer, and
+// left in they would let one question fill the cache under many keys.
+func readCacheKey(req proto.Message) (string, error) {
+	msg := req.ProtoReflect()
+
+	if fd := msg.Descriptor().Fields().ByName("fields"); fd != nil && fd.IsList() && fd.Kind() == protoreflect.EnumKind {
+		msg = proto.Clone(req).ProtoReflect()
+		list := msg.Mutable(fd).List()
+
+		values := make([]protoreflect.EnumNumber, 0, list.Len())
+		for idx := range list.Len() {
+			values = append(values, list.Get(idx).Enum())
+		}
+
+		slices.Sort(values)
+		values = slices.Compact(values)
+
+		list.Truncate(0)
+
+		for _, v := range values {
+			list.Append(protoreflect.ValueOfEnum(v))
+		}
+	}
+
+	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(msg.Interface())
+	if err != nil {
+		return "", err
+	}
+
+	sum := sha256.Sum256(raw)
+
+	return string(msg.Descriptor().FullName()) + "\x00" + string(sum[:]), nil
+}
+
+// readCacheMethod names the handler for the metrics. Each request type is named after its
+// method.
+func readCacheMethod(req proto.Message) string {
+	return strings.TrimSuffix(string(req.ProtoReflect().Descriptor().Name()), "Request")
+}
+
+func cloneAs[Resp proto.Message](msg proto.Message) (Resp, error) {
+	resp, ok := proto.Clone(msg).(Resp)
+	if !ok {
+		var zero Resp
+
+		// Unreachable while each request type is served by one handler: the key carries the
+		// request type, so a load only ever produces that handler's response type.
+		return zero, fmt.Errorf("read cache holds %T, not %T", msg, zero)
+	}
+
+	return resp, nil
 }

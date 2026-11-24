@@ -212,7 +212,44 @@ func (i *Indexer) Start(ctx context.Context) error {
 		i.log.WithField("index", legacyPermanentBlockIndex).Info("Dropped superseded permanent block index")
 	}
 
+	i.reportInvalidIndexes(ctx)
+
 	return nil
+}
+
+// reportInvalidIndexes logs every index Postgres has marked invalid. A CREATE INDEX
+// CONCURRENTLY that fails or is cancelled leaves its index behind, still listed under its
+// name, so AutoMigrate counts it as present and never rebuilds it while the planner ignores
+// it. Behind a loose-scanned field that turns each dropdown query into a full scan per
+// distinct value, slower than the DISTINCT it replaced. Rebuilding is left to an operator: an
+// index still being built concurrently is invalid too, and dropping that one would queue
+// every write to the table behind the build.
+func (i *Indexer) reportInvalidIndexes(ctx context.Context) {
+	if i.db.Name() != "postgres" {
+		return
+	}
+
+	var invalid []string
+
+	if err := i.db.WithContext(ctx).Raw(`
+		SELECT c.relname
+		FROM pg_index x
+		JOIN pg_class c ON c.oid = x.indexrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE NOT x.indisvalid AND n.nspname = current_schema()
+	`).Scan(&invalid).Error; err != nil {
+		i.log.WithError(err).Warn("Failed to check for invalid indexes")
+
+		return
+	}
+
+	for _, name := range invalid {
+		i.log.WithField("index", name).Error(
+			"Index is invalid: Postgres ignores it and AutoMigrate will not rebuild it. " +
+				"Unless a CREATE INDEX CONCURRENTLY is still building it, drop it with " +
+				"DROP INDEX CONCURRENTLY and create it again",
+		)
+	}
 }
 
 func (i *Indexer) Stop(ctx context.Context) error {
