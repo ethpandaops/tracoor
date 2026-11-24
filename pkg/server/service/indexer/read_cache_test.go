@@ -11,6 +11,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/ethpandaops/beacon/pkg/human"
 	"github.com/ethpandaops/tracoor/pkg/proto/tracoor/indexer"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -128,6 +129,28 @@ func TestReadCacheExpires(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestReadCacheFreesExpiredEntries(t *testing.T) {
+	c := newReadCache(20*time.Millisecond, 16, nil)
+
+	var calls atomic.Int64
+
+	req := &indexer.CountBeaconStateRequest{Network: "mainnet"}
+
+	_, err := cachedRead(context.Background(), c, req, countLoader(&calls, 1))
+	require.NoError(t, err)
+	require.Equal(t, 1, c.entries.Len())
+
+	time.Sleep(30 * time.Millisecond)
+
+	// The next miss drops the expired entry before loading, and a failed load leaves the
+	// key empty rather than holding the stale response.
+	_, err = cachedRead(context.Background(), c, req, func(context.Context, *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
+		return nil, errors.New("database unavailable")
+	})
+	require.Error(t, err)
+	require.Zero(t, c.entries.Len())
+}
+
 func TestReadCacheDoesNotCacheErrors(t *testing.T) {
 	c := newReadCache(time.Minute, 16, nil)
 
@@ -150,14 +173,16 @@ func TestReadCacheDoesNotCacheErrors(t *testing.T) {
 }
 
 func TestReadCacheSharesConcurrentLoads(t *testing.T) {
-	metrics := NewMetrics(metricsNamespace)
+	// A counter of its own: the registered metrics are process-wide.
+	metrics := &Metrics{readCache: prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "test_read_cache_requests_total",
+		Help: "Read cache requests seen by this test",
+	}, []string{labelMethod, labelResult})}
 	c := newReadCache(time.Minute, 16, metrics)
 
-	method := "CountBeaconState"
 	counter := func(result string) float64 {
-		return testutil.ToFloat64(metrics.readCache.WithLabelValues(method, result))
+		return testutil.ToFloat64(metrics.readCache.WithLabelValues("CountBeaconState", result))
 	}
-	missBefore, sharedBefore, hitBefore := counter(readCacheMiss), counter(readCacheShared), counter(readCacheHit)
 
 	var calls atomic.Int64
 
@@ -212,9 +237,9 @@ func TestReadCacheSharesConcurrentLoads(t *testing.T) {
 	require.NoError(t, err)
 
 	// One caller started the load, the rest shared it, and the last one hit the cache.
-	require.InDelta(t, 1, counter(readCacheMiss)-missBefore, 0)
-	require.InDelta(t, callers-1, counter(readCacheShared)-sharedBefore, 0)
-	require.InDelta(t, 1, counter(readCacheHit)-hitBefore, 0)
+	require.InDelta(t, 1, counter(readCacheMiss), 0)
+	require.InDelta(t, callers-1, counter(readCacheShared), 0)
+	require.InDelta(t, 1, counter(readCacheHit), 0)
 }
 
 func TestReadCacheCallerCancelKeepsSharedLoad(t *testing.T) {
@@ -281,13 +306,21 @@ func TestReadCacheLastCallerCancelAbortsLoad(t *testing.T) {
 	var calls atomic.Int64
 
 	aborted := make(chan struct{})
+	hold := make(chan struct{})
+	returned := make(chan struct{})
 
-	blocking := func(ctx context.Context, _ *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
+	// The cancelled load notices its cancellation, then takes a while to unwind, and finally
+	// reports success anyway, as a query whose last round trip finished just before the
+	// cancel would.
+	slowToUnwind := func(ctx context.Context, _ *indexer.CountBeaconStateRequest) (*indexer.CountBeaconStateResponse, error) {
+		defer close(returned)
+
 		calls.Add(1)
 		<-ctx.Done()
 		close(aborted)
+		<-hold
 
-		return nil, ctx.Err()
+		return &indexer.CountBeaconStateResponse{Count: wrapperspb.UInt64(1)}, nil
 	}
 
 	req := &indexer.CountBeaconStateRequest{Network: "mainnet"}
@@ -297,7 +330,7 @@ func TestReadCacheLastCallerCancelAbortsLoad(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		_, err := cachedRead(ctx, c, req, blocking)
+		_, err := cachedRead(ctx, c, req, slowToUnwind)
 		done <- err
 	}()
 
@@ -313,13 +346,52 @@ func TestReadCacheLastCallerCancelAbortsLoad(t *testing.T) {
 		t.Fatal("load kept running after its last caller left")
 	}
 
-	// The next caller starts a fresh load rather than joining the cancelled one.
+	// While the cancelled load is still unwinding, the next caller starts a fresh load rather
+	// than joining the cancelled one and inheriting its cancellation.
 	var fresh atomic.Int64
 
-	resp, err := cachedRead(context.Background(), c, req, countLoader(&fresh, 4))
-	require.NoError(t, err)
-	require.Equal(t, uint64(4), resp.GetCount().GetValue())
+	next := make(chan uint64, 1)
+
+	go func() {
+		resp, err := cachedRead(context.Background(), c, req, countLoader(&fresh, 4))
+		if err == nil {
+			next <- resp.GetCount().GetValue()
+		}
+
+		close(next)
+	}()
+
+	select {
+	case v := <-next:
+		require.Equal(t, uint64(4), v)
+	case <-time.After(time.Second):
+		t.Fatal("caller joined the cancelled load")
+	}
+
 	require.Equal(t, int64(1), fresh.Load())
+
+	// The cancelled load's late success must not replace the newer answer.
+	close(hold)
+	<-returned
+
+	require.Never(t, func() bool {
+		resp, err := cachedRead(context.Background(), c, req, countLoader(&fresh, 9))
+
+		return err != nil || resp.GetCount().GetValue() != 4
+	}, 100*time.Millisecond, 5*time.Millisecond)
+}
+
+func TestReadCacheDoneCallerStartsNoLoad(t *testing.T) {
+	c := newReadCache(time.Minute, 16, nil)
+
+	var calls atomic.Int64
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := cachedRead(ctx, c, &indexer.CountBeaconStateRequest{Network: "mainnet"}, countLoader(&calls, 1))
+	require.ErrorIs(t, err, context.Canceled)
+	require.Zero(t, calls.Load())
 }
 
 func TestReadCacheReturnsClones(t *testing.T) {

@@ -101,9 +101,23 @@ func cachedRead[Req, Resp proto.Message](
 		return cloneAs[Resp](cached)
 	}
 
-	l, started := c.join(ctx, key, func(loadCtx context.Context) (proto.Message, error) {
+	// A caller that has already gone must not start a load: it would leave at once, after the
+	// query had gone out.
+	if err := ctx.Err(); err != nil {
+		var zero Resp
+
+		return zero, err
+	}
+
+	l, started, cached := c.join(ctx, key, func(loadCtx context.Context) (proto.Message, error) {
 		return load(loadCtx, req)
 	})
+
+	if cached != nil {
+		c.observe(method, readCacheHit)
+
+		return cloneAs[Resp](cached)
+	}
 
 	if started {
 		c.observe(method, readCacheMiss)
@@ -133,8 +147,8 @@ func cachedRead[Req, Resp proto.Message](
 func (c *readCache) get(key string) (proto.Message, bool) {
 	entry, ok := c.entries.Get(key)
 	if !ok || time.Now().After(entry.expires) {
-		// An expired entry is left for the next load to overwrite: removing it here could
-		// race that load and drop the fresh one.
+		// join() removes an expired entry, under the lock every write to the cache takes;
+		// removing it here could drop a fresh one a load has just added.
 		return nil, false
 	}
 
@@ -142,10 +156,19 @@ func (c *readCache) get(key string) (proto.Message, bool) {
 }
 
 // join adds the caller to the load in flight for key, starting one if there is none, and
-// reports whether it started it.
-func (c *readCache) join(ctx context.Context, key string, load func(context.Context) (proto.Message, error)) (*readLoad, bool) {
+// reports whether it started it. A load that finished since the caller's own cache lookup has
+// already cached its answer, so that is checked again under the lock and returned instead.
+func (c *readCache) join(ctx context.Context, key string, load func(context.Context) (proto.Message, error)) (*readLoad, bool, proto.Message) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if cached, ok := c.get(key); ok {
+		return nil, false, cached
+	}
+
+	// Whatever is under key now has expired, if anything is, so it goes: a response held
+	// past its TTL is only memory.
+	c.entries.Remove(key)
 
 	l, ok := c.loads[key]
 	if !ok {
@@ -161,21 +184,23 @@ func (c *readCache) join(ctx context.Context, key string, load func(context.Cont
 
 	l.waiters++
 
-	return l, !ok
+	return l, !ok, nil
 }
 
 func (c *readCache) run(ctx context.Context, key string, l *readLoad, load func(context.Context) (proto.Message, error)) {
 	defer l.cancel()
 
 	val, err := load(ctx)
-	if err == nil {
-		// Cached before the load is retired, so a caller arriving in between finds one or
-		// the other.
-		c.entries.Add(key, readCacheEntry{resp: val, expires: time.Now().Add(c.ttl)})
-	}
 
+	// Caching and retiring the load happen under one lock, so a caller finds either this
+	// load or its answer. A load leave() already retired is not cached even if it succeeded:
+	// a newer load may have answered since, and this one must not overwrite it.
 	c.mu.Lock()
 	if c.loads[key] == l {
+		if err == nil {
+			c.entries.Add(key, readCacheEntry{resp: val, expires: time.Now().Add(c.ttl)})
+		}
+
 		delete(c.loads, key)
 	}
 	c.mu.Unlock()
