@@ -25,6 +25,14 @@ services:
     # It must exceed the longest fetch-plus-upload plus the agents' payload-lookup
     # cache TTL, so an agent mid-hash cannot link to a payload being deleted.
     blobGcGracePeriod: 10m
+    # Cache the filter-dropdown values and the counts the UI asks for on every page load.
+    # Identical concurrent requests share one database query. The ttl stays under the UI's
+    # 6s count refresh. Set disabled: true to turn it off (a ttl of 0 is replaced by the
+    # default).
+    readCache:
+      disabled: false
+      ttl: 5s
+      maxEntries: 4096
     # Keep at least one copy of an artifact for ever, copied to permanent/<network>/ before
     # the retention reaper removes the buffered one. Opt-in, per kind. From gloas on a
     # beacon block no longer carries its execution payload, so archiving blocks without

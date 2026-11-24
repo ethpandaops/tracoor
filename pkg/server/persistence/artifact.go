@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -449,20 +450,25 @@ type RootDisagreement struct {
 }
 
 // FindRootDisagreements reports slots within the recent window where the network did not agree
-// on a single root. The group rides the leading columns of the dedupe index.
+// on a single root. Both steps ride the leading (network, slot) columns of the dedupe index.
 func (i *Indexer) FindRootDisagreements(ctx context.Context, kind string, slotWindow int64) ([]*RootDisagreement, error) {
 	model, err := artifactModel(kind)
 	if err != nil {
 		return nil, err
 	}
 
-	var rootColumn string
+	var (
+		rootColumn string
+		table      distinctTable
+	)
 
 	switch kind {
 	case KindBeaconState:
-		rootColumn = KeyStateRoot
-	case KindBeaconBlock, KindExecutionPayloadEnvelope:
-		rootColumn = KeyBlockRoot
+		rootColumn, table = KeyStateRoot, beaconStateDistinct
+	case KindBeaconBlock:
+		rootColumn, table = KeyBlockRoot, beaconBlockDistinct
+	case KindExecutionPayloadEnvelope:
+		rootColumn, table = KeyBlockRoot, executionPayloadEnvelopeDistinct
 	default:
 		return nil, fmt.Errorf("kind %q has no root to disagree on", kind)
 	}
@@ -472,13 +478,32 @@ func (i *Indexer) FindRootDisagreements(ctx context.Context, kind string, slotWi
 		MaxSlot int64
 	}
 
-	var heads []networkHead
-
-	if err := i.db.WithContext(ctx).Model(model).
-		Select("network, MAX(slot) AS max_slot").
-		Group(KeyNetwork).
-		Scan(&heads).Error; err != nil {
+	// Each network's head is looked up on its own. A single MAX(slot) ... GROUP BY network
+	// cannot skip through the index, so it reads every row of the table on every pass, where
+	// a MAX within one network is a single seek to the end of that network's slots.
+	networks, err := i.distinctLooseScanValues(ctx, table.name, KeyNetwork, nil)
+	if err != nil {
 		return nil, err
+	}
+
+	heads := make([]networkHead, 0, len(networks))
+
+	for _, network := range distinctStrings(networks) {
+		var maxSlot sql.NullInt64
+
+		if err := i.db.WithContext(ctx).Model(model).
+			Select("MAX(slot)").
+			Where("network = ?", network).
+			Row().Scan(&maxSlot); err != nil {
+			return nil, err
+		}
+
+		if !maxSlot.Valid {
+			// Its last row went between the two queries.
+			continue
+		}
+
+		heads = append(heads, networkHead{Network: network, MaxSlot: maxSlot.Int64})
 	}
 
 	disagreements := make([]*RootDisagreement, 0)

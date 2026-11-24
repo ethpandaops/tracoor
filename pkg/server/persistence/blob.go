@@ -27,13 +27,16 @@ var ErrBlobNotFound = errors.New("blob not found")
 type Blob struct {
 	// The content-hash index carries kind and network ahead of the hash: retention resolves a
 	// trace's payload by hash within a (kind, network), and neither planner can combine those
-	// equalities with a hash-only index, so a narrower one degrades to a full scan.
-	Kind     string `gorm:"primaryKey;size:32;index:ix_blobs_kind_network_content_hash,priority:1"`
-	Network  string `gorm:"primaryKey;index:ix_blobs_kind_network_content_hash,priority:2"`
+	// equalities with a hash-only index, so a narrower one degrades to a full scan. The
+	// location index does the same for AgreementCountsByLocation, which every list request
+	// runs: without it the (kind, network) prefix of the content-hash index is the best match,
+	// and the query walks every blob of that kind to filter a page's worth of locations.
+	Kind     string `gorm:"primaryKey;size:32;index:ix_blobs_kind_network_content_hash,priority:1;index:ix_blobs_kind_network_location,priority:1"`
+	Network  string `gorm:"primaryKey;index:ix_blobs_kind_network_content_hash,priority:2;index:ix_blobs_kind_network_location,priority:2"`
 	DedupKey string `gorm:"primaryKey"`
 
 	ContentHash     string `gorm:"not null;default:'';size:64;index:ix_blobs_kind_network_content_hash,priority:3"`
-	Location        string `gorm:"not null;default:''"`
+	Location        string `gorm:"not null;default:'';index:ix_blobs_kind_network_location,priority:3"`
 	ContentEncoding string `gorm:"not null;default:''"`
 	RawSize         int64  `gorm:"not null;default:0"`
 	CompressedSize  int64  `gorm:"not null;default:0"`

@@ -8,14 +8,20 @@ import (
 )
 
 // expectedIndexes is the full index set each artifact table is allowed to carry: the dedupe
-// unique index, the three fetched_at orderings the list, filter and retention queries use, and
-// on beacon_blocks the (network, epoch) pair the promotion service walks.
+// unique index, the three fetched_at orderings the list, filter and retention queries use, on
+// beacon_blocks the (network, epoch) pair the promotion service walks, and on the high-volume
+// tables the (network, <field>) pairs the filter dropdowns loose-scan and the UI's list
+// filters and sorts seek on.
 var expectedIndexes = map[string][]string{
 	"beacon_states": {
 		"ux_beacon_states_dedupe",
 		"ix_beacon_states_network_node_fetched_at",
 		"ix_beacon_states_network_fetched_at",
 		"ix_beacon_states_fetched_at",
+		"ix_beacon_states_network_node_version",
+		"ix_beacon_states_network_beacon_implementation",
+		"ix_beacon_states_network_epoch",
+		"ix_beacon_states_network_state_root",
 	},
 	"beacon_blocks": {
 		"ux_beacon_blocks_dedupe",
@@ -23,12 +29,19 @@ var expectedIndexes = map[string][]string{
 		"ix_beacon_blocks_network_fetched_at",
 		"ix_beacon_blocks_fetched_at",
 		"ix_beacon_blocks_network_epoch",
+		"ix_beacon_blocks_network_node_version",
+		"ix_beacon_blocks_network_beacon_implementation",
+		"ix_beacon_blocks_network_block_root",
 	},
 	"execution_payload_envelopes": {
 		"ux_execution_payload_envelopes_dedupe",
 		"ix_execution_payload_envelopes_network_node_fetched_at",
 		"ix_execution_payload_envelopes_network_fetched_at",
 		"ix_execution_payload_envelopes_fetched_at",
+		"ix_execution_payload_envelopes_network_node_version",
+		"ix_execution_payload_envelopes_network_beacon_implementation",
+		"ix_execution_payload_envelopes_network_epoch",
+		"ix_execution_payload_envelopes_network_block_root",
 	},
 	"beacon_bad_blocks": {
 		"ux_beacon_bad_blocks_dedupe",
@@ -47,6 +60,9 @@ var expectedIndexes = map[string][]string{
 		"ix_execution_block_traces_network_node_fetched_at",
 		"ix_execution_block_traces_network_fetched_at",
 		"ix_execution_block_traces_fetched_at",
+		"ix_execution_block_traces_network_node_version",
+		"ix_execution_block_traces_network_execution_implementation",
+		"ix_execution_block_traces_network_block_number",
 	},
 	"execution_bad_blocks": {
 		"ux_execution_bad_blocks_dedupe",
@@ -57,6 +73,7 @@ var expectedIndexes = map[string][]string{
 	"blobs": {
 		"ix_blobs_kind_network_content_hash",
 		"ix_blobs_state_created_at",
+		"ix_blobs_kind_network_location",
 	},
 	"payload_divergences": {
 		"ix_payload_divergences_observed_at",
