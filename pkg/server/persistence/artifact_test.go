@@ -400,6 +400,49 @@ func TestFindRootDisagreements(t *testing.T) {
 	require.Equal(t, map[int64]int64{100: 2}, found)
 }
 
+// Each network's window is measured back from that network's own head, not the table's.
+func TestFindRootDisagreementsPerNetworkHead(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	ahead := generateRandomString(6)
+	behind := generateRandomString(6)
+	now := time.Now()
+
+	insert := func(network string, slot int64, root, node, key string) {
+		require.NoError(t, indexer.InsertBeaconState(ctx, newTestState(network, slot, root, node, key, "", now)))
+	}
+
+	// ahead's head is 1000: its slot-990 split is in the window, its slot-500 split is not.
+	insert(ahead, 1000, "root-h", "node-a", "a1")
+	insert(ahead, 990, "root-x", "node-a", "a2")
+	insert(ahead, 990, "root-y", "node-b", "a3")
+	insert(ahead, 500, "root-x", "node-a", "a4")
+	insert(ahead, 500, "root-y", "node-b", "a5")
+
+	// behind's head is 100, far below ahead's window, and its slot-50 split must still count.
+	insert(behind, 100, "root-h", "node-a", "b1")
+	insert(behind, 50, "root-x", "node-a", "b2")
+	insert(behind, 50, "root-y", "node-b", "b3")
+
+	disagreements, err := indexer.FindRootDisagreements(ctx, KindBeaconState, 64)
+	require.NoError(t, err)
+
+	found := make(map[string]map[int64]int64)
+
+	for _, d := range disagreements {
+		if found[d.Network] == nil {
+			found[d.Network] = make(map[int64]int64)
+		}
+
+		found[d.Network][d.Slot] = d.Roots
+	}
+
+	require.Equal(t, map[int64]int64{990: 2}, found[ahead])
+	require.Equal(t, map[int64]int64{50: 2}, found[behind])
+}
+
 // The retention cutoff is built from the process clock, so it carries whatever zone the host
 // is configured for, while every stored timestamp is UTC. SQLite's driver renders a time.Time
 // as text carrying that value's own offset and compares those strings byte for byte, so a
