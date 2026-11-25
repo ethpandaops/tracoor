@@ -48,8 +48,16 @@ type Blob struct {
 	State      string `gorm:"not null;default:'ready';size:16;index:ix_blobs_state_created_at,priority:1"`
 	Generation int64  `gorm:"not null;default:0"`
 
-	CreatedAt time.Time `gorm:"not null;index:ix_blobs_state_created_at,priority:2"`
+	// The unreferenced index holds only blobs no artifact points at, which is what the
+	// collector's candidate scan asks for on every retention pass. Nearly every blob is
+	// referenced, so (state, created_at) leaves that scan walking the whole table to find
+	// none. The partial predicate must stay identical to the one ListCollectableBlobs filters
+	// on, or the planner cannot use it. It costs ref_count updates their in-place (HOT) path.
+	CreatedAt time.Time `gorm:"not null;index:ix_blobs_state_created_at,priority:2;index:ix_blobs_unreferenced_created_at,where:ref_count <= 0"`
 }
+
+// blobUnreferencedIndex is the partial index the collector's candidate scan reads.
+const blobUnreferencedIndex = "ix_blobs_unreferenced_created_at"
 
 // BeforeSave keeps created_at in UTC, which is what the collector's grace-period cutoff is
 // compared against.
@@ -102,7 +110,18 @@ const (
 func (i *Indexer) ListCollectableBlobs(ctx context.Context, createdBefore time.Time, limit, offset int) ([]*BlobCandidate, error) {
 	var candidates []*BlobCandidate
 
-	query := i.db.WithContext(ctx).Model(&Blob{}).
+	if err := collectableBlobsQuery(i.db.WithContext(ctx), createdBefore, limit, offset).Scan(&candidates).Error; err != nil {
+		return nil, err
+	}
+
+	return candidates, nil
+}
+
+// collectableBlobsQuery is the candidate scan. Its ref_count predicate is the partial
+// predicate of ix_blobs_unreferenced_created_at, written the same way so the planner can
+// match the two.
+func collectableBlobsQuery(db *gorm.DB, createdBefore time.Time, limit, offset int) *gorm.DB {
+	query := db.Model(&Blob{}).
 		Select("kind, network, dedup_key, location, generation, state").
 		Where("state IN ? AND ref_count <= 0 AND created_at < ?",
 			[]string{BlobStateReady, BlobStateDeleting}, utcBound(createdBefore)).
@@ -113,11 +132,7 @@ func (i *Indexer) ListCollectableBlobs(ctx context.Context, createdBefore time.T
 		query = query.Offset(offset)
 	}
 
-	if err := query.Scan(&candidates).Error; err != nil {
-		return nil, err
-	}
-
-	return candidates, nil
+	return query
 }
 
 // TombstoneBlob moves a candidate to the deleting state after confirming against the artifact

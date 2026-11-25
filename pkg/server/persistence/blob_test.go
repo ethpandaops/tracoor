@@ -2,11 +2,14 @@ package persistence
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestBlobInsertAndGet(t *testing.T) {
@@ -137,4 +140,71 @@ func TestListCollectableBlobsOffersTombstonedBlobs(t *testing.T) {
 	require.Len(t, candidates, 1, "a tombstoned blob is offered again so its object delete can be retried")
 	assert.Equal(t, BlobStateDeleting, candidates[0].State)
 	assert.Equal(t, blob.Generation, candidates[0].Generation, "the generation guard carries through the retry")
+}
+
+// The candidate scan runs on every retention pass and nearly every blob is referenced, so it
+// must read the partial index of unreferenced blobs rather than walk the table. A predicate
+// that drifts from the index's own makes the planner unable to use it, which only shows in
+// the plan.
+func TestListCollectableBlobsReadsTheUnreferencedIndex(t *testing.T) {
+	indexer, _, err := NewMockIndexer()
+	require.NoError(t, err)
+
+	var ddl string
+
+	require.NoError(t, indexer.db.Raw(
+		"SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?", blobUnreferencedIndex,
+	).Scan(&ddl).Error)
+	assert.Contains(t, ddl, "WHERE ref_count <= 0")
+
+	// The shape of a live table: every blob referenced but a couple, with statistics, which is
+	// what the planner decides on.
+	ctx := context.Background()
+
+	for idx := range 2000 {
+		refs := int64(1)
+		if idx%1000 == 999 {
+			refs = 0
+		}
+
+		_, err = indexer.InsertBlob(ctx, &Blob{
+			Kind:        "beacon_state",
+			Network:     "mainnet",
+			DedupKey:    fmt.Sprintf("%d/0xaaaa", idx),
+			ContentHash: generateRandomString(64),
+			Location:    fmt.Sprintf("states/%d", idx),
+			RefCount:    refs,
+			CreatedAt:   time.Now().UTC().Add(-time.Duration(2000-idx) * time.Minute),
+		})
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, indexer.db.Exec("ANALYZE").Error)
+
+	candidates, err := indexer.ListCollectableBlobs(ctx, time.Now().UTC(), 100, 0)
+	require.NoError(t, err)
+	require.Len(t, candidates, 2)
+
+	for _, offset := range []int{0, 100} {
+		stmt := collectableBlobsQuery(indexer.db.Session(&gorm.Session{DryRun: true}), time.Now(), 100, offset).
+			Scan(&[]*BlobCandidate{}).Statement
+
+		var plan []struct {
+			ID      int
+			Parent  int
+			Notused int
+			Detail  string
+		}
+
+		require.NoError(t, indexer.db.Raw("EXPLAIN QUERY PLAN "+stmt.SQL.String(), stmt.Vars...).Scan(&plan).Error)
+
+		details := make([]string, 0, len(plan))
+		for _, step := range plan {
+			details = append(details, step.Detail)
+		}
+
+		joined := strings.Join(details, "; ")
+		assert.Contains(t, joined, blobUnreferencedIndex, "offset %d: %s", offset, joined)
+		assert.NotContains(t, joined, "TEMP B-TREE", "offset %d sorts instead of reading the index in order: %s", offset, joined)
+	}
 }
