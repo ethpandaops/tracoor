@@ -74,6 +74,7 @@ var expectedIndexes = map[string][]string{
 		"ix_blobs_kind_network_content_hash",
 		"ix_blobs_state_created_at",
 		"ix_blobs_kind_network_location",
+		"ix_blobs_unreferenced_created_at",
 	},
 	"payload_divergences": {
 		"ix_payload_divergences_observed_at",
