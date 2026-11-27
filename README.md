@@ -144,7 +144,7 @@ persistence:
 - `${VAR:-default}` uses `default` when `VAR` is unset or empty. `${VAR:-}` makes the variable optional.
 - Only the `${...}` form is expanded: `$VAR` and any other `$` are kept as written.
 - Placeholders are expanded in values only, after the YAML is parsed. Keys and comments are never expanded, and a value containing quotes, `#`, tabs or newlines arrives exactly as set.
-- An unquoted placeholder takes the type of its value, so `port: ${PORT}` can fill a number. A quoted placeholder is always a string.
+- An unquoted placeholder takes the type of its value, so `port: ${PORT}` can fill a number. A value that would read as null, such as `null` or `~`, stays a string. A quoted placeholder is always a string.
 
 ## Getting Started
 
