@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/creasty/defaults"
 	"github.com/ethpandaops/tracoor/pkg/single"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -72,14 +69,9 @@ func loadSingleConfigFromFile(file string) (*single.Config, error) {
 		return nil, err
 	}
 
-	yamlFile, err := os.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
 	type plain single.Config
 
-	if err := yaml.Unmarshal(yamlFile, (*plain)(config)); err != nil {
+	if err := loadConfigFile(file, (*plain)(config)); err != nil {
 		return nil, err
 	}
 
