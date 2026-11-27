@@ -131,6 +131,21 @@ Flags:
   -h, --help            help for agent
 ```
 
+### Environment variables in config
+
+The server, agent and single config files can reference environment variables, so credentials can be kept out of the file:
+
+```yaml
+persistence:
+  dsn: "postgres://user:${DB_PASSWORD}@postgres:5432/tracoor?sslmode=disable"
+```
+
+- `${VAR}` is replaced with the value of `VAR`. If `VAR` is unset or empty, tracoor refuses to start and names the variable.
+- `${VAR:-default}` uses `default` when `VAR` is unset or empty. `${VAR:-}` makes the variable optional.
+- Only the `${...}` form is expanded: `$VAR` and any other `$` are kept as written.
+- Placeholders are expanded in values only, after the YAML is parsed. Keys and comments are never expanded, and a value containing quotes, `#`, tabs or newlines arrives exactly as set.
+- An unquoted placeholder takes the type of its value, so `port: ${PORT}` can fill a number. A quoted placeholder is always a string.
+
 ## Getting Started
 
 ### Download a release
